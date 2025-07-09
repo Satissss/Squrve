@@ -1,0 +1,11 @@
+# [Question]: Which university faculty members' salaries are closest to the average salary for their respective ranks? Please provide the ranks, first names, last names, and salaries.university
+# [Schema links]: [university_faculty.FacRank, university_faculty.FacFirstName, university_faculty.FacLastName, university_faculty.FacSalary]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `FacRank`, `FacFirstName`, `FacLastName`, `FacSalary` from the `university_faculty` table.
+2. Calculate the average salary for each faculty rank using a Common Table Expression (CTE) named `AvgSalaries`.
+3. Join the `university_faculty` table with `AvgSalaries` on `FacRank` to align each faculty member's salary with their rank's average.
+4. Compute the absolute difference between each faculty member's salary and their rank's average salary.
+5. For each rank, determine the minimum absolute difference between any faculty member's salary and the rank's average salary.
+6. Select faculty members where their absolute salary difference matches the minimum difference for their respective rank.
+7. Structure the final query to return the required columns: rank, first name, last name, and salary.
+# [Sql]: WITH AvgSalaries AS (SELECT FacRank, avg(FacSalary) AS AvgSalary FROM university_faculty GROUP BY FacRank) SELECT T1.FacRank, T1.FacFirstName, T1.FacLastName, T1.FacSalary FROM university_faculty AS T1 JOIN AvgSalaries AS T2 ON T1.FacRank = T2.FacRank WHERE abs(T1.FacSalary - T2.AvgSalary) = (     SELECT min(abs(T3.FacSalary - T4.AvgSalary))     FROM university_faculty AS T3     JOIN AvgSalaries AS T4 ON T3.FacRank = T4.FacRank     WHERE T3.FacRank = T1.FacRank )

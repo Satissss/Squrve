@@ -1,0 +1,13 @@
+# [Question]: Can you provide a breakdown of the total number of articles into different categories and the percentage of those articles that mention "education" within each category from the BBC News?
+# [Schema links]: ["fulltext.category", "fulltext.body"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `fulltext` (category, body) from `bigquery-public-data.bbc_news`.
+2. Select `category` to group results by each news category.
+3. Calculate the total number of articles per category using `COUNT(*) AS total_articles`.
+4. Use a conditional `COUNT(CASE WHEN LOWER(body) LIKE '%education%' THEN 1 END)` to count articles mentioning "education".
+5. Compute the percentage by dividing education_articles by total_articles, multiplying by 100, and rounding to two decimal places.
+6. Construct the `SELECT` clause with category, total_articles, education_articles, and percentage_education.
+7. Specify the table `bigquery-public-data.bbc_news.fulltext` in the `FROM` clause.
+8. Group results by `category` to aggregate per category.
+9. Order the final output by `category` alphabetically.
+# [Sql]: SELECT   category,   COUNT(*) AS total_articles,   COUNT(CASE WHEN LOWER(body) LIKE '%education%' THEN 1 END) AS education_articles,   ROUND(     COUNT(CASE WHEN LOWER(body) LIKE '%education%' THEN 1 END) * 100.0 / COUNT(*),     2   ) AS percentage_education FROM   bigquery-public-data.bbc_news.fulltext GROUP BY   category ORDER BY   category;

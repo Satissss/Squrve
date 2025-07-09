@@ -1,0 +1,15 @@
+# [Question]: What was the percentage change in post-market close prices for the Magnificent 7 tech companies from January 1 to June 30, 2024?
+# [Schema links]: [cybersyn.stock_price_timeseries.ticker, cybersyn.stock_price_timeseries.date, cybersyn.stock_price_timeseries.value, cybersyn.stock_price_timeseries.variable_name]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `stock_price_timeseries` (ticker, date, value, variable_name).
+2. Filter rows where `variable_name` is 'Post-Market Close', `date` is between 2024-01-01 and 2024-06-30, and `ticker` is one of the Magnificent 7 tech companies.
+3. For each ticker, calculate the earliest date in the period using `MIN(date) OVER (PARTITION BY ticker)`.
+4. For each ticker, capture the starting price as the first `value` on the earliest date using `FIRST_VALUE(value) OVER (PARTITION BY ticker ORDER BY date ASC)`.
+5. For each ticker, capture the latest date in the period using `MAX(date) OVER (PARTITION BY ticker)`.
+6. For each ticker, capture the ending price as the last `value` on the latest date using `LAST_VALUE(value) OVER (PARTITION BY ticker ORDER BY date ASC)`.
+7. Create a CTE `ytd_performance` to store the ticker, start_of_year_price, latest_price, and associated dates.
+8. Calculate the percentage change using the formula `((latest_price - start_of_year_price)/start_of_year_price)*100`.
+9. Select `ticker` and the calculated `percentage_change_ytd` from the CTE.
+10. Group results by `ticker` and all non-aggregated columns to avoid ambiguity.
+11. Order the final results by `percentage_change_ytd` in descending order.
+# [Sql]: WITH ytd_performance AS (   SELECT      ticker,     MIN(date) OVER (PARTITION BY ticker) AS start_of_year_date,     FIRST_VALUE(value) OVER (PARTITION BY ticker ORDER BY date ASC) AS start_of_year_price,     MAX(date) OVER (PARTITION BY ticker) AS latest_date,     LAST_VALUE(value) OVER (PARTITION BY ticker ORDER BY date ASC) AS latest_price   FROM FINANCE__ECONOMICS.CYBERSYN.STOCK_PRICE_TIMESERIES   WHERE      ticker IN ('AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'TSLA', 'NVDA')     AND date BETWEEN DATE '2024-01-01' AND DATE '2024-06-30'     AND variable_name = 'Post-Market Close' ) SELECT    ticker,   (latest_price - start_of_year_price) / start_of_year_price * 100 AS percentage_change_ytd FROM    ytd_performance GROUP BY    ticker, start_of_year_date, start_of_year_price, latest_date, latest_price ORDER BY    percentage_change_ytd DESC;

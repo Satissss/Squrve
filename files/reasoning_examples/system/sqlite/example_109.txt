@@ -1,0 +1,11 @@
+# [Question]: For weekly-sales data, I need an analysis of our sales performance around mid-June for the years 2018, 2019, and 2020. Specifically, calculate the percentage change in sales between the four weeks leading up to June 15 and the four weeks following June 15 for each year.
+# [Schema links]: [cleaned_weekly_sales.calendar_year, cleaned_weekly_sales.week_date, cleaned_weekly_sales.sales]
+# [Analysis]: Let’s think step by step.
+1. Identify the required years (2018, 2019, 2020) from the `calendar_year` column in the `cleaned_weekly_sales` table.
+2. Determine the date ranges: "four weeks leading up to June 15" corresponds to May 18 to June 14, and "four weeks following June 15" corresponds to June 15 to July 12 for each year.
+3. Calculate total sales for both periods using `SUM` with `CASE` statements to conditionally sum sales based on the date ranges.
+4. Create a Common Table Expression (CTE) named `sales_before_after` to store annual sales_before and sales_after values.
+5. Compute the percentage change using the formula `((sales_after - sales_before) / sales_before) * 100` in the final SELECT statement.
+6. Group results by `calendar_year` to aggregate sales for each year.
+7. Filter the data to include only the specified years using `WHERE calendar_year IN (2018, 2019, 2020)`.
+# [Sql]: WITH sales_before_after AS (     SELECT         calendar_year,         SUM(CASE WHEN date(week_date) >= date(printf('%d-05-18', calendar_year)) AND date(week_date) <= date(printf('%d-06-14', calendar_year)) THEN sales ELSE 0 END) AS sales_before,         SUM(CASE WHEN date(week_date) >= date(printf('%d-06-15', calendar_year)) AND date(week_date) <= date(printf('%d-07-12', calendar_year)) THEN sales ELSE 0 END) AS sales_after     FROM         cleaned_weekly_sales     WHERE         calendar_year IN (2018, 2019, 2020)     GROUP BY         calendar_year ) SELECT     calendar_year,     (sales_after - sales_before) * 100.0 / sales_before AS percentage_change FROM     sales_before_after;

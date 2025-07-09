@@ -1,0 +1,11 @@
+# [Question]: Can you identify the year and month with the highest rental orders created by the store's staff for each store? Please list the store ID, the year, the month, and the total rentals for those dates.
+# [Schema links]: ["rental.staff_id", "rental.rental_date", "rental.rental_id", "staff.staff_id", "staff.store_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `rental` (staff_id, rental_date, rental_id) and `staff` (staff_id, store_id).
+2. Join the `rental` and `staff` tables on `staff_id` to associate rentals with their corresponding store.
+3. Extract the year and month from `rental_date` using `strftime` and group rental counts by store_id, year, and month.
+4. Create a CTE `rental_counts` to store aggregated results of total rentals per store per month.
+5. Create another CTE `max_rentals` to determine the maximum total_rentals for each store from `rental_counts`.
+6. Join `rental_counts` with `max_rentals` on store_id and matching total_rentals to filter rows with maximum rentals.
+7. Select the required columns (store_id, year, month, total_rentals) from the joined result and order by store_id and date.
+# [Sql]: WITH rental_counts AS (     SELECT         s.store_id,         strftime('%Y', r.rental_date) AS rental_year,         strftime('%m', r.rental_date) AS rental_month,         COUNT(r.rental_id) AS total_rentals     FROM         rental r     JOIN         staff s ON r.staff_id = s.staff_id     WHERE         r.rental_date IS NOT NULL     GROUP BY         s.store_id,         rental_year,         rental_month ), max_rentals AS (     SELECT         store_id,         MAX(total_rentals) AS max_rentals     FROM         rental_counts     GROUP BY         store_id ) SELECT     rc.store_id AS store_id,     rc.rental_year AS year,     rc.rental_month AS month,     rc.total_rentals AS total_rentals FROM     rental_counts rc JOIN     max_rentals mr ON rc.store_id = mr.store_id AND rc.total_rentals = mr.max_rentals ORDER BY     rc.store_id,     rc.rental_year,     rc.rental_month

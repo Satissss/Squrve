@@ -1,0 +1,12 @@
+# [Question]: In the dicom_pivot table, how many unique StudyInstanceUID values exactly match the SegmentedPropertyTypeCodeSequence of "15825003" (case-insensitive) and also have a collection_id of either "Community" or "nsclc_radiomics"?
+# [Schema links]: ["IDC_V17.DICOM_PIVOT.StudyInstanceUID"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `IDC_V17.DICOM_PIVOT` with columns `StudyInstanceUID`, `SegmentedPropertyTypeCodeSequence`, and `collection_id`.
+2. Filter rows where `SegmentedPropertyTypeCodeSequence` matches '15825003' case-insensitively using `LOWER()`.
+3. Group the filtered rows by `StudyInstanceUID` to get unique values for the first condition.
+4. Filter rows where `collection_id` is either 'Community' or 'nsclc_radiomics'.
+5. Group the filtered rows by `StudyInstanceUID` to get unique values for the second condition.
+6. Use `INTERSECT` to find `StudyInstanceUID` values common to both grouped result sets.
+7. Count the number of unique `StudyInstanceUID` values from the intersected result using `COUNT(*)`.
+8. Construct the final SQL by nesting subqueries to apply the conditions and aggregation.
+# [Sql]: SELECT   COUNT(*) AS "total_count" FROM   IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot" WHERE   "StudyInstanceUID" IN (     SELECT       "StudyInstanceUID"     FROM       IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"     WHERE       "StudyInstanceUID" IN (         SELECT           "StudyInstanceUID"         FROM           IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"         WHERE           LOWER("dicom_pivot"."SegmentedPropertyTypeCodeSequence") LIKE LOWER('15825003')         GROUP BY           "StudyInstanceUID"         INTERSECT         SELECT           "StudyInstanceUID"         FROM           IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"         WHERE           "dicom_pivot"."collection_id" IN ('Community', 'nsclc_radiomics')         GROUP BY           "StudyInstanceUID"       )     GROUP BY       "StudyInstanceUID"   );

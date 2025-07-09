@@ -1,0 +1,9 @@
+# [Question]: How many US B2 patents granted between 2008 and 2018 contain claims that do not include the word 'claim'?
+# [Schema links]: ["PUBLICATIONS.publication_number", "PUBLICATIONS.country_code", "PUBLICATIONS.kind_code", "PUBLICATIONS.grant_date", "PUBLICATIONS.claims_localized"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required columns: `publication_number` for counting, `country_code`, `kind_code`, `grant_date`, and `claims_localized` from the `PUBLICATIONS` table.
+2. Filter patents by `country_code = 'US'`, `kind_code = 'B2'`, and `grant_date` between 20080101 and 20181231.
+3. Process the `claims_localized` array to check each claim's text using `CROSS JOIN LATERAL FLATTEN` to expand the array into individual rows.
+4. Add a condition to exclude claims containing the word 'claim' using `claim.value:"text" NOT LIKE '%claim%'`.
+5. Count distinct `publication_number` to avoid duplicates and ensure each patent is counted once if any qualifying claim exists.
+# [Sql]: SELECT COUNT(DISTINCT p."publication_number")  FROM PATENTS.PATENTS.PUBLICATIONS p  CROSS JOIN LATERAL FLATTEN(input => p."claims_localized") AS claim  WHERE p."country_code" = 'US'    AND p."kind_code" = 'B2'    AND p."grant_date" BETWEEN 20080101 AND 20181231    AND claim.value:"text" NOT LIKE '%claim%';

@@ -1,0 +1,12 @@
+# [Question]: Assuming today is April 1, 2024, I would like to know the daily snowfall amounts greater than 6 inches for each U.S. postal code during the week ending after the first two full weeks of the previous year. Show the postal code, date, and snowfall amount.
+# [Schema links]: ["standard_tile.history_day.country", "standard_tile.history_day.postal_code", "standard_tile.history_day.tot_snowfall_in"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `country`, `postal_code`, `date_valid_std`, and `tot_snowfall_in` from the `history_day` table.
+2. Calculate the reference timestamp as the start of the previous year using `DATE_TRUNC` and `DATEADD`.
+3. Determine the end date of the week two weeks into the previous year, adjusted for ISO week alignment.
+4. Generate all seven days of the target week by calculating dates relative to the end date using a subquery with `ROW_NUMBER()`.
+5. Create a Common Table Expression (CTE) named `timestamps` to store the generated dates for the target week.
+6. Join the `history_day` table with the `timestamps` CTE on `date_valid_std` to filter records to the target week.
+7. Filter the joined results to include only U.S. postal codes (`country = 'US'`) and snowfall amounts exceeding 6 inches (`tot_snowfall_in > 6.0`).
+8. Select the required columns (`country`, `postal_code`, `date_valid_std`, `tot_snowfall_in`) and order the results by `postal_code` and `date_valid_std`.
+# [Sql]: WITH timestamps AS (        SELECT         DATE_TRUNC(year,DATEADD(year,-1,DATE '2024-08-29')) AS ref_timestamp,         LAST_DAY(DATEADD(week,2 + CAST(WEEKISO(ref_timestamp) != 1 AS INTEGER),ref_timestamp),week) AS end_week,         DATEADD(day, day_num - 7, end_week) AS date_valid_std     FROM     (            SELECT             ROW_NUMBER() OVER (ORDER BY SEQ1()) AS day_num         FROM             TABLE(GENERATOR(rowcount => 7))     )  ) SELECT     country,     postal_code,     date_valid_std,     tot_snowfall_in  FROM      GLOBAL_WEATHER__CLIMATE_DATA_FOR_BI.standard_tile.history_day NATURAL INNER JOIN     timestamps WHERE     country='US' AND     tot_snowfall_in > 6.0  ORDER BY      postal_code,date_valid_std ;

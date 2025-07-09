@@ -1,0 +1,14 @@
+# [Question]: Please help me find the film category with the highest total rental hours in cities where the city's name either starts with "A" or contains a hyphen. 
+# [Schema links]: [sales.region_id, film.length, city.city, customer_list.city, customer_list.ID, rental.customer_id, rental.inventory_id, inventory.inventory_id, inventory.film_id, film.film_id, film_category.film_id, film_category.category_id, category.category_id]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables: `city`, `customer_list`, `rental`, `inventory`, `film`, `film_category`, and `category` to link cities to film categories via rentals.
+2. Filter cities where `city` starts with 'A' or contains a hyphen using `WHERE city LIKE 'A%' OR city LIKE '%-%'`.
+3. Join `city` to `customer_list` on matching `city` to connect city data with customers.
+4. Join `customer_list` to `rental` using `customer_list.ID = rental.customer_id` to link customers to their rentals.
+5. Join `rental` to `inventory` on `rental.inventory_id = inventory.inventory_id` to access film information.
+6. Join `inventory` to `film` on `inventory.film_id = film.film_id` to retrieve film details including `length`.
+7. Join `film` to `film_category` on `film.film_id = film_category.film_id` to connect films to their categories.
+8. Join `film_category` to `category` on `film_category.category_id = category.category_id` to get category names.
+9. Calculate total rental hours per category by summing `film.length` grouped by `category.name`.
+10. Order the results by `total_rental_hours` in descending order and limit to the top result.
+# [Sql]: SELECT      T7.name AS category_name,      SUM(T5.length) AS total_rental_hours  FROM      city AS T1  JOIN      customer_list AS T2 ON T1.city = T2.city  JOIN      rental AS T3 ON T2.ID = T3.customer_id  JOIN      inventory AS T4 ON T3.inventory_id = T4.inventory_id  JOIN      film AS T5 ON T4.film_id = T5.film_id  JOIN      film_category AS T6 ON T5.film_id = T6.film_id  JOIN      category AS T7 ON T6.category_id = T7.category_id  WHERE      T1.city LIKE 'A%' OR T1.city LIKE '%-%'  GROUP BY      T7.name  ORDER BY      total_rental_hours DESC  LIMIT 1;

@@ -1,0 +1,13 @@
+# [Question]: Which target approved symbol has the overall association score closest to the mean score for psoriasis?
+# [Schema links]: [platform.associationByOverallDirect.score, platform.targets.approvedSymbol, platform.associationByOverallDirect.diseaseId, platform.diseases.id, platform.associationByOverallDirect.targetId, platform.targets.id, platform.diseases.name]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `associationByOverallDirect` (score, diseaseId, targetId), `diseases` (id, name), and `targets` (approvedSymbol, id).
+2. Calculate the average association score for psoriasis by joining `associationByOverallDirect` with `diseases` on `diseaseId = id` where `diseases.name = 'psoriasis'`.
+3. Create a Common Table Expression (CTE) named `AvgScore` to store the calculated average score.
+4. Join `associationByOverallDirect` with `diseases` and `targets` tables to link scores with their corresponding target approved symbols and disease name.
+5. Cross join the main query with the `AvgScore` CTE to access the average score in calculations.
+6. Filter records where `diseases.name = 'psoriasis'` to ensure relevance to the disease.
+7. Compute the absolute difference between each association score and the average score using `ABS(associations.score - AvgScore.avg_score)`.
+8. Order the results by the computed absolute difference in ascending order to find the closest match.
+9. Limit the result to the top record to get the target with the closest score to the mean.
+# [Sql]: WITH AvgScore AS (   SELECT     AVG(associations.score) AS avg_score   FROM     `open-targets-prod.platform.associationByOverallDirect` AS associations   JOIN     `open-targets-prod.platform.diseases` AS diseases   ON     associations.diseaseId = diseases.id   WHERE     diseases.name = 'psoriasis' ) SELECT   targets.approvedSymbol AS target_approved_symbol FROM   `open-targets-prod.platform.associationByOverallDirect` AS associations JOIN   `open-targets-prod.platform.diseases` AS diseases ON   associations.diseaseId = diseases.id JOIN   `open-targets-prod.platform.targets` AS targets ON   associations.targetId = targets.id CROSS JOIN   AvgScore WHERE   diseases.name = 'psoriasis' ORDER BY   ABS(associations.score - AvgScore.avg_score) ASC LIMIT 1

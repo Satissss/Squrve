@@ -1,0 +1,12 @@
+# [Question]: Can you provide a list of hardware product segments along with their unique product counts for 2020 in the output, ordered by the highest percentage increase in unique fact sales products from 2020 to 2021?
+# [Schema links]: ["hardware_fact_sales_monthly.product_code", "hardware_fact_sales_monthly.fiscal_year", "hardware_dim_product.segment", "hardware_dim_product.product_code"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `hardware_fact_sales_monthly` (product_code, fiscal_year) and `hardware_dim_product` (segment, product_code).
+2. Join `hardware_fact_sales_monthly` (alias s) and `hardware_dim_product` (alias p) on `product_code` to link sales data with product segments.
+3. Filter records where `fiscal_year` is 2020 or 2021 using `WHERE s.fiscal_year IN (2020, 2021)`.
+4. For each segment, calculate the distinct product count in 2020 using `COUNT(DISTINCT CASE WHEN s.fiscal_year = 2020 THEN s.product_code END)`.
+5. Similarly, calculate the distinct product count in 2021 using `COUNT(DISTINCT CASE WHEN s.fiscal_year = 2021 THEN s.product_code END)`.
+6. Compute the percentage increase using the formula: `((2021_count - 2020_count) * 100.0 / 2020_count)`.
+7. Group results by `p.segment` to aggregate counts per segment.
+8. Order the final output by `percentage_increase` in descending order to prioritize highest increases.
+# [Sql]: SELECT      p.segment,     COUNT(DISTINCT CASE WHEN s.fiscal_year = 2020 THEN s.product_code END) AS unique_product_count_2020,     COUNT(DISTINCT CASE WHEN s.fiscal_year = 2021 THEN s.product_code END) AS unique_product_count_2021,     ((COUNT(DISTINCT CASE WHEN s.fiscal_year = 2021 THEN s.product_code END) - COUNT(DISTINCT CASE WHEN s.fiscal_year = 2020 THEN s.product_code END)) * 100.0 / COUNT(DISTINCT CASE WHEN s.fiscal_year = 2020 THEN s.product_code END)) AS percentage_increase FROM      hardware_fact_sales_monthly s JOIN      hardware_dim_product p ON      s.product_code = p.product_code WHERE      s.fiscal_year IN (2020, 2021) GROUP BY      p.segment ORDER BY      percentage_increase DESC;

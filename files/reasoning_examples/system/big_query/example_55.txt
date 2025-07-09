@@ -1,0 +1,10 @@
+# [Question]: What is the highest number of motor vehicle theft incidents that occurred in any single month during 2016?
+# [Schema links]: ["chicago_crime.crime.date", "chicago_crime.crime.year", "chicago_crime.crime.primary_type"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `date`, `year`, and `primary_type` from the `chicago_crime.crime` table.
+2. Filter records to include only those from the year 2016 and where `primary_type` is 'MOTOR VEHICLE THEFT'.
+3. Extract the month from the `date` column to group incidents by month.
+4. Count the number of incidents for each month using `COUNT(*)`.
+5. Create a Common Table Expression (CTE) named `MonthlyThefts` to store monthly counts and their corresponding months.
+6. Select the maximum value from the `theft_count` column in the CTE to determine the highest number of incidents in any single month.
+# [Sql]: WITH MonthlyThefts AS (   SELECT     EXTRACT(MONTH FROM date) AS month,     COUNT(*) AS theft_count   FROM     bigquery-public-data.chicago_crime.crime   WHERE     year = 2016     AND primary_type = 'MOTOR VEHICLE THEFT'   GROUP BY     EXTRACT(MONTH FROM date) ) SELECT   MAX(theft_count) AS max_theft_count FROM   MonthlyThefts;

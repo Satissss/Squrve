@@ -1,0 +1,11 @@
+# [Question]: List the repository names and commit counts for the top two GitHub repositories with JavaScript as the primary language and the highest number of commits.
+# [Schema links]: ["GITHUB_REPOS.LANGUAGES.repo_name", "GITHUB_REPOS.SAMPLE_COMMITS.repo_name"]
+# [Analysis]: Let’s think step by step.
+1. Identify the tables involved: `GITHUB_REPOS.LANGUAGES` (contains repo languages and bytes) and `GITHUB_REPOS.SAMPLE_COMMITS` (contains commit data).
+2. Determine the primary language for each repository by ranking languages by their bytes per repo, selecting only those with rank 1.
+3. Filter repositories to include only those where the primary language is JavaScript.
+4. Join the filtered JavaScript repositories with the sample commits table on repo_name to associate commits with repositories.
+5. Count the number of commits per JavaScript repository using `COUNT(*)`.
+6. Sort the repositories by commit count in descending order and limit the result to the top 2 entries.
+7. Construct the final SQL with CTEs to first identify JavaScript repositories and then calculate commit counts for the top two.
+# [Sql]: WITH repositories AS (     SELECT         t2."repo_name",         t2."language"     FROM (         SELECT             t1."repo_name",             t1."language",             RANK() OVER (PARTITION BY t1."repo_name" ORDER BY t1."language_bytes" DESC) AS "rank"         FROM (             SELECT                 l."repo_name",                 lang.value:"name"::STRING AS "language",                 lang.value:"bytes"::NUMBER AS "language_bytes"             FROM                 GITHUB_REPOS.GITHUB_REPOS.LANGUAGES AS l,                 LATERAL FLATTEN(input => l."language") AS lang         ) AS t1     ) AS t2     WHERE t2."rank" = 1 ), javascript_repo AS (     SELECT         "repo_name"     FROM         repositories     WHERE         "language" = 'JavaScript' ) SELECT     sc."repo_name",     COUNT(*) AS "num_commits" FROM     GITHUB_REPOS.GITHUB_REPOS.SAMPLE_COMMITS AS sc INNER JOIN     javascript_repo  ON      javascript_repo."repo_name" = sc."repo_name" GROUP BY     sc."repo_name" ORDER BY     "num_commits" DESC LIMIT 2;

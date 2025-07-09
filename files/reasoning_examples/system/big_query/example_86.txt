@@ -1,0 +1,11 @@
+# [Question]: Can you figure out the average difference in pageviews between users who bought something and those who didn’t in December 2020? Just label anyone who was involved in purchase events as a purchaser.
+# [Schema links]: ["events.user_pseudo_id", "events.event_name"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `user_pseudo_id`, `event_name` from the `events_*` table.
+2. Filter events for December 2020 using `_TABLE_SUFFIX BETWEEN '20201201' AND '20201231'`.
+3. Create a CTE `UserInfo` to calculate per-user metrics: `page_view_count` (COUNTIF event_name='page_view'), and `purchase_event_count` (COUNTIF event_name in ('in_app_purchase', 'purchase')).
+4. Group `UserInfo` by `user_pseudo_id` to aggregate individual user statistics.
+5. Create a CTE `Averages` to categorize users into purchasers (purchase_event_count > 0) and non-purchasers.
+6. Calculate average page views for each group by dividing total page views by user count within each category.
+7. Compute the difference between the two averages using conditional aggregation with CASE statements in the final SELECT.
+# [Sql]: WITH   UserInfo AS (     SELECT       user_pseudo_id,       COUNTIF(event_name = 'page_view') AS page_view_count,       COUNTIF(event_name IN ('in_app_purchase', 'purchase')) AS purchase_event_count     FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`     WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'     GROUP BY 1   ),   Averages AS (     SELECT       (purchase_event_count > 0) AS purchaser,       COUNT(*) AS user_count,       SUM(page_view_count) AS total_page_views,       SUM(page_view_count) / COUNT(*) AS avg_page_views     FROM UserInfo     GROUP BY 1   )  SELECT   MAX(CASE WHEN purchaser THEN avg_page_views ELSE 0 END) -   MAX(CASE WHEN NOT purchaser THEN avg_page_views ELSE 0 END) AS avg_page_views_difference FROM Averages;

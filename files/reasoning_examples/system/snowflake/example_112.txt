@@ -1,0 +1,12 @@
+# [Question]: As of December 31, 2022, list the top 10 active banks with assets exceeding $10 billion, ranked by the highest percentage of uninsured assets, where the percentage is calculated as one minus the value of the '% Insured (Estimated)' variable from quarterly estimates. Provide the names of these banks and their respective percentages of uninsured assets.
+# [Schema links]: ["CYBERSYN.financial_institution_timeseries.id_rssd", "CYBERSYN.financial_institution_entities.name", "CYBERSYN.financial_institution_timeseries.variable", "CYBERSYN.financial_institution_attributes.variable", "CYBERSYN.financial_institution_entities.id_rssd", "CYBERSYN.financial_institution_timeseries.date", "CYBERSYN.financial_institution_attributes.variable_name", "CYBERSYN.financial_institution_attributes.frequency", "CYBERSYN.financial_institution_entities.is_active", "CYBERSYN.financial_institution_timeseries.value"]
+# [Analysis]: Let’s think step by step.
+1. Identify banks with assets >$10B as of 2022-12-31 using financial_institution_timeseries where variable='ASSET' and value>1E10.
+2. Create CTE 'big_banks' to store qualifying id_rssd values from the asset filter.
+3. Join timeseries (ts) with attributes (att) on variable to link '% Insured (Estimated)' variable entries.
+4. Join with entities (ent) to get bank names and activity status (is_active=True).
+5. Join with big_banks CTE to filter only large banks meeting asset criteria.
+6. Calculate uninsured percentage as (1 - ts.value) where att.variable_name='% Insured (Estimated)' and frequency='Quarterly'.
+7. Order results by uninsured percentage descending and limit to top 10 entries.
+8. Select required columns (name and uninsured percentage) from joined tables.
+# [Sql]: WITH big_banks AS (     SELECT id_rssd     FROM FINANCE__ECONOMICS.CYBERSYN.financial_institution_timeseries     WHERE variable = 'ASSET'       AND date = '2022-12-31'       AND value > 1E10 ) SELECT name FROM FINANCE__ECONOMICS.CYBERSYN.financial_institution_timeseries AS ts INNER JOIN FINANCE__ECONOMICS.CYBERSYN.financial_institution_attributes AS att ON (ts.variable = att.variable) INNER JOIN FINANCE__ECONOMICS.CYBERSYN.financial_institution_entities AS ent ON (ts.id_rssd = ent.id_rssd) INNER JOIN big_banks ON (big_banks.id_rssd = ts.id_rssd) WHERE ts.date = '2022-12-31'   AND att.variable_name = '% Insured (Estimated)'   AND att.frequency = 'Quarterly'   AND ent.is_active = True ORDER BY (1 - value) DESC LIMIT 10;

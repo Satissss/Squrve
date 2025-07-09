@@ -1,0 +1,11 @@
+# [Question]: Which country has the highest percentage of population under the age of 25 in 2017?
+# [Schema links]: ["census_bureau_international.midyear_population_agespecific.country_name", "census_bureau_international.midyear_population_agespecific.year", "census_bureau_international.midyear_population_agespecific.age", "census_bureau_international.midyear_population_agespecific.population"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `midyear_population_agespecific` (country_name, year, age, population).
+2. Calculate total population per country for 2017 by summing all populations where `year=2017`, grouped by `country_name`.
+3. Calculate population under 25 for each country in 2017 by summing populations where `year=2017` and `age < 25`, grouped by `country_name`.
+4. Join the two calculations on `country_name` to combine under-25 population with total population.
+5. Compute the percentage by dividing the under-25 population sum by the total population.
+6. Sort countries by this percentage in descending order.
+7. Select the top country with the highest percentage and return its name.
+# [Sql]: SELECT    T1.country_name FROM    bigquery-public-data.census_bureau_international.midyear_population_agespecific AS T1 JOIN (   SELECT      country_name,      SUM(population) AS total_population   FROM      bigquery-public-data.census_bureau_international.midyear_population_agespecific   WHERE      year = 2017   GROUP BY      country_name ) AS T2 ON    T1.country_name = T2.country_name WHERE    T1.year = 2017 AND T1.age < 25 GROUP BY    T1.country_name, T2.total_population ORDER BY    SUM(T1.population) / T2.total_population DESC LIMIT 1;

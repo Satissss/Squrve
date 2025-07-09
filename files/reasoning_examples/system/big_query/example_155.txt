@@ -1,0 +1,13 @@
+# [Question]: On November 30, 2020, identify the item category with the highest tax rate by dividing tax value in usd by purchase revenue in usd for purchase events, and then retrieve the transaction IDs, total item quantities, and both purchase revenue in usd and purchase revenue for those purchase events in that top-tax-rate category.
+# [Schema links]: ["events_20201130.items.item_category", "events_20201130.ecommerce.tax_value_in_usd", "events_20201130.ecommerce.purchase_revenue_in_usd", "events_20201130.event_name", "events_20201130.ecommerce.transaction_id", "events_20201130.ecommerce.total_item_quantity", "events_20201130.ecommerce.purchase_revenue"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table `events_20201130` and columns: `items.item_category`, `ecommerce.tax_value_in_usd`, `ecommerce.purchase_revenue_in_usd`, `event_name`, `ecommerce.transaction_id`, `ecommerce.total_item_quantity`, `ecommerce.purchase_revenue`.
+2. Filter rows where `event_name` is 'purchase' to focus on purchase events.
+3. Unnest the `items` array to access individual item categories.
+4. Calculate the tax rate for each category as `SUM(tax_value_in_usd) / SUM(purchase_revenue_in_usd)` grouped by `item_category`.
+5. Determine the top category with the highest tax rate by ordering the results in descending order and limiting to 1.
+6. Create a CTE `top_category` to store the highest tax rate category.
+7. Join the original purchase events with the `top_category` CTE on matching `item_category`.
+8. For the matched transactions, aggregate `total_item_quantity`, `purchase_revenue_in_usd`, and `purchase_revenue` grouped by `transaction_id`.
+9. Select the required fields: `transaction_id`, summed `total_item_quantity`, summed `purchase_revenue_in_usd`, and summed `purchase_revenue`.
+# [Sql]: WITH top_category AS (   SELECT      items.item_category,      SUM(ecommerce.tax_value_in_usd) / SUM(ecommerce.purchase_revenue_in_usd) AS tax_rate   FROM      bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20201130,     UNNEST(items) AS items   WHERE      event_name = 'purchase'   GROUP BY      items.item_category   ORDER BY      tax_rate DESC   LIMIT 1 ) SELECT    ecommerce.transaction_id,   SUM(ecommerce.total_item_quantity) AS total_item_quantity,   SUM(ecommerce.purchase_revenue_in_usd) AS purchase_revenue_in_usd,   SUM(ecommerce.purchase_revenue) AS purchase_revenue FROM    bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_20201130,   UNNEST(items) AS items JOIN    top_category  ON    items.item_category = top_category.item_category WHERE    event_name = 'purchase' GROUP BY    ecommerce.transaction_id;

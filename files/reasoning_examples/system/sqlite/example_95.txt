@@ -1,0 +1,13 @@
+# [Question]: Retrieve the names of players who scored no less than 100 runs in a match while playing for the team that lost that match.
+# [Schema links]: [player.player_name, player.player_id, player_match.player_id, player_match.match_id, match.match_id, ball_by_ball.match_id, ball_by_ball.striker, ball_by_ball.innings_no, ball_by_ball.over_id, ball_by_ball.ball_id, batsman_scored.match_id, batsman_scored.innings_no, batsman_scored.over_id, batsman_scored.ball_id, player_match.team_id, match.match_winner, batsman_scored.runs_scored]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables: `player`, `player_match`, `match`, `ball_by_ball`, and `batsman_scored`.
+2. Join `player` to `player_match` on `player_id` to link players to their match participation.
+3. Join `player_match` to `match` on `match_id` to access match results and winners.
+4. Join `player_match` to `ball_by_ball` on `match_id` and `player_id = striker` to connect players to their ball-by-ball actions.
+5. Join `ball_by_ball` to `batsman_scored` on matching `match_id`, `innings_no`, `over_id`, and `ball_id` to aggregate runs scored per ball.
+6. Filter matches where `player_match.team_id` does not equal `match.match_winner` to identify losing teams.
+7. Group results by `player_id` and `match_id` to calculate total runs scored per player per match.
+8. Apply a HAVING clause to retain groups where the sum of `runs_scored` is >= 100.
+9. Select distinct `player_name` from the filtered and aggregated results.
+# [Sql]: SELECT DISTINCT p.player_name FROM player p JOIN player_match pm ON p.player_id = pm.player_id JOIN match m ON pm.match_id = m.match_id JOIN ball_by_ball bbb ON pm.match_id = bbb.match_id AND pm.player_id = bbb.striker JOIN batsman_scored bs ON bbb.match_id = bs.match_id AND bbb.innings_no = bs.innings_no AND bbb.over_id = bs.over_id AND bbb.ball_id = bs.ball_id WHERE pm.team_id != m.match_winner GROUP BY p.player_id, bbb.match_id HAVING SUM(bs.runs_scored) >= 100;

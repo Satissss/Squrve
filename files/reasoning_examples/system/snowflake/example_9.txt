@@ -1,0 +1,13 @@
+# [Question]: What is the most common 4-digit IPC code among US B2 utility patents granted from June to August in 2022?
+# [Schema links]: ["PUBLICATIONS.publication_number", "PUBLICATIONS.country_code", "PUBLICATIONS.kind_code", "PUBLICATIONS.grant_date", "PUBLICATIONS.ipc.code"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required columns: `publication_number`, `country_code`, `kind_code`, `grant_date`, and `ipc.code` from the `PUBLICATIONS` table.
+2. Filter rows where `country_code` is 'US', `kind_code` is 'B2', and `grant_date` is between 20220601 and 20220831.
+3. Extract the first 4 characters of each `ipc.code` value to form the 4-digit IPC code (`ipc4`).
+4. Use `LATERAL FLATTEN` to process array-based `ipc` data into individual rows for code extraction.
+5. Exclude rows where `ipc.code` is NULL to ensure valid codes are counted.
+6. Group the results by the 4-digit IPC code (`ipc4`).
+7. Count the number of `publication_number` entries per `ipc4` group.
+8. Sort the groups in descending order by the count of publications.
+9. Select the top result with the highest count using `LIMIT 1`.
+# [Sql]: WITH interim_table AS (     SELECT         t1."publication_number",         SUBSTR(ipc_u.value:"code", 1, 4) AS ipc4     FROM         PATENTS.PATENTS.PUBLICATIONS t1,         LATERAL FLATTEN(input => t1."ipc") AS ipc_u     WHERE         t1."country_code" = 'US'         AND t1."kind_code" = 'B2'         AND t1."grant_date" BETWEEN 20220601 AND 20220831         AND ipc_u.value:"code" IS NOT NULL ) SELECT     ipc4 FROM     interim_table GROUP BY     ipc4 ORDER BY     COUNT("publication_number") DESC LIMIT 1;

@@ -1,0 +1,12 @@
+# [Question]: In each league, considering all seasons, which single team has the fewest total match wins based on comparing home and away goals, including teams with zero wins, ensuring that if multiple teams tie for the fewest wins, only one team is returned for each league?
+# [Schema links]: ["League.name", "Team.team_long_name", "Match.home_team_api_id", "Match.away_team_api_id", "Match.home_team_goal", "Match.away_team_goal", "League.id", "Match.league_id", "Team.team_api_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `League.name`, `Team.team_long_name`, `Match.home_team_api_id`, `Match.away_team_api_id`, `Match.home_team_goal`, `Match.away_team_goal`.
+2. Join `League` with `Match` on `league_id` to associate matches with their league.
+3. Link `Team` to `Match` by matching `team_api_id` with both `home_team_api_id` and `away_team_api_id` to include all teams participating in matches.
+4. Calculate each team's total wins in their league by summing cases where they won as home or away team.
+5. Group results by league and team to aggregate total_wins, including teams with zero wins.
+6. Rank teams within each league by total_wins in ascending order, using `ROW_NUMBER()` to break ties by team name or ID.
+7. Filter the ranked results to select only the first-ranked team per league.
+8. Order the final output by league name for clarity.
+# [Sql]: WITH team_wins AS (     SELECT         L.name AS league,         T.team_long_name AS team,         SUM(CASE             WHEN M.home_team_api_id = T.team_api_id AND M.home_team_goal > M.away_team_goal THEN 1             WHEN M.away_team_api_id = T.team_api_id AND M.away_team_goal > M.home_team_goal THEN 1             ELSE 0         END) AS total_wins     FROM         League L     JOIN         Match M ON L.id = M.league_id     JOIN         Team T ON T.team_api_id IN (M.home_team_api_id, M.away_team_api_id)     GROUP BY         L.id, T.team_api_id ), ranked_wins AS (     SELECT         league,         team,         total_wins,         ROW_NUMBER() OVER (PARTITION BY league ORDER BY total_wins ASC, team) AS win_rank     FROM         team_wins ) SELECT     league,     team FROM     ranked_wins WHERE     win_rank = 1 ORDER BY     league;

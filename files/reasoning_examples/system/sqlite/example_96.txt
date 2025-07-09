@@ -1,0 +1,14 @@
+# [Question]: Please help me find the names of top 5 players with the highest average runs per match in season 5, along with their batting averages.
+# [Schema links]: ["player.player_name", "batsman_scored.runs_scored", "batsman_scored.match_id", "match.match_id", "batsman_scored.innings_no", "ball_by_ball.innings_no", "batsman_scored.over_id", "ball_by_ball.over_id", "batsman_scored.ball_id", "ball_by_ball.ball_id", "ball_by_ball.striker", "player.player_id", "match.season_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `player.player_name`, `batsman_scored.runs_scored`, `match.season_id`, and join keys from `batsman_scored`, `ball_by_ball`, and `match`.
+2. Join `batsman_scored` with `ball_by_ball` using `match_id`, `innings_no`, `over_id`, and `ball_id` to link scoring events with player information.
+3. Join the result with `match` on `match_id` to filter records where `season_id = 5`.
+4. Link `ball_by_ball.striker` to `player.player_id` to retrieve the player's name.
+5. Calculate total runs per player using `SUM(batsman_scored.runs_scored)`.
+6. Count distinct `match_id` per player to determine the number of matches played.
+7. Compute batting average by dividing total runs by the number of matches.
+8. Group results by `striker` (player ID) and `player_name`.
+9. Sort players by batting average in descending order.
+10. Select the top 5 records from the sorted results.
+# [Sql]: SELECT     p.player_name,     CAST(SUM(bs.runs_scored) AS REAL) / COUNT(DISTINCT bs.match_id) AS batting_average FROM     batsman_scored bs JOIN     match m ON bs.match_id = m.match_id JOIN     ball_by_ball bbb ON bs.match_id = bbb.match_id AND bs.innings_no = bbb.innings_no AND bs.over_id = bbb.over_id AND bs.ball_id = bbb.ball_id JOIN     player p ON bbb.striker = p.player_id WHERE     m.season_id = 5 GROUP BY     bbb.striker ORDER BY     batting_average DESC LIMIT 5;

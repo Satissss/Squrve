@@ -1,0 +1,14 @@
+# [Question]: Find the top 10 northernmost addresses in Florida's largest zip code area. What are their address numbers, street names, and types?
+# [Schema links]: ["geography_index.geo_id", "geography_index.geo_name", "geography_relationships.related_geo_name", "geography_characteristics.value", "geography_index.level", "geography_relationships.geo_id", "geography_characteristics.geo_id", "us_addresses.number", "us_addresses.street", "us_addresses.street_type", "us_addresses.id_zip", "us_addresses.state", "us_addresses.latitude"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `geography_index` (geo_id, level, geo_name), `geography_relationships` (related_level, related_geo_name), `geography_characteristics` (value), `us_addresses` (number, street, street_type, id_zip, state, latitude).
+2. Filter `geography_index` to `CensusZipCodeTabulationArea` level to focus on zip code areas.
+3. Join `geography_relationships` to link zip codes with their state and country via `related_level` filters.
+4. Calculate the area of each zip code using `ST_AREA(TRY_TO_GEOGRAPHY(value))` from `geography_characteristics`.
+5. Create CTE `zip_areas` to store zip code details including area, state, and country.
+6. Rank zip codes within each country/state by area in descending order using `ROW_NUMBER()` in CTE `zip_area_ranks`.
+7. Filter for Florida (state 'FL') and United States (country) to identify the largest zip code (rank 1).
+8. Join `us_addresses` with the top-ranked zip code using `id_zip = geo_id`.
+9. Select address number, street, and street_type from `us_addresses`.
+10. Order results by latitude descending and limit to top 10 to get northernmost addresses.
+# [Sql]: WITH zip_areas AS (     SELECT         geo.geo_id,         geo.geo_name AS zip,         states.related_geo_name AS state,         countries.related_geo_name AS country,         ST_AREA(TRY_TO_GEOGRAPHY(value)) AS area     FROM US_ADDRESSES__POI.CYBERSYN.geography_index AS geo     JOIN US_ADDRESSES__POI.CYBERSYN.geography_relationships AS states         ON (geo.geo_id = states.geo_id AND states.related_level = 'State')     JOIN US_ADDRESSES__POI.CYBERSYN.geography_relationships AS countries         ON (geo.geo_id = countries.geo_id AND countries.related_level = 'Country')     JOIN US_ADDRESSES__POI.CYBERSYN.geography_characteristics AS chars         ON (geo.geo_id = chars.geo_id AND chars.relationship_type = 'coordinates_geojson')     WHERE geo.level = 'CensusZipCodeTabulationArea' ),  zip_area_ranks AS (     SELECT         *,         ROW_NUMBER() OVER (PARTITION BY country, state ORDER BY area DESC, geo_id) AS zip_area_rank     FROM zip_areas )  SELECT addr.number, addr.street, addr.street_type FROM US_ADDRESSES__POI.CYBERSYN.us_addresses AS addr JOIN zip_area_ranks AS areas     ON (addr.id_zip = areas.geo_id) WHERE addr.state = 'FL' AND areas.country = 'United States' AND areas.zip_area_rank = 1 ORDER BY LATITUDE DESC LIMIT 10;

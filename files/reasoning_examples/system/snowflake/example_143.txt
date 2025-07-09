@@ -1,0 +1,12 @@
+# [Question]: In the "qin_prostate_repeatability" collection, please provide the distinct StudyInstanceUIDs for studies that include T2-weighted axial MR imaging and also contain anatomical structure segmentations labeled as "Peripheral zone."
+# [Schema links]: ["IDC_V17.DICOM_ALL.StudyInstanceUID", "IDC_V17.DICOM_ALL.Modality", "IDC_V17.DICOM_ALL.collection_id", "IDC_V17.DICOM_ALL.SOPInstanceUID", "IDC_V17.SEGMENTATIONS.SOPInstanceUID", "IDC_V17.SEGMENTATIONS.SegmentedPropertyType.CodeMeaning", "IDC_V17.SEGMENTATIONS.SegmentedPropertyCategory.CodeMeaning"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables: `IDC_V17.DICOM_ALL` for study and modality information, and `IDC_V17.SEGMENTATIONS` for segmentation labels.
+2. Filter `DICOM_ALL` for MR studies in the "qin_prostate_repeatability" collection with "T2 Weighted Axial" in SeriesDescription to get eligible StudyInstanceUIDs.
+3. Create a CTE `mr_studies` to store these MR study identifiers.
+4. Join `DICOM_ALL` with `SEGMENTATIONS` on SOPInstanceUID to link segmentations to their studies.
+5. Filter segmentations for "Peripheral zone" in `SegmentedPropertyType.CodeMeaning` and "Anatomical Structure" in `SegmentedPropertyCategory.CodeMeaning` within the same collection.
+6. Create a CTE `seg_studies` to store StudyInstanceUIDs with valid segmentations.
+7. Join `mr_studies` and `seg_studies` on StudyInstanceUID to find overlapping studies meeting both criteria.
+8. Select distinct StudyInstanceUIDs from the joined result to ensure uniqueness.
+# [Sql]: WITH -- Studies that have MR volumes "mr_studies" AS (   SELECT     "dicom_all_mr"."StudyInstanceUID"   FROM     "IDC"."IDC_V17"."DICOM_ALL" AS "dicom_all_mr"   WHERE     "Modality" = 'MR'     AND "collection_id" = 'qin_prostate_repeatability'     AND CONTAINS("SeriesDescription", 'T2 Weighted Axial') ),  "seg_studies" AS (   SELECT     "dicom_all_seg"."StudyInstanceUID"   FROM     "IDC"."IDC_V17"."DICOM_ALL" AS "dicom_all_seg"   JOIN     "IDC"."IDC_V17"."SEGMENTATIONS" AS "segmentations"   ON     "dicom_all_seg"."SOPInstanceUID" = "segmentations"."SOPInstanceUID"   WHERE     "collection_id" = 'qin_prostate_repeatability'     AND CONTAINS("segmentations"."SegmentedPropertyType":"CodeMeaning", 'Peripheral zone')     AND "segmentations"."SegmentedPropertyCategory":"CodeMeaning" = 'Anatomical Structure' )  SELECT DISTINCT   "mr_studies"."StudyInstanceUID" FROM   "mr_studies" JOIN   "seg_studies" ON   "mr_studies"."StudyInstanceUID" = "seg_studies"."StudyInstanceUID";

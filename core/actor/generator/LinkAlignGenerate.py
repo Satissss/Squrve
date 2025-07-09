@@ -1,0 +1,326 @@
+from llama_index.core.llms.llm import LLM
+from typing import Union, List, Callable, Dict
+import pandas as pd
+from os import PathLike
+from pathlib import Path
+
+from core.actor.generator.BaseGenerate import BaseGenerator
+from core.data_manage import Dataset, single_central_process
+from core.actor.reducer.LinkAlignReduce import LinkAlignReducer
+from core.actor.parser.LinkAlignParse import LinkAlignParser
+from core.actor.generator.sql_debug import sql_debug_by_experience, sql_debug_by_feedback
+from core.utils import (
+    parse_schema_from_df,
+    load_dataset,
+    save_dataset
+)
+
+
+class LinkAlignGenerator(BaseGenerator):
+    """ We adapt the DIN-SQL method to scalable real-world db environment by applying the LinkAlign framework """
+
+    NAME = "LinkAlignGenerator"
+
+    def __init__(
+            self,
+            dataset: Dataset = None,
+            llm: LLM = None,
+            reducer: LinkAlignReducer = None,
+            parser: LinkAlignParser = None,
+            is_save: bool = True,
+            save_dir: Union[str, PathLike] = "../files/pred_sql",
+            use_external: bool = True,
+            use_few_shot: bool = True,
+            sql_post_process_function: Callable = None,
+            use_feedback_debug: bool = True,
+            debug_turn_n: int = 2,
+            db_path: Union[str, PathLike] = None,
+            credential: Dict = None,
+            **kwargs
+    ):
+
+        self.dataset: Dataset = dataset
+        self.llm: LLM = llm
+        self.reducer = reducer
+        self.parser = parser
+        self.is_save = is_save
+        self.save_dir: Union[str, PathLike] = save_dir
+        self.use_external: bool = use_external
+        self.use_few_shot: bool = use_few_shot
+
+        self.sql_post_process_function: Callable = sql_post_process_function
+        self.use_feedback_debug: bool = use_feedback_debug
+        self.debug_turn_n: int = debug_turn_n
+
+        self.db_path: Union[str, PathLike] = self.dataset.db_path if not db_path else db_path
+        self.credential: Dict = self.dataset.credential if not credential else credential
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        external = load_dataset(external)
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
+    @property
+    def classification_prompt(self):
+        classification_prompt = '''### Here are some reference examples:
+# 
+Q: "How many courses that do not have prerequisite?"
+schema_links: [course.*,course.course_id = prereq.course_id]
+A: Let’s think step by step. The SQL query for the question "How many courses that do not have prerequisite?" needs these tables = [course,prereq], so we need JOIN.
+Plus, it requires nested queries with (INTERSECT, UNION, EXCEPT, IN, NOT IN), and we need the answer to the questions = ["Which courses have prerequisite?"].
+So, we need JOIN and need nested queries, then the the SQL query can be classified as "NESTED".
+Label: "NESTED"
+#
+Q: "Find the title of course that is provided by both Statistics and Psychology departments."
+schema_links: [course.title,course.dept_name,Statistics,Psychology]
+A: Let’s think step by step. The SQL query for the question "Find the title of course that is provided by both Statistics and Psychology departments." needs these tables = [course], so we don't need JOIN.
+Plus, it requires nested queries with (INTERSECT, UNION, EXCEPT, IN, NOT IN), and we need the answer to the questions = ["Find the titles of courses that is provided by Psychology departments"].
+So, we don't need JOIN and need nested queries, then the the SQL query can be classified as "NESTED".
+Label: "NESTED"
+#
+Q: "Find the id of instructors who taught a class in Fall 2009 but not in Spring 2010."
+schema_links: [teaches.id,teaches.semester,teaches.year,Fall,2009,Spring,2010]
+A: Let’s think step by step. The SQL query for the question "Find the id of instructors who taught a class in Fall 2009 but not in Spring 2010." needs these tables = [teaches], so we don't need JOIN.
+Plus, it requires nested queries with (INTERSECT, UNION, EXCEPT, IN, NOT IN), and we need the answer to the questions = ["Find the id of instructors who taught a class in Spring 2010"].
+So, we don't need JOIN and need nested queries, then the the SQL query can be classified as "NESTED".
+Label: "NESTED"
+#
+Q: "Give the name and building of the departments with greater than average budget."
+schema_links: [department.budget,department.dept_name,department.building]
+A: Let’s think step by step. The SQL query for the question "Give the name and building of the departments with greater than average budget." needs these tables = [department], so we don't need JOIN.
+Plus, it requires nested queries with (INTERSECT, UNION, EXCEPT, IN, NOT IN), and we need the answer to the questions = ["What is the average budget of the departments"].
+So, we don't need JOIN and need nested queries, then the the SQL query can be classified as "NESTED".
+Label: "NESTED"
+#
+'''
+        return classification_prompt
+
+    def classification_prompt_maker(
+            self,
+            question: str,
+            schema: str,
+            schema_links: Union[str, List] = "None",
+    ):
+
+        instruction = """# [Instruction]
+For the given question, classify it as NESTED. 
+Break down the problem into sub-problems and list them in the `List` format: questions = [q1,q2,q3..], e.g. questions = ['Which courses have prerequisite?']
+"""
+        prompt = (
+            f"{instruction}"
+            f"{schema}\n"
+            f"{self.classification_prompt}\n"
+            f"Question: {question}\n"
+            f"schema_links: {schema_links}\n"
+            "A: Let’s think step by step."
+        )
+
+        return prompt
+
+    @property
+    def hard_prompt(self):
+        hard_prompt = '''### Here are some reference examples:
+# [Question]: "Find the title of courses that have two prerequisites?"
+# [Schema links]: [course.title,course.course_id = prereq.course_id]
+# [Analysis]: Let's think step by step. "Find the title of courses that have two prerequisites?" can be solved by knowing the answer to the following sub-question "What are the titles for courses with two prerequisites?".
+The SQL query for the sub-question "What are the titles for courses with two prerequisites?" is SELECT T1.title FROM course AS T1 JOIN prereq AS T2 ON T1.course_id  =  T2.course_id GROUP BY T2.course_id HAVING count(*)  =  2
+So, the answer to the question "Find the title of courses that have two prerequisites?" is =
+Intermediate_representation: select course.title from course  where  count ( prereq.* )  = 2  group by prereq.course_id
+# [Sql]: SELECT T1.title FROM course AS T1 JOIN prereq AS T2 ON T1.course_id  =  T2.course_id GROUP BY T2.course_id HAVING count(*)  =  2
+
+# [Question]: "Find the name and building of the department with the highest budget."
+# [Schema links]: [department.dept_name,department.building,department.budget]
+# [Analysis]: Let's think step by step. "Find the name and building of the department with the highest budget." can be solved by knowing the answer to the following sub-question "What is the department name and corresponding building for the department with the greatest budget?".
+The SQL query for the sub-question "What is the department name and corresponding building for the department with the greatest budget?" is SELECT dept_name ,  building FROM department ORDER BY budget DESC LIMIT 1
+So, the answer to the question "Find the name and building of the department with the highest budget." is =
+Intermediate_representation: select department.dept_name , department.building from department  order by department.budget desc limit 1
+# [Sql]: SELECT dept_name ,  building FROM department ORDER BY budget DESC LIMIT 1
+
+# [Question]: "Find the title, credit, and department name of courses that have more than one prerequisites?"
+# [Schema links]: [course.title,course.credits,course.dept_name,course.course_id = prereq.course_id]
+# [Analysis]: Let's think step by step. "Find the title, credit, and department name of courses that have more than one prerequisites?" can be solved by knowing the answer to the following sub-question "What is the title, credit value, and department name for courses with more than one prerequisite?".
+The SQL query for the sub-question "What is the title, credit value, and department name for courses with more than one prerequisite?" is SELECT T1.title ,  T1.credits , T1.dept_name FROM course AS T1 JOIN prereq AS T2 ON T1.course_id  =  T2.course_id GROUP BY T2.course_id HAVING count(*)  >  1
+So, the answer to the question "Find the name and building of the department with the highest budget." is =
+Intermediate_representation: select course.title , course.credits , course.dept_name from course  where  count ( prereq.* )  > 1  group by prereq.course_id 
+# [Sql]: SELECT T1.title ,  T1.credits , T1.dept_name FROM course AS T1 JOIN prereq AS T2 ON T1.course_id  =  T2.course_id GROUP BY T2.course_id HAVING count(*)  >  1
+
+# [Question]: "Give the name and building of the departments with greater than average budget."
+# [Schema links]: [department.dept_name,department.building,department.budget]
+# [Analysis]: Let's think step by step. "Give the name and building of the departments with greater than average budget." can be solved by knowing the answer to the following sub-question "What is the average budget of departments?".
+The SQL query for the sub-question "What is the average budget of departments?" is SELECT avg(budget) FROM department
+So, the answer to the question "Give the name and building of the departments with greater than average budget." is =
+Intermediate_representation: select department.dept_name , department.building from department  where  @.@ > avg ( department.budget )
+# [Sql]: SELECT dept_name ,  building FROM department WHERE budget  >  (SELECT avg(budget) FROM department)
+
+###
+'''
+        return hard_prompt
+
+    def hard_prompt_maker(
+            self,
+            question: str,
+            schema: str,
+            sub_questions: str,
+            schema_links: Union[str, List] = "None",
+            reasoning_examples: str = None
+    ) -> str:
+        instruction = """[Instructions]
+Use the intermediate representation, schema links, and the provided prior knowledge (including field and table information) to generate the correct SQL queries for each question. The SQL queries must be syntactically correct and logically aligned with the requirements of the question. 
+You need to follow below requirements:
+1. Understand the question: Carefully analyze the question to identify the relevant data and the required result.
+2. Consult the schema: Use the schema links provided to identify the tables, fields, and relationships (including foreign keys and primary keys) necessary to answer the question.
+3. Leverage prior knowledge: Utilize any domain-specific knowledge, field names, table relationships, and query logic to craft an accurate SQL query.
+4. Use intermediate representations: Where applicable, break down the query into logical components such as CTEs (Common Table Expressions), subqueries, and joins, ensuring that each part of the query is clearly derived from the question and schema.
+5. Adhere to DBMS syntax: Ensure that the SQL queries comply with the syntax specifications of {dbms_name}. Pay attention to common SQL conventions, such as SELECT, JOIN, WHERE, GROUP BY, and ORDER BY clauses, and ensure correct use of aggregate functions and data types.
+6. Correct complex queries: For complex queries, use appropriate techniques (e.g., CTEs, subqueries) to avoid errors and improve readability.
+7. Return only the SQL query: Provide the final, corrected SQL query without any explanations.
+"""
+
+        example_prompt = reasoning_examples if reasoning_examples else self.hard_prompt
+        step_reasoning = (
+            f"Let's think step by step. "
+            f"Question can be solved by knowing the answer to the following sub-question \"{sub_questions}\"."
+        )
+        prompt = (
+            f"{instruction}\n\n"
+            f"### [Question]: {question}\n"
+            f"### [Provided Database Schema]:\n{schema}\n"
+            f"### [Relevant Examples]: \n{example_prompt}\n\n"
+            "### [Process Begin]\n"
+            f'# [Question]: "{question}"\n'
+            f"# [Schema links]: {str(schema_links)}\n"
+            f"# [Analysis]: {step_reasoning}\n"
+            "# Only output SQL query:"
+        )
+
+        return prompt
+
+    def act(
+            self,
+            item,
+            schema: Union[str, PathLike, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            **kwargs
+    ):
+        row = self.dataset[item]
+        question = row['question']
+        db_type = row['db_type']
+        db_id = row["db_id"]
+        db_path = Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
+
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+
+        # Use LinkAlign to reduce the dimensionality of database schema
+        if isinstance(schema, (str, PathLike)):
+            schema = load_dataset(schema)
+
+        # Try to load schema if not provided
+        if schema is None:
+            instance_schema_path = row.get("instance_schemas")
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
+
+            if schema is None:
+                schema = self.dataset.get_db_schema(item)
+                reducer = self.reducer or LinkAlignReducer(self.dataset, self.llm)
+                schema = reducer.act(item, schema)
+
+            if schema is None:
+                raise Exception("Failed to load a valid database schema for the sample!")
+
+        # Normalize schema type
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        elif isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        if isinstance(schema, pd.DataFrame):
+            schema = parse_schema_from_df(schema)
+        else:
+            raise Exception("Failed to load a valid database schema for the sample!")
+
+        # The following follows the DIN-SQL processing procedure
+        # Step 1: schema linking
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                schema_links = load_dataset(schema_link_path)
+            else:
+                parser = LinkAlignParser(self.dataset, self.llm) if not self.parser else self.parser
+                schema_links = parser.act(item, schema)
+
+        # Step 2: difficulty classification
+        try:
+            class_prompt = self.classification_prompt_maker(question, schema, schema_links)
+            classification = self.llm.complete(class_prompt).text
+        except Exception as e:
+            print(e)
+            raise e
+        try:
+            sub_questions = classification.split('questions = [')[1].split(']')[0]
+        except Exception as e:
+            print('warning: error when parsing sub_question. treat it as Non-Nested. error:', e)
+            sub_questions = classification
+
+        # step 3: SQL generation
+        # load reasoning examples
+        reasoning_examples = None
+        if self.use_few_shot:
+            reasoning_example_path = row.get("reasoning_examples", None)
+            if reasoning_example_path:
+                reasoning_examples = load_dataset(reasoning_example_path)
+
+        try:
+            hard_prompt = self.hard_prompt_maker(question, schema, sub_questions, schema_links, reasoning_examples)
+            sql = self.llm.complete(hard_prompt).text
+            sql_list = [sql]
+        except Exception as e:
+            print(e)
+            raise e
+
+        # step 4: SQL debugging by experience
+        for idx, sql in enumerate(sql_list):
+            debugged_sql = sql_debug_by_experience(self.llm, question, schema, sql, db_type, schema_links)
+            # SQL post-process
+            if self.sql_post_process_function:
+                debugged_sql = self.sql_post_process_function(debugged_sql, self.dataset)
+            sql_list[idx] = debugged_sql
+
+        # LinkAlign: SQL debugging by feedback
+        if self.use_feedback_debug:
+            for idx, sql in enumerate(sql_list):
+                debug_args = {
+                    "question": question,
+                    "schema": schema,
+                    "sql_query": sql,
+                    "llm": self.llm,
+                    "db_id": db_id,
+                    "db_path": db_path,
+                    "db_type": db_type,
+                    "credential": self.credential,
+                    "debug_turn_n": self.debug_turn_n
+                }
+                _, debugged_sql = sql_debug_by_feedback(**debug_args)
+                sql_list[idx] = debugged_sql
+
+        # Select the Winner SQL
+        pred_sql = sql_list[0]
+
+        if self.is_save:
+            instance_id = row.get("instance_id")
+            save_path = Path(self.save_dir)
+            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
+            save_path = save_path / f"{self.name}_{instance_id}.sql"
+
+            save_dataset(pred_sql, new_data_source=save_path)
+            self.dataset.setitem(item, "pred_sql", str(save_path))
+
+        return pred_sql

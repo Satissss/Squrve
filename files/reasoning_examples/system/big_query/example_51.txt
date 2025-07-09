@@ -1,0 +1,12 @@
+# [Question]: Which census tract has witnessed the largest increase in median income between 2015 and 2018 in California? Tell me the tract code.
+# [Schema links]: ["census_bureau_acs.censustract_2018_5yr.geo_id", "census_bureau_acs.censustract_2018_5yr.median_income", "census_bureau_acs.censustract_2015_5yr.geo_id", "census_bureau_acs.censustract_2015_5yr.median_income", "geo_census_tracts.census_tracts_california.geo_id", "geo_census_tracts.census_tracts_california.tract_ce"]
+# [Analysis]: Let’s think step by step.
+1. Identify the tables for 2015 and 2018 census data (`censustract_2015_5yr` and `censustract_2018_5yr`) containing `geo_id` and `median_income`.
+2. Create CTEs `acs_2015` and `acs_2018` to alias median_income columns and retain `geo_id`.
+3. Join `acs_2018` and `acs_2015` on `geo_id` to pair median incomes for the same tract across years.
+4. Calculate the difference `median_income_2018 - median_income_2015` as `median_income_diff`.
+5. Filter to California tracts by joining with `census_tracts_california` on `geo_id`.
+6. Exclude tracts with `NULL` income differences to ensure valid comparisons.
+7. Order the results by `median_income_diff` in descending order to prioritize the largest increase.
+8. Select the top record using `LIMIT 1` and retrieve the `tract_ce` from `census_tracts_california`.
+# [Sql]: WITH acs_2018 AS (     SELECT         geo_id,         median_income AS median_income_2018     FROM         bigquery-public-data.census_bureau_acs.censustract_2018_5yr ), acs_2015 AS (     SELECT         geo_id,         median_income AS median_income_2015     FROM         bigquery-public-data.census_bureau_acs.censustract_2015_5yr ), acs_diff AS (     SELECT         a18.geo_id,         a18.median_income_2018,         a15.median_income_2015,         (a18.median_income_2018 - a15.median_income_2015) AS median_income_diff     FROM         acs_2018 a18     JOIN         acs_2015 a15     ON         a18.geo_id = a15.geo_id ), california_tracts AS (     SELECT         diff.geo_id,         diff.median_income_diff     FROM         acs_diff diff     JOIN         bigquery-public-data.geo_census_tracts.census_tracts_california tracts     ON         diff.geo_id = tracts.geo_id     WHERE         diff.median_income_diff IS NOT NULL ) SELECT     tracts.tract_ce AS tract_code FROM     california_tracts JOIN     bigquery-public-data.geo_census_tracts.census_tracts_california tracts USING     (geo_id) ORDER BY     median_income_diff DESC LIMIT 1;

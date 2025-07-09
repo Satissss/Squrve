@@ -1,0 +1,13 @@
+# [Question]: How many U.S. publications related to IoT (where the abstract includes the phrase 'internet of things') were filed each month from 2008 to 2022, including months with no filings?
+# [Schema links]: ["PATENTS.PUBLICATIONS.filing_date", "PATENTS.PUBLICATIONS.application_number", "PATENTS.PUBLICATIONS.country_code"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `PATENTS.PUBLICATIONS.filing_date`, `application_number`, `country_code`, and abstract data from `abstract_localized`.
+2. Filter patents to U.S. entries (`country_code = 'US'`) and those with 'internet of things' in abstract text using `LOWER` and `LIKE`.
+3. Use `LATERAL FLATTEN` to process the `abstract_localized` array and extract text values for filtering.
+4. Create a CTE `Patent_Matches` to store qualifying patents with their filing dates and application numbers.
+5. Generate a date series covering all days from January 2008 to December 2022 using `GENERATOR` and `DATEADD`.
+6. Create a CTE `Date_Series_Table` with each day in the date range and a placeholder count column.
+7. Left join `Date_Series_Table` with `Patent_Matches` on matching filing dates to include all days even without patents.
+8. Group results by month (formatted as `YYYY-MM`) using `TO_CHAR` and count the non-null `Patent_Application_Number` entries per month.
+9. Filter the final results to exclude dates beyond December 2022 and order by month.
+# [Sql]: WITH Patent_Matches AS (     SELECT       TO_DATE(CAST(ANY_VALUE(patentsdb."filing_date") AS STRING), 'YYYYMMDD') AS Patent_Filing_Date,       patentsdb."application_number" AS Patent_Application_Number,       MAX(abstract_info.value:"text") AS Patent_Title,       MAX(abstract_info.value:"language") AS Patent_Title_Language     FROM       PATENTS.PATENTS.PUBLICATIONS AS patentsdb,       LATERAL FLATTEN(input => patentsdb."abstract_localized") AS abstract_info     WHERE       LOWER(abstract_info.value:"text") LIKE '%internet of things%'       AND patentsdb."country_code" = 'US'     GROUP BY       Patent_Application_Number ),  Date_Series_Table AS (     SELECT         DATEADD(day, seq4(), DATE '2008-01-01') AS day,         0 AS Number_of_Patents     FROM         TABLE(             GENERATOR(                 ROWCOUNT => 5479             )         )     ORDER BY         day )  SELECT   TO_CHAR(Date_Series_Table.day, 'YYYY-MM') AS Patent_Date_YearMonth,   COUNT(Patent_Matches.Patent_Application_Number) AS Number_of_Patent_Applications FROM   Date_Series_Table   LEFT JOIN Patent_Matches     ON Date_Series_Table.day = Patent_Matches.Patent_Filing_Date WHERE     Date_Series_Table.day < DATE '2023-01-01' GROUP BY   TO_CHAR(Date_Series_Table.day, 'YYYY-MM') ORDER BY   Patent_Date_YearMonth;

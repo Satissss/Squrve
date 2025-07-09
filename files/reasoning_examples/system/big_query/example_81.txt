@@ -1,0 +1,12 @@
+# [Question]: Which high-income country had the highest average crude birth rate respectively in each region, and what are their corresponding average birth rate, during the 1980s?
+# [Schema links]: ["country_summary.country_code", "country_summary.short_name", "country_summary.region", "country_summary.income_group", "indicators_data.country_code", "indicators_data.indicator_code", "indicators_data.year", "indicators_data.value"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `country_summary` (country_code, short_name, region, income_group) and `indicators_data` (country_code, indicator_code, year, value).
+2. Filter `country_summary` for high-income countries using `income_group = "High income"`.
+3. Join `country_summary` with `indicators_data` on `country_code` to link country details with birth rate data.
+4. Filter `indicators_data` for the birth rate indicator (`indicator_code = "SP.DYN.CBRT.IN"`) and years between 1980-1989.
+5. Calculate the average birth rate per country using `AVG(value)` grouped by country_code, country, and region.
+6. Rank countries within each region by their average birth rate in descending order using `RANK() OVER (PARTITION BY region ORDER BY avg_birth_rate DESC)`.
+7. Select the top-ranked country (rank = 1) from each region with their average birth rate.
+8. Order the final results by region for clarity.
+# [Sql]: WITH country_data AS (    SELECT      country_code,      short_name AS country,     region,      income_group    FROM      bigquery-public-data.world_bank_wdi.country_summary ) , birth_rate_data AS (   SELECT      data.country_code,      country_data.country,     country_data.region,     AVG(value) AS avg_birth_rate   FROM      bigquery-public-data.world_bank_wdi.indicators_data data    LEFT JOIN      country_data    ON      data.country_code = country_data.country_code   WHERE      indicator_code = "SP.DYN.CBRT.IN" -- Birth Rate     AND EXTRACT(YEAR FROM PARSE_DATE('%Y', CAST(year AS STRING))) BETWEEN 1980 AND 1989 -- 1980s     AND country_data.income_group = "High income" -- High-income group   GROUP BY      data.country_code,      country_data.country,     country_data.region ) , ranked_birth_rates AS (   SELECT     region,     country,     avg_birth_rate,     RANK() OVER(PARTITION BY region ORDER BY avg_birth_rate DESC) AS rank   FROM     birth_rate_data ) SELECT    region,    country,    avg_birth_rate FROM    ranked_birth_rates WHERE    rank = 1 ORDER BY    region;

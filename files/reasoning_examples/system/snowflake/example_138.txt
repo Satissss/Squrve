@@ -1,0 +1,10 @@
+# [Question]: Based on the most recent refresh date, identify the top-ranked rising search term for the week that is exactly one year prior to the latest available week in the dataset.
+# [Schema links]: ["GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS.term", "GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS.week", "GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS.refresh_date", "GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS.rank"]
+# [Analysis]: Let’s think step by step.
+1. Identify the latest available week in the dataset using `MAX("week")` from the `INTERNATIONAL_TOP_RISING_TERMS` table.
+2. Calculate the target week by subtracting 52 weeks from the latest week using `DATEADD(WEEK, -52, ...)` to get the week exactly one year prior.
+3. Determine the most recent refresh date using `MAX("refresh_date")` to ensure data freshness.
+4. Filter rows where "week" matches the calculated target week and "refresh_date" matches the maximum refresh date.
+5. Order the filtered results by "rank" in ascending order to prioritize the top-ranked term.
+6. Select the "term" column and limit the result to the first record to get the highest-ranked term.
+# [Sql]: SELECT "term" FROM GOOGLE_TRENDS.GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS WHERE "week" = DATEADD(WEEK, -52, (     SELECT MAX("week")     FROM GOOGLE_TRENDS.GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS )) AND "refresh_date" = (     SELECT MAX("refresh_date")     FROM GOOGLE_TRENDS.GOOGLE_TRENDS.INTERNATIONAL_TOP_RISING_TERMS ) ORDER BY "rank" ASC LIMIT 1;

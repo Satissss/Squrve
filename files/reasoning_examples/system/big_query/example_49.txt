@@ -1,0 +1,10 @@
+# [Question]: Which top 3 countries had the highest net migration in 2017 among those with an area greater than 500 square kilometers? And what are their migration rates?
+# [Schema links]: ["birth_death_growth_rates.country_name", "birth_death_growth_rates.net_migration", "birth_death_growth_rates.country_code", "country_names_area.country_code", "country_names_area.country_area", "birth_death_growth_rates.year"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables: `birth_death_growth_rates` (for net_migration and year) and `country_names_area` (for country_area).
+2. Join the tables on `country_code` to link migration data with country area information.
+3. Filter records where `year` is 2017 and `country_area` exceeds 500 square kilometers.
+4. Select `country_name` and `net_migration` columns from the joined tables.
+5. Sort the filtered results in descending order by `net_migration` to get the highest values first.
+6. Limit the output to the top 3 records to identify the countries with the highest net migration.
+# [Sql]: SELECT      T1.country_name,      T1.net_migration  FROM      bigquery-public-data.census_bureau_international.birth_death_growth_rates AS T1 JOIN      bigquery-public-data.census_bureau_international.country_names_area AS T2 ON      T1.country_code = T2.country_code WHERE      T2.country_area > 500      AND T1.year = 2017 ORDER BY      T1.net_migration DESC LIMIT 3;

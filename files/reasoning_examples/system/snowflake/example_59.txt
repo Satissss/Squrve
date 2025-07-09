@@ -1,0 +1,11 @@
+# [Question]: How do the average reputation and number of badges vary among Stack Overflow users based on the number of complete years they have been members, considering only those who joined on or before October 1, 2021?
+# [Schema links]: ["STACKOVERFLOW.USERS.id", "STACKOVERFLOW.USERS.creation_date", "STACKOVERFLOW.USERS.reputation", "STACKOVERFLOW.BADGES.user_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `USERS` (id, creation_date, reputation) and `BADGES` (user_id).
+2. Convert `creation_date` from epoch time to a DATE using `TO_TIMESTAMP` and filter users with `user_creation_date` ≤ October 1, 2021.
+3. Perform a LEFT JOIN between `USERS` and `BADGES` on `user_id` to include users without badges.
+4. Calculate the number of badges per user using a conditional sum in the subquery.
+5. Compute the tenure in years using `DATEDIFF` between `user_creation_date` and October 1, 2021.
+6. Group results by `user_tenure` to aggregate average reputation, average badges, and user count per tenure group.
+7. Select the final aggregated metrics (tenure, user count, avg reputation, avg badges) and order by tenure.
+# [Sql]: WITH sub AS (   SELECT      "users"."id",     CAST(TO_TIMESTAMP(MAX("users"."creation_date") / 1000000.0) AS DATE) AS "user_creation_date",  -- 使用 MAX 聚合 creation_date 并转换为 DATE     MAX("users"."reputation") AS "reputation",       SUM(CASE WHEN badges."user_id" IS NULL THEN 0 ELSE 1 END) AS "num_badges"   FROM "STACKOVERFLOW"."STACKOVERFLOW"."USERS" "users"   LEFT JOIN "STACKOVERFLOW"."STACKOVERFLOW"."BADGES" badges     ON "users"."id" = badges."user_id"   WHERE CAST(TO_TIMESTAMP("users"."creation_date" / 1000000.0) AS DATE) <= DATE '2021-10-01'   GROUP BY "users"."id" )  SELECT    DATEDIFF(YEAR, "user_creation_date", DATE '2021-10-01') AS "user_tenure",   COUNT(1) AS "Num_Users",   AVG("reputation") AS "Avg_Reputation",   AVG("num_badges") AS "Avg_Num_Badges" FROM sub GROUP BY "user_tenure" ORDER BY "user_tenure";

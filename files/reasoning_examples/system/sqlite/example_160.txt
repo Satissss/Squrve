@@ -1,0 +1,12 @@
+# [Question]: Please identify the top three customers, based on their customer_unique_id, who have the highest number of delivered orders, and provide the average payment value, city, and state for each of these customers.
+# [Schema links]: ["olist_customers.customer_unique_id", "olist_order_payments.payment_value", "olist_customers.customer_city", "olist_customers.customer_state", "olist_customers.customer_id", "olist_orders.customer_id", "olist_orders.order_id", "olist_order_payments.order_id", "olist_orders.order_status"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `olist_customers` (customer_unique_id, customer_city, customer_state), `olist_orders` (customer_id, order_id, order_status), and `olist_order_payments` (order_id, payment_value).
+2. Join `olist_customers` with `olist_orders` on `customer_id` to link customers to their orders.
+3. Join the result with `olist_order_payments` on `order_id` to include payment information.
+4. Filter orders where `order_status` is 'delivered' to consider only delivered orders.
+5. Group the results by `customer_unique_id`, `customer_city`, and `customer_state` to aggregate data per customer.
+6. Calculate the average payment value using `AVG(payment_value)` for each customer.
+7. Order the grouped results by the count of `order_id` in descending order to prioritize customers with the most delivered orders.
+8. Limit the output to the top 3 records to get the highest-ranked customers.
+# [Sql]: SELECT      c.customer_unique_id,     AVG(p.payment_value) AS avg_payment_value,     c.customer_city,     c.customer_state FROM      olist_customers c JOIN      olist_orders o ON c.customer_id = o.customer_id JOIN      olist_order_payments p ON o.order_id = p.order_id WHERE      o.order_status = 'delivered' GROUP BY      c.customer_unique_id ORDER BY      COUNT(o.order_id) DESC LIMIT 3;

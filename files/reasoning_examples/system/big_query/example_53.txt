@@ -1,0 +1,11 @@
+# [Question]: Calculate the minimum and maximum trip duration in minutes (rounded to the nearest whole number), total number of trips, and average fare for each of six equal quantile groups based on trip duration, considering only trips between 0 and 60 minutes.
+# [Schema links]: ["chicago_taxi_trips.taxi_trips.trip_seconds", "chicago_taxi_trips.taxi_trips.fare"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant columns: `trip_seconds` and `fare` from `chicago_taxi_trips.taxi_trips`.
+2. Filter trips where `trip_seconds` is between 0 and 3600 seconds (0-60 minutes).
+3. Convert `trip_seconds` to minutes by dividing by 60.
+4. Use `NTILE(6)` to divide trips into six equal quantile groups based on ordered `trip_duration_minutes`.
+5. Create a CTE `TripQuantiles` to store quantile groups with their trip duration in minutes and fare.
+6. For each quantile group, calculate the minimum and maximum trip duration (rounded), total trips count, and average fare.
+7. Group results by `quantile_group` and order the final output by `quantile_group`.
+# [Sql]: WITH TripQuantiles AS (     SELECT          NTILE(6) OVER (ORDER BY trip_seconds / 60) AS quantile_group,         trip_seconds / 60 AS trip_duration_minutes,         fare     FROM          bigquery-public-data.chicago_taxi_trips.taxi_trips     WHERE          trip_seconds BETWEEN 0 AND 3600 ) SELECT      quantile_group,     ROUND(MIN(trip_duration_minutes)) AS min_duration_minutes,     ROUND(MAX(trip_duration_minutes)) AS max_duration_minutes,     COUNT(*) AS total_trips,     AVG(fare) AS average_fare FROM      TripQuantiles GROUP BY      quantile_group ORDER BY      quantile_group;

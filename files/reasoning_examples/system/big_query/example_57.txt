@@ -1,0 +1,10 @@
+# [Question]: Retrieve the approved symbol of target genes with the highest overall score that are associated with the disease 'EFO_0000676' from the data source 'IMPC'.
+# [Schema links]: ["open_targets_platform.associationByDatasourceDirect.targetId", "open_targets_platform.associationByDatasourceDirect.datasourceId", "open_targets_platform.targets.approvedSymbol", "open_targets_platform.associationByOverallDirect.score", "open_targets_platform.targets.id", "open_targets_platform.associationByOverallDirect.targetId", "open_targets_platform.associationByOverallDirect.diseaseId"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required columns: `approvedSymbol` from `targets`, `score` from `associationByOverallDirect`, and filter by `diseaseId = 'EFO_0000676'` and `datasourceId = 'impc'`.
+2. Join `associationByDatasourceDirect` (T1) with `targets` on `targetId = targets.id` to access gene symbols.
+3. Join T1 with `associationByOverallDirect` on `T1.targetId = overall_associations.targetId` to link scores and disease associations.
+4. Apply filters in the WHERE clause: `overall_associations.diseaseId = 'EFO_0000676'` and `T1.datasourceId = 'impc'`.
+5. Sort the results by `overall_associations.score` in descending order to prioritize the highest score.
+6. Select the top record using LIMIT 1 to retrieve the gene with the highest score meeting the criteria.
+# [Sql]: SELECT   T1.targetId AS target_id,   T1.datasourceId,   targets.approvedSymbol AS approved_symbol,   overall_associations.score AS overall_score FROM   `bigquery-public-data.open_targets_platform.associationByDatasourceDirect` as T1 JOIN   `bigquery-public-data.open_targets_platform.targets` AS targets ON   targetId = targets.id JOIN   `bigquery-public-data.open_targets_platform.associationByOverallDirect` AS overall_associations ON   T1.targetId = overall_associations.targetId WHERE   overall_associations.diseaseId = 'EFO_0000676' AND datasourceId = 'impc' ORDER BY   overall_associations.score DESC LIMIT   1;

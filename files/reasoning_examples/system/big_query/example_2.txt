@@ -1,0 +1,11 @@
+# [Question]: Find the top-selling product among customers who bought 'Youtube Men’s Vintage Henley' in July 2017, excluding itself.
+# [Schema links]: ["google_analytics_sample.ga_sessions_201707*.fullVisitorId", "google_analytics_sample.ga_sessions_201707*.product.v2ProductName", "google_analytics_sample.ga_sessions_201707*.product.productRevenue", "google_analytics_sample.ga_sessions_201707*.product.productQuantity"]
+# [Analysis]: Let’s think step by step.
+1. Identify customers who purchased "YouTube Men's Vintage Henley" in July 2017 by selecting distinct fullVisitorId from sessions where product.v2ProductName matches and productRevenue exists.
+2. Create a CTE (GET_CUS_ID) to store these customer IDs for efficient reuse.
+3. Join the main sessions table with GET_CUS_ID on fullVisitorId to filter sessions belonging to Henley buyers.
+4. Exclude the target product by adding product.v2ProductName <> "YouTube Men's Vintage Henley" condition.
+5. Aggregate productQuantity sums for remaining products purchased by these customers.
+6. Order aggregated results by total productQuantity in descending order.
+7. Select the top product using LIMIT 1 after grouping and ordering.
+# [Sql]: WITH GET_CUS_ID AS (     SELECT          DISTINCT fullVisitorId as Henley_CUSTOMER_ID     FROM          `bigquery-public-data.google_analytics_sample.ga_sessions_201707*`,         UNNEST(hits) AS hits,         UNNEST(hits.product) as product     WHERE         product.v2ProductName = "YouTube Men's Vintage Henley"         AND product.productRevenue IS NOT NULL     )  SELECT     product.v2ProductName AS other_purchased_products FROM     `bigquery-public-data.google_analytics_sample.ga_sessions_201707*` TAB_A      RIGHT JOIN GET_CUS_ID     ON GET_CUS_ID.Henley_CUSTOMER_ID=TAB_A.fullVisitorId,     UNNEST(hits) AS hits,     UNNEST(hits.product) as product WHERE     TAB_A.fullVisitorId IN (         SELECT * FROM GET_CUS_ID     )     AND product.v2ProductName <> "YouTube Men's Vintage Henley"     AND product.productRevenue IS NOT NULL GROUP BY     product.v2ProductName ORDER BY     SUM(product.productQuantity) DESC LIMIT 1;

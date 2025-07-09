@@ -1,0 +1,11 @@
+# [Question]: Extract and count the frequency of all package names listed in the require section of JSON-formatted content
+# [Schema links]: ["sample_contents.content"]
+# [Analysis]: Let’s think step by step.
+1. Identify the table and column containing JSON data: `sample_contents.content`.
+2. Parse the JSON content to extract the "require" section using `TRY_PARSE_JSON`.
+3. Filter records where "content" is not null, non-empty, and "require" exists as a non-null object.
+4. Use `LATERAL FLATTEN` to expand the "require" object into individual key-value pairs for each package name.
+5. Extract the `key` from each flattened row to get package names.
+6. Count occurrences of each package name by grouping and aggregating with `COUNT(*)`.
+7. Order the final results by count in descending order to show most frequent packages first.
+# [Sql]: WITH json_files AS (     SELECT         TRY_PARSE_JSON("content"):"require" AS dependencies     FROM         GITHUB_REPOS.GITHUB_REPOS.SAMPLE_CONTENTS     WHERE         "content" IS NOT NULL AND "content" != ''         AND TRY_PARSE_JSON("content"):"require" IS NOT NULL         AND TYPEOF(TRY_PARSE_JSON("content"):"require") = 'OBJECT' ), package_names AS (     SELECT         f.key AS package_name     FROM         json_files,         LATERAL FLATTEN(input => dependencies) AS f     WHERE         f.key IS NOT NULL ) SELECT     package_name,     COUNT(*) AS count FROM     package_names GROUP BY     package_name ORDER BY     count DESC;

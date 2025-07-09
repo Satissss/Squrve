@@ -1,0 +1,12 @@
+# [Question]: What is the highest number of electric bike rides lasting more than 10 minutes taken by subscribers with 'Student Membership' in a single day, excluding rides starting or ending at 'Mobile Station' or 'Repair Shop'?
+# [Schema links]: [austin_bikeshare.bikeshare_trips.start_station_name, austin_bikeshare.bikeshare_trips.end_station_name, austin_bikeshare.bikeshare_trips.subscriber_type, austin_bikeshare.bikeshare_trips.bike_type, austin_bikeshare.bikeshare_trips.duration_minutes, austin_bikeshare.bikeshare_trips.start_time]
+# [Analysis]: Let’s think step by step.
+1. Identify the required columns: `start_station_name`, `end_station_name`, `subscriber_type`, `bike_type`, `duration_minutes`, and `start_time` from the `austin_bikeshare.bikeshare_trips` table.
+2. Filter trips where `subscriber_type` is 'Student Membership' and `bike_type` is 'electric'.
+3. Exclude trips where `start_station_name` or `end_station_name` is 'Mobile Station' or 'Repair Shop'.
+4. Include only trips with `duration_minutes` > 10.
+5. Extract the date from `start_time` using `DATE(start_time)` to group rides by day.
+6. Count the number of rides per day using `COUNT(*)`.
+7. Sort the results in descending order by the count of rides.
+8. Select the top result with `LIMIT 1` to get the highest number of rides in a single day.
+# [Sql]: SELECT   COUNT(*) AS num_rides FROM   `bigquery-public-data.austin_bikeshare.bikeshare_trips` WHERE   start_station_name NOT IN ('Mobile Station', 'Repair Shop')   AND end_station_name NOT IN ('Mobile Station', 'Repair Shop')   AND subscriber_type = 'Student Membership'   AND bike_type = 'electric'   AND duration_minutes > 10 GROUP BY   DATE(start_time) ORDER BY   num_rides DESC LIMIT 1;

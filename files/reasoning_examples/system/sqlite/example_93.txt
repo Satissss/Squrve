@@ -1,0 +1,12 @@
+# [Question]: In which year were the two most common causes of traffic accidents different from those in other years?
+# [Schema links]: [collisions.collision_date, collisions.case_id, collisions.pcf_violation_category]
+# [Analysis]: Let’s think step by step.
+1. Extract the year from `collision_date` to group collisions by year.
+2. Calculate annual total collisions using `COUNT(case_id)` grouped by year.
+3. For each year and violation category, calculate the subtotal of collisions.
+4. Compute the percentage of each category's collisions relative to the annual total.
+5. Rank categories by their percentage within each year to identify top two.
+6. Aggregate top two categories per year into a concatenated string.
+7. Identify years where the top two categories' combination occurs uniquely once across all years.
+8. Retrieve the distinct year(s) from the filtered results.
+# [Sql]: WITH AnnualTotals AS (     SELECT          STRFTIME('%Y', collision_date) AS Year,          COUNT(case_id) AS AnnualTotal     FROM          collisions     GROUP BY          Year ), CategoryTotals AS (     SELECT          STRFTIME('%Y', collision_date) AS Year,         pcf_violation_category AS Category,         COUNT(case_id) AS Subtotal     FROM          collisions     GROUP BY          Year, Category ), CategoryPercentages AS (     SELECT          ct.Year,         ct.Category,         ROUND((ct.Subtotal * 100.0) / at.AnnualTotal, 1) AS PercentageOfAnnualRoadIncidents     FROM          CategoryTotals ct     JOIN          AnnualTotals at ON ct.Year = at.Year ), RankedCategories AS (     SELECT         Year,         Category,         PercentageOfAnnualRoadIncidents,         ROW_NUMBER() OVER (PARTITION BY Year ORDER BY PercentageOfAnnualRoadIncidents DESC) AS Rank     FROM         CategoryPercentages ), TopTwoCategories AS (     SELECT         Year,         GROUP_CONCAT(Category, ', ') AS TopCategories     FROM         RankedCategories     WHERE         Rank <= 2     GROUP BY         Year ), UniqueYear AS (     SELECT         Year     FROM         TopTwoCategories     GROUP BY         TopCategories     HAVING COUNT(Year) = 1 ), results AS ( SELECT      rc.Year,      rc.Category,      rc.PercentageOfAnnualRoadIncidents FROM      UniqueYear u JOIN      RankedCategories rc ON u.Year = rc.Year WHERE      rc.Rank <= 2 )  SELECT distinct Year FROM results

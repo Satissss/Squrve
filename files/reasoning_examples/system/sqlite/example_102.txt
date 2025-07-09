@@ -1,0 +1,14 @@
+# [Question]: Identify the top 10 and bottom 10 interest categories based on their highest composition values across all months. For each category, display the time(MM-YYYY), interest name, and the composition value
+# [Schema links]: ["interest_metrics.month_year", "interest_map.interest_name", "interest_metrics.composition", "interest_metrics.interest_id", "interest_map.id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `interest_metrics` (month_year, composition, interest_id) and `interest_map` (interest_name, id).
+2. Join `interest_metrics` and `interest_map` on `interest_id = id` to combine interest names with their composition values.
+3. Filter rows to include only those with the maximum composition value for each `interest_id` across all months using a subquery.
+4. Create a CTE named `max_compositions` to store the filtered results with month_year, interest_name, and composition.
+5. Rank the entries in `max_compositions` by composition in both descending and ascending order using `ROW_NUMBER()` to determine top and bottom positions.
+6. Create a CTE named `ranked` containing the rankings and composition values.
+7. Select the top 10 entries where `rn_desc <= 10` from the ranked CTE.
+8. Select the bottom 10 entries where `rn_asc <= 10` from the ranked CTE.
+9. Combine both selections using `UNION ALL` to include all top and bottom categories.
+10. Order the final result by composition in descending order to prioritize higher values first.
+# [Sql]: WITH max_compositions AS (     SELECT          im.month_year,         imap.interest_name,         im.composition     FROM interest_metrics im     JOIN interest_map imap ON im.interest_id = imap.id     WHERE (im.interest_id, im.composition) IN (         SELECT interest_id, MAX(composition)         FROM interest_metrics         GROUP BY interest_id     ) ), ranked AS (     SELECT          month_year,         interest_name,         composition,         ROW_NUMBER() OVER (ORDER BY composition DESC) AS rn_desc,         ROW_NUMBER() OVER (ORDER BY composition ASC) AS rn_asc     FROM max_compositions ) SELECT month_year, interest_name, composition FROM ranked WHERE rn_desc <= 10 UNION ALL SELECT month_year, interest_name, composition FROM ranked WHERE rn_asc <= 10 ORDER BY composition DESC;

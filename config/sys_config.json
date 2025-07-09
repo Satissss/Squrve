@@ -1,0 +1,69 @@
+{
+  "text_embed": {
+    "embed_model_source": "HuggingFace"
+  },
+  "dataset": {
+    "data_source_dir": "../files/data_source",
+    "default_data_file_name": "user_data.json",
+    "default_get_external_function": "LinkAlign",
+    "sys_few_shot_dir": "../files/reasoning_examples/system",
+    "few_shot_save_dir": "../files/reasoning_examples/user",
+    "external_save_dir": "../files/external"
+  },
+  "database": {
+    "schema_source_dir": "../files/schema_source",
+    "default_schema_dir_name": "user_schema",
+    "index_method": "VectorStoreIndex"
+  },
+  "reducer": {
+    "reduce_type": "LinkAlign",
+    "reduce_save_dir": "../files/instance_schemas"
+  },
+  "parser": {
+    "parse_type": "LinkAlign",
+    "parse_save_dir": "../files/schema_links"
+  },
+  "generator": {
+    "generate_type": "LinkAlign",
+    "generate_save_dir": "../files/pred_sql"
+  },
+  "benchmark": [
+    {
+      "id": "spider",
+      "meta_info": "",
+      "root_path": "../benchmarks/spider",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "dev",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
+    },
+    {
+      "id": "bird",
+      "meta_info": "",
+      "root_path": "../benchmarks/bird",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": false,
+      "sub_data": [
+        {
+          "sub_id": "dev",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
+    }
+  ],
+  "task": {
+    "default_log_save_dir": "../files/log"
+  }
+}

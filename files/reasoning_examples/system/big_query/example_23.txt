@@ -1,0 +1,14 @@
+# [Question]: Can you provide the latitude of the final coordinates for the hurricane that traveled the second longest distance in the North Atlantic during 2020?
+# [Schema links]: ["noaa_hurricanes.hurricanes.season", "noaa_hurricanes.hurricanes.basin", "noaa_hurricanes.hurricanes.name", "noaa_hurricanes.hurricanes.usa_wind", "noaa_hurricanes.hurricanes.longitude", "noaa_hurricanes.hurricanes.latitude", "noaa_hurricanes.hurricanes.sid", "noaa_hurricanes.hurricanes.iso_time"]
+# [Analysis]: Let’s think step by step.
+1. Filter the hurricanes table for records where season is '2020' and basin is 'NA' (North Atlantic).
+2. Exclude non-named storms by ensuring name != 'NOT NAMED'.
+3. Convert longitude and latitude coordinates into geographic points using ST_GEOGPOINT for distance calculations.
+4. Calculate the distance between consecutive positions for each hurricane using ST_DISTANCE and LAG function.
+5. Compute cumulative distance traveled for each hurricane by summing distances between points.
+6. Calculate total distance for each hurricane using window function SUM OVER sid partition.
+7. Rank hurricanes by total distance in descending order using DENSE_RANK.
+8. Identify the hurricane with rank 2 (second longest distance).
+9. Select the final coordinates of this hurricane by ordering its points by cumulative_distance DESC and taking the latest entry.
+10. Extract the latitude from the final coordinate point using ST_Y function.
+# [Sql]: WITH hurricane_geometry AS (   SELECT     * EXCEPT (longitude, latitude),     ST_GEOGPOINT(longitude, latitude) AS geom,     MAX(usa_wind) OVER (PARTITION BY sid) AS max_wnd_speed   FROM     `bigquery-public-data.noaa_hurricanes.hurricanes`   WHERE     season = '2020'     AND basin = 'NA'     AND name != 'NOT NAMED' ), dist_between_points AS (   SELECT     sid,     name,     season,     iso_time,     max_wnd_speed,     geom,     ST_DISTANCE(geom, LAG(geom, 1) OVER (PARTITION BY sid ORDER BY iso_time ASC)) / 1000 AS dist   FROM     hurricane_geometry ), total_distances AS (   SELECT     sid,     name,     season,     iso_time,     max_wnd_speed,     geom,     SUM(dist) OVER (PARTITION BY sid ORDER BY iso_time ASC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS cumulative_distance,     SUM(dist) OVER (PARTITION BY sid) AS total_dist   FROM     dist_between_points ), ranked_hurricanes AS (   SELECT     *,     DENSE_RANK() OVER (ORDER BY total_dist DESC) AS dense_rank   FROM     total_distances )  SELECT   ST_Y(geom) FROM   ranked_hurricanes WHERE   dense_rank = 2 ORDER BY cumulative_distance DESC LIMIT 1 ;

@@ -1,0 +1,12 @@
+# [Question]: Can you tell me the name of the most popular female baby in Wyoming for the year 2021, based on the proportion of female babies given that name compared to the total number of female babies given the same name across all states?
+# [Schema links]: [usa_names.usa_1910_current.name, usa_names.usa_1910_current.state, usa_names.usa_1910_current.number, usa_names.usa_1910_current.gender, usa_names.usa_1910_current.year]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `usa_names.usa_1910_current` (name, state, number, gender, year).
+2. Filter records to female babies from the year 2021 using `WHERE gender = 'F' AND year = 2021`.
+3. Group data by `name` to calculate counts per name.
+4. For each name, compute Wyoming's count using `SUM(CASE WHEN state = 'WY' THEN number ELSE 0 END)`.
+5. Compute total count across all states for each name using `SUM(number)`.
+6. Calculate the proportion as Wyoming count divided by total count.
+7. Order names by this proportion in descending order.
+8. Select the top result using `LIMIT 1` to get the most popular name.
+# [Sql]: SELECT   name FROM   (     SELECT       name,       SUM(CASE WHEN state = 'WY' THEN number ELSE 0 END) AS wyoming_count,       SUM(number) AS total_count,       SUM(CASE WHEN state = 'WY' THEN number ELSE 0 END) / SUM(number) AS proportion     FROM       bigquery-public-data.usa_names.usa_1910_current     WHERE       gender = 'F'       AND year = 2021     GROUP BY       name   ) AS proportions ORDER BY   proportion DESC LIMIT   1

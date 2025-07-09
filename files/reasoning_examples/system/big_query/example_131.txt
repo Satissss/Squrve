@@ -1,0 +1,11 @@
+# [Question]: For each New York City borough, how many subway stations are there in total, how many have at least one entrance that is marked both as an actual entry and as ADA-compliant, and what percentage of the total stations in each borough does this represent, listing boroughs from the highest to the lowest percentage?
+# [Schema links]: [new_york_subway.stations.borough_name, new_york_subway.stations.station_name, new_york_subway.station_entrances.entry, new_york_subway.station_entrances.ada_compliant]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `stations` (borough_name, station_name) and `station_entrances` (entry, ada_compliant).
+2. Join `stations` and `station_entrances` on `station_name` to link each station with its entrances, creating a CTE named `stations_n_entrances`.
+3. Calculate the total number of stations per borough by counting distinct `station_name` in the CTE.
+4. Identify stations with at least one compliant entrance by filtering rows where `entry` and `ada_compliant` are both true, then count distinct `station_name` for compliant stations.
+5. Perform a LEFT JOIN between the CTE (as `se`) and itself (as `adas`) to associate stations with their compliant entrances, using matching `station_name` and the compliance criteria.
+6. Calculate the percentage of compliant stations by dividing the compliant count by the total count and multiplying by 100.
+7. Group results by `borough_name`, then order by the calculated percentage in descending order.
+# [Sql]: WITH stations_n_entrances AS (       SELECT borough_name,s.station_name,entry,ada_compliant       FROM `bigquery-public-data.new_york_subway.stations` s       JOIN `bigquery-public-data.new_york_subway.station_entrances` se       ON s.station_name = se.station_name       )  SELECT se.borough_name, COUNT(DISTINCT se.station_name) num_stations,       COUNT(DISTINCT adas.station_name) num_stations_w_compliant_entrance,        (100*COUNT(DISTINCT adas.station_name))/(COUNT(DISTINCT se.station_name)) percent_compliant_stations FROM `stations_n_entrances` se LEFT JOIN `stations_n_entrances` adas ON se.station_name = adas.station_name AND adas.entry AND adas.ada_compliant GROUP BY 1 ORDER BY 4 DESC

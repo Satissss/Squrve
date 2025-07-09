@@ -1,0 +1,9 @@
+# [Question]: How many unique StudyInstanceUIDs are there from the DWI, T2 Weighted Axial, Apparent Diffusion Coefficient series, and T2 Weighted Axial Segmentations in the 'qin_prostate_repeatability' collection?
+# [Schema links]: [DICOM_ALL.StudyInstanceUID, DICOM_ALL.collection_id, DICOM_ALL.SeriesDescription]
+# [Analysis]: Let’s think step by step.
+1. Identify the required columns: `StudyInstanceUID`, `collection_id`, and `SeriesDescription` from the `DICOM_ALL` table.
+2. Filter rows where `collection_id` equals 'qin_prostate_repeatability'.
+3. Include rows where `SeriesDescription` contains 'DWI', 'T2 Weighted Axial', 'Apparent Diffusion Coefficient', or 'T2 Weighted Axial Segmentations' using `LIKE` with wildcard matching.
+4. Use `COUNT(DISTINCT StudyInstanceUID)` to calculate the number of unique study instance UIDs meeting the criteria.
+5. Construct the SQL query by combining the filters with `OR` conditions in the `WHERE` clause and specifying the table schema.
+# [Sql]: SELECT COUNT(DISTINCT "StudyInstanceUID") AS unique_study_instance_uids  FROM IDC.IDC_V17.DICOM_ALL  WHERE "collection_id" = 'qin_prostate_repeatability'  AND (     "SeriesDescription" LIKE '%DWI%'      OR "SeriesDescription" LIKE '%T2 Weighted Axial%'      OR "SeriesDescription" LIKE '%Apparent Diffusion Coefficient%'      OR "SeriesDescription" LIKE '%T2 Weighted Axial Segmentations%' );

@@ -1,0 +1,11 @@
+# [Question]: I'm trying to evaluate which board types were most effective on September 15, 2018. Can you find out the average scores for each board type from the quick play mode completions on that day?
+# [Schema links]: ["events_20180915.user_pseudo_id", "events_20180915.event_timestamp", "events_20180915.event_name", "events_20180915.event_params.key", "events_20180915.event_params.value.int_value", "events_20180915.event_params.value.string_value"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant table and columns: `events_20180915` with columns `user_pseudo_id`, `event_timestamp`, `event_name`, `event_params.key`, `event_params.value.int_value`, and `event_params.value.string_value`.
+2. Filter events to only those with `event_name` "level_complete_quickplay" from the specified date.
+3. Unnest the `event_params` array to access individual key-value pairs for each event.
+4. Separate parameters into two columns: "value" (score as integer) and "board" (board_type as string) using conditional aggregation.
+5. Group unnested parameters by `user_pseudo_id` and `event_timestamp` to create rows with both score and board_type per event.
+6. Calculate the average score for each distinct board_type by grouping the processed data by board_type.
+7. Use `ANY_VALUE(board_type)` to include the board name in results while aggregating averages.
+# [Sql]: WITH EventData AS (     SELECT          user_pseudo_id,          event_timestamp,          param     FROM          `firebase-public-project.analytics_153293282.events_20180915`,         UNNEST(event_params) AS param     WHERE          event_name = "level_complete_quickplay"         AND (param.key = "value" OR param.key = "board") ), ProcessedData AS (     SELECT          user_pseudo_id,          event_timestamp,          MAX(IF(param.key = "value", param.value.int_value, NULL)) AS score,         MAX(IF(param.key = "board", param.value.string_value, NULL)) AS board_type     FROM          EventData     GROUP BY          user_pseudo_id,          event_timestamp ) SELECT      ANY_VALUE(board_type) AS board,      AVG(score) AS average_score FROM      ProcessedData GROUP BY      board_type

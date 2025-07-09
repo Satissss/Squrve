@@ -1,0 +1,9 @@
+# [Question]: What is the total distance traveled by each bike in the San Francisco Bikeshare program? Use data from bikeshare trips and stations to calculate this.
+# [Schema links]: [san_francisco.bikeshare_trips.bike_number, san_francisco.bikeshare_stations.longitude, san_francisco.bikeshare_stations.latitude, san_francisco.bikeshare_trips.start_station_id, san_francisco.bikeshare_stations.station_id, san_francisco.bikeshare_trips.end_station_id]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables: `bikeshare_trips` (bike_number, start_station_id, end_station_id) and `bikeshare_stations` (station_id, longitude, latitude).
+2. Join `bikeshare_trips` with `bikeshare_stations` twice: once for start stations (bs1) using `start_station_id`, and once for end stations (bs2) using `end_station_id`.
+3. Calculate the distance for each trip using `ST_DISTANCE` between the start and end station coordinates converted with `ST_GEOGPOINT(longitude, latitude)`.
+4. Sum the calculated distances for each `bike_number` to get the total distance traveled.
+5. Group the results by `bike_number` to aggregate the total distance per bike.
+# [Sql]: SELECT      bike_number,      SUM(ST_DISTANCE(         ST_GEOGPOINT(bs1.longitude, bs1.latitude),          ST_GEOGPOINT(bs2.longitude, bs2.latitude)     )) AS total_distance FROM      bigquery-public-data.san_francisco.bikeshare_trips bt JOIN      bigquery-public-data.san_francisco.bikeshare_stations bs1 ON bt.start_station_id = bs1.station_id JOIN      bigquery-public-data.san_francisco.bikeshare_stations bs2 ON bt.end_station_id = bs2.station_id GROUP BY      bike_number

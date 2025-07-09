@@ -1,0 +1,14 @@
+# [Question]: Could you tell me the number of orders, average payment per order and customer lifespan in weeks of the 3 custumers with the highest average payment per order, where the lifespan is calculated by subtracting the earliest purchase date from the latest purchase date in days, dividing by seven, and if the result is less than seven days, setting it to 1.0?
+# [Schema links]: [customers.customer_unique_id, customers.customer_id, orders.order_id, orders.customer_id, orders.order_purchase_timestamp, order_payments.payment_value, order_payments.order_id]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `customers` (customer_unique_id, customer_id), `orders` (order_id, customer_id, order_purchase_timestamp), and `order_payments` (payment_value, order_id).
+2. Join `customers` with `orders` on `customer_id` to link customer information with their orders.
+3. Join the result with `order_payments` on `order_id` to include payment values for each order.
+4. Group data by `customer_unique_id` to aggregate per-customer metrics.
+5. Calculate `number_of_orders` using `COUNT(DISTINCT o.order_id)`.
+6. Compute `average_payment_per_order` with `AVG(op.payment_value)`.
+7. Determine the earliest and latest purchase dates using `MIN(o.order_purchase_timestamp)` and `MAX(o.order_purchase_timestamp)`.
+8. Calculate lifespan in days by subtracting MIN from MAX purchase dates using `julianday()` function.
+9. Convert lifespan to weeks: divide days by 7.0, but set to 1.0 if result is less than 1 week.
+10. Order customers by `average_payment_per_order` descending and limit to top 3.
+# [Sql]: SELECT     c.customer_unique_id,     COUNT(DISTINCT o.order_id) AS number_of_orders,     AVG(op.payment_value) AS average_payment_per_order,     CASE         WHEN julianday(MAX(o.order_purchase_timestamp)) - julianday(MIN(o.order_purchase_timestamp)) > 7 THEN             (julianday(MAX(o.order_purchase_timestamp)) - julianday(MIN(o.order_purchase_timestamp))) / 7.0         ELSE 1.0     END AS customer_lifespan_weeks FROM     customers c JOIN     orders o ON c.customer_id = o.customer_id JOIN     order_payments op ON o.order_id = op.order_id GROUP BY     c.customer_unique_id ORDER BY     average_payment_per_order DESC LIMIT 3;

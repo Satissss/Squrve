@@ -1,0 +1,95 @@
+{
+  "api_key": {
+    "deepseek": "sk-b305721c29f54facb3c3849104712519",
+    "qwen": "sk-3f43effded4d49fc934829ee24e79f1d",
+    "zhipu": "7ff727a6f39606898fa5d99a4535a972.tahGD54SmhjkZY4u"
+  },
+  "llm": {
+    "use": "qwen",
+    "model_name": "qwen-plus-latest",
+    "context_window": 120000,
+    "max_token": 8000,
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "time_out": 300.0
+  },
+  "text_embed": {
+    "embed_model_name": "E:/pretrain_model/text_embedding/multilingual_e5_large_instruct"
+  },
+  "dataset": {
+    "data_source": {
+      "spider2_lite": "spider:dev"
+    },
+    "need_few_shot": false,
+    "few_shot_num": 3
+  },
+  "database": {
+    "schema_source": {
+      "spider2_lite": "spider:dev"
+    },
+    "skip_schema_init": true,
+    "need_build_index": false
+  },
+  "generator": {
+    "generate_save_dir": "../files/pred_sql"
+  },
+  "task": {
+    "task_meta": [
+      {
+        "task_id": "reduce_bge",
+        "task_type": "ReduceTask",
+        "data_source": "spider2_lite",
+        "schema_source": "spider2_lite",
+        "is_save_dataset": true,
+        "meta": {
+          "dataset": {
+            "embed_model_name": "E:/pretrain_model/text_embedding/bge_large_en_v15"
+          },
+          "task": {
+            "generate_type": "LinkAlignReducer"
+          }
+        }
+      },
+      {
+        "task_id": "parse",
+        "task_type": "ParseTask",
+        "data_source": "spider2_lite",
+        "schema_source": "spider2_lite",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "generate_type": "LinkAlignParser"
+          }
+        }
+      }
+    ],
+    "cpx_task_meta": [
+      {
+        "task_id": "bge",
+        "task_lis": [
+          "reduce_bge",
+          "parse"
+        ],
+        "dataset_save_path": "../files/data_source/qwen/spider2_lite_bge.json",
+        "meta": {
+          "task": {
+            "max_workers": 3
+          },
+          "actor": {
+            "reduce_bge": {
+              "save_dir": "../files/instance_schemas/bge"
+            },
+            "parse": {
+              "save_dir": "../files/schema_links/bge"
+            }
+          }
+        }
+      }
+    ]
+  },
+  "engine": {
+    "exec_process": [
+      "bge"
+    ]
+  }
+}

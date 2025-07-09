@@ -1,0 +1,13 @@
+# [Question]: What is the highest number of answers received for a single Python 2 specific question on Stack Overflow, excluding any discussions that involve Python 3?
+# [Schema links]: ["stackoverflow.posts_questions.id", "stackoverflow.posts_questions.title", "stackoverflow.posts_questions.body", "stackoverflow.posts_questions.tags", "stackoverflow.posts_answers.parent_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the relevant tables and columns: `posts_questions` (id, title, body, tags) and `posts_answers` (parent_id).
+2. Filter `posts_questions` to include only questions tagged or mentioning Python 2 (e.g., 'python-2', 'python2') in title/body.
+3. Exclude questions mentioning Python 3 (e.g., 'python3', 'python 3') in title/body using negation conditions.
+4. Create a CTE `python2_questions` to store filtered Python 2-specific questions.
+5. Join `python2_questions` with `posts_answers` on `question_id = parent_id` to associate answers with their questions.
+6. Group the joined results by `question_id` to aggregate answers per question.
+7. Count the number of answers for each question using `COUNT(*)`.
+8. Sort the grouped results in descending order by the answer count.
+9. Select the top result with `LIMIT 1` to retrieve the highest answer count.
+# [Sql]: WITH   python2_questions AS (     SELECT       q.id AS question_id,       q.title,       q.body AS question_body,       q.tags     FROM       `bigquery-public-data.stackoverflow.posts_questions` q     WHERE       (LOWER(q.tags) LIKE '%python-2%'       OR LOWER(q.tags) LIKE '%python-2.x%'       OR (         LOWER(q.title) LIKE '%python 2%'         OR LOWER(q.body) LIKE '%python 2%'         OR LOWER(q.title) LIKE '%python2%'         OR LOWER(q.body) LIKE '%python2%'       ))       AND (         LOWER(q.title) NOT LIKE '%python 3%'         AND LOWER(q.body) NOT LIKE '%python 3%'         AND LOWER(q.title) NOT LIKE '%python3%'         AND LOWER(q.body) NOT LIKE '%python3%'       )   )  SELECT   COUNT(*) AS count_number FROM   python2_questions q LEFT JOIN   `bigquery-public-data.stackoverflow.posts_answers` a ON   q.question_id = a.parent_id GROUP BY q.question_id ORDER BY count_number DESC LIMIT 1

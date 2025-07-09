@@ -1,0 +1,12 @@
+# [Question]: I would like to know the given names of baseball players who have achieved the highest value of games played, runs, hits, and home runs, with their corresponding score values.
+# [Schema links]: [player.player_id, batting.player_id, player.name_given, batting.g, batting.r, batting.h, batting.hr]
+# [Analysis]: Let’s think step by step.
+1. Identify required tables and columns: player (player_id, name_given) and batting (player_id, g, r, h, hr).
+2. Join player and batting tables on player_id to associate names with stats.
+3. Aggregate batting stats (g, r, h, hr) using SUM and group by player_id and name_given.
+4. Create CTE (player_batting_stats) to store aggregated player statistics.
+5. For each statistic category (games played, runs, hits, home runs), select rows where the aggregated value equals the maximum of that column in the CTE.
+6. Use subqueries in WHERE clauses to dynamically find maximum values for each category.
+7. Construct separate SELECT statements for each category with labeled Category column and aliased result columns.
+8. Combine all category-specific SELECT statements using UNION ALL to merge results into a single table.
+# [Sql]: WITH player_batting_stats AS (     SELECT         p.player_id,         p.name_given,         SUM(b.g) AS total_games_played,         SUM(b.r) AS total_runs,         SUM(b.h) AS total_hits,         SUM(b.hr) AS total_home_runs     FROM         player p     JOIN         batting b ON p.player_id = b.player_id     GROUP BY         p.player_id, p.name_given ) SELECT     'Games Played' AS Category,     name_given AS Player_Name,     total_games_played AS Top_Value FROM     player_batting_stats WHERE     total_games_played = (SELECT MAX(total_games_played) FROM player_batting_stats)  UNION ALL  SELECT     'Runs' AS Category,     name_given AS Player_Name,     total_runs AS Top_Value FROM     player_batting_stats WHERE     total_runs = (SELECT MAX(total_runs) FROM player_batting_stats)  UNION ALL  SELECT     'Hits' AS Category,     name_given AS Player_Name,     total_hits AS Top_Value FROM     player_batting_stats WHERE     total_hits = (SELECT MAX(total_hits) FROM player_batting_stats)  UNION ALL  SELECT     'Home Runs' AS Category,     name_given AS Player_Name,     total_home_runs AS Top_Value FROM     player_batting_stats WHERE     total_home_runs = (SELECT MAX(total_home_runs) FROM player_batting_stats);

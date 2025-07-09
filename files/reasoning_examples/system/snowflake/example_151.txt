@@ -1,0 +1,12 @@
+# [Question]: Identify the pair of Kaggle users involved in ForumMessageVotes such that one user has given the other the greatest distinct number of upvotes, then also display how many upvotes that recipient returned. Present the usernames of both users, the total distinct upvotes one received from the other, and the upvotes they gave back, sorting by the highest received count and then by the highest given count, and show only the top result.
+# [Schema links]: ["META_KAGGLE.USERS.UserName", "META_KAGGLE.FORUMMESSAGEVOTES.Id", "META_KAGGLE.FORUMMESSAGEVOTES.FromUserId", "META_KAGGLE.USERS.Id", "META_KAGGLE.FORUMMESSAGEVOTES.ToUserId"]
+# [Analysis]: Let’s think step by step.
+1. Identify the tables and columns: `FORUMMESSAGEVOTES` (Id, FromUserId, ToUserId) and `USERS` (Id, UserName).
+2. Join `FORUMMESSAGEVOTES` with `USERS` twice: once for the voter (FromUserId → u1) and once for the recipient (ToUserId → u2).
+3. Use a LEFT JOIN to self-reference `FORUMMESSAGEVOTES` (fmv2) to capture reciprocal upvotes where FromUserId is the original ToUserId and ToUserId is the original FromUserId.
+4. Calculate `ReceivedUpvotes` as the count of distinct fmv1.Id for each FromUserId → ToUserId pair.
+5. Calculate `GivenUpvotes` as the count of distinct fmv2.Id representing reciprocal upvotes from the recipient back to the voter.
+6. Group results by both usernames to aggregate counts per user pair.
+7. Order by `ReceivedUpvotes` DESC then `GivenUpvotes` DESC to prioritize highest received upvotes first.
+8. Limit the result to the top 1 record to get the desired pair.
+# [Sql]: SELECT      u1."UserName" AS VoterUsername,      u2."UserName" AS VotedUsername,      COUNT(DISTINCT fmv1."Id") AS ReceivedUpvotes,      COUNT(DISTINCT fmv2."Id") AS GivenUpvotes  FROM      "META_KAGGLE"."META_KAGGLE"."FORUMMESSAGEVOTES" fmv1  JOIN      "META_KAGGLE"."META_KAGGLE"."USERS" u1      ON fmv1."FromUserId" = u1."Id"  JOIN      "META_KAGGLE"."META_KAGGLE"."USERS" u2      ON fmv1."ToUserId" = u2."Id"  LEFT JOIN      "META_KAGGLE"."META_KAGGLE"."FORUMMESSAGEVOTES" fmv2      ON fmv2."FromUserId" = fmv1."ToUserId"      AND fmv2."ToUserId" = fmv1."FromUserId"  GROUP BY      u1."UserName", u2."UserName"  ORDER BY      ReceivedUpvotes DESC, GivenUpvotes DESC  LIMIT 1;

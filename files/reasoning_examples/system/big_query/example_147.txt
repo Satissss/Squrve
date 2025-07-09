@@ -1,0 +1,13 @@
+# [Question]: Using data from ChEMBL Release 23, retrieve all distinct molecules associated with the company 'SanofiAventis,' listing the trade name and the most recent approval date for each molecule. Make sure to keep only the latest approval date per molecule and ensure the company field precisely matches 'SanofiAventis' without relying on other fields.
+# [Schema links]: ["compound_records_23.molregno", "research_companies_23.company", "products_23.trade_name", "products_23.approval_date", "molecule_synonyms_23.molregno", "research_companies_23.res_stem_id", "formulations_23.molregno", "formulations_23.product_id", "products_23.product_id"]
+# [Analysis]: Let’s think step by step.
+1. Identify the required tables and columns: `compound_records_23` (molregno), `research_companies_23` (company, res_stem_id), `products_23` (trade_name, approval_date, product_id), `molecule_synonyms_23` (molregno), and `formulations_23` (molregno, product_id).
+2. Join `compound_records_23` with `molecule_synonyms_23` on `molregno` to link compound records to molecule synonyms.
+3. Join the result with `research_companies_23` on `res_stem_id` to include company information.
+4. Join with `formulations_23` on `molregno` to connect molecules to products via formulations.
+5. Join with `products_23` on `product_id` to retrieve trade names and approval dates.
+6. Filter rows where `company` exactly matches 'SanofiAventis' to ensure precise company matching.
+7. Use `ROW_NUMBER()` partitioned by `molregno` and ordered by `approval_date` descending to rank approvals per molecule.
+8. Select only rows with `rn = 1` to retain the most recent approval date for each molecule.
+9. Construct the final query by selecting relevant columns and applying the ranking filter.
+# [Sql]: SELECT *   FROM (   SELECT   molregno,   comp.company,   prod.trade_name,   prod.approval_date,   ROW_NUMBER() OVER(PARTITION BY molregno ORDER BY PARSE_DATE('%Y-%m-%d', prod.approval_date) DESC) rn   FROM bigquery-public-data.ebi_chembl.compound_records_23 AS cmpd_rec   JOIN bigquery-public-data.ebi_chembl.molecule_synonyms_23 AS ms USING (molregno)   JOIN bigquery-public-data.ebi_chembl.research_companies_23 AS comp USING (res_stem_id)   JOIN bigquery-public-data.ebi_chembl.formulations_23 AS form USING (molregno)   JOIN bigquery-public-data.ebi_chembl.products_23 AS prod USING (product_id)   ) as subq  WHERE rn = 1 AND company = 'SanofiAventis'

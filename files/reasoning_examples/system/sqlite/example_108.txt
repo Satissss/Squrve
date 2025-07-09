@@ -1,0 +1,12 @@
+# [Question]: Can you identify the hubs that saw more than a 20% increase in finished orders from February to March?
+# [Schema links]: [hubs.hub_id, orders.order_id, orders.store_id, stores.store_id, stores.hub_id, orders.order_moment_finished, orders.order_created_year, orders.order_created_month, hubs.hub_name]
+# [Analysis]: Let’s think step by step.
+1. Identify relevant tables and columns: `hubs` (hub_id, hub_name), `orders` (order_id, order_moment_finished, order_created_year, order_created_month), `stores` (store_id, hub_id).
+2. Filter orders where `order_moment_finished` is not null to consider only finished orders.
+3. Create CTE `feb_orders` to count finished orders in February 2021 per hub by joining `orders` → `stores` → `hubs`.
+4. Create CTE `mar_orders` to count finished orders in March 2021 per hub using the same joins as `feb_orders`.
+5. Join `hubs` with both CTEs on `hub_id` to combine February and March order counts.
+6. Calculate percentage increase using formula: ((mar_order_count - feb_order_count) / feb_order_count) * 100.
+7. Filter hubs where the calculated percentage increase exceeds 20%.
+8. Select hub details, order counts, and percentage increase for qualifying hubs.
+# [Sql]: WITH feb_orders AS (     SELECT          hubs.hub_id,         COUNT(orders.order_id) AS feb_order_count     FROM          orders     JOIN          stores ON orders.store_id = stores.store_id     JOIN          hubs ON stores.hub_id = hubs.hub_id     WHERE          orders.order_moment_finished IS NOT NULL         AND orders.order_created_year = 2021         AND orders.order_created_month = 2     GROUP BY          hubs.hub_id ), mar_orders AS (     SELECT          hubs.hub_id,         COUNT(orders.order_id) AS mar_order_count     FROM          orders     JOIN          stores ON orders.store_id = stores.store_id     JOIN          hubs ON stores.hub_id = hubs.hub_id     WHERE          orders.order_moment_finished IS NOT NULL         AND orders.order_created_year = 2021         AND orders.order_created_month = 3     GROUP BY          hubs.hub_id ) SELECT      hubs.hub_id,     hubs.hub_name,     feb_orders.feb_order_count,     mar_orders.mar_order_count,     (mar_orders.mar_order_count - feb_orders.feb_order_count) * 100.0 / feb_orders.feb_order_count AS percent_increase FROM      hubs JOIN      feb_orders ON hubs.hub_id = feb_orders.hub_id JOIN      mar_orders ON hubs.hub_id = mar_orders.hub_id WHERE      (mar_orders.mar_order_count - feb_orders.feb_order_count) * 100.0 / feb_orders.feb_order_count > 20;
