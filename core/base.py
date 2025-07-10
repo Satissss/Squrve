@@ -1,7 +1,7 @@
 import json
 import warnings
 from pathlib import Path
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Optional
 
 
 class Router:
@@ -16,8 +16,8 @@ class Router:
     such as the DataLoader (for loading datasets and database schemas) and Engine (for managing the core execution flow).
     """
 
-    _sys_config_path = "../config/sys_config.json"
-    _demo_config_path = "../config/demo_config.json"
+    _sys_config_path = "config/sys_config.json"
+    _demo_config_path = "config/demo_config.json"
 
     """ CONFIG """
     _config: dict
@@ -40,29 +40,29 @@ class Router:
 
     """ DATASET """
     _data_source: Union[None, str, List[str], Dict]
-    _data_source_dir: str
+    _data_source_dir: Union[str, None]
     _overwrite_exist_file: bool
     _default_data_file_name: str
 
     _need_few_shot: bool
     _few_shot_num: int
     _sys_few_shot_dir: str
-    _few_shot_save_dir: str
-    _few_show_range: Union[int, str, List[str], List[int]]
+    _few_shot_save_dir: Union[str, None]
+    _few_shot_range: Union[int, str, List[str], List[int]]
 
     _need_external: bool
     _default_get_external_function: str
     _external_range: Union[int, str, List[str], List[int]]
-    _external_save_dir: str
+    _external_save_dir: Union[str, None]
 
-    _db_path: Union[str, List[str], Dict]
+    _db_path: Union[str, List[str], Dict, None]
 
     """ DATABASE """
     _skip_schema_init: bool
     _schema_source: Union[None, str, List[str], Dict]
     _multi_database: Union[bool, List[bool], Dict]
     _vector_store: Union[None, str, List[str], Dict]
-    _schema_source_dir: str
+    _schema_source_dir: Union[str, None]
     _default_schema_dir_name: str
 
     _need_build_index: bool
@@ -79,22 +79,22 @@ class Router:
     _reduce_type: Union[None, str]
     _reduce_output_format: str
     _is_save_reduce: bool
-    _reduce_save_dir: str
+    _reduce_save_dir: Union[str, None]
 
     """ PARSER """
     _parse_type: Union[None, str]
     _is_save_parse: bool
     _parse_save_dir: Union[None, str]
-    _parse_output_format: str
+    _parse_output_format: Union[str, None]
 
     """ GENERATOR"""
     _generate_type: Union[None, str]
     _is_save_generate: bool
-    _generate_save_dir: bool
+    _generate_save_dir: Union[str, None]
 
     """ TASK """
-    _task_meta: Union[Dict, List[Dict]]
-    _cpx_task_meta: Union[Dict, List[Dict]]
+    _task_meta: Union[Dict, List[Dict], None]
+    _cpx_task_meta: Union[Dict, List[Dict], None]
     _default_log_save_dir: str
     _is_save_dataset: bool
     _open_parallel: bool
@@ -111,8 +111,8 @@ class Router:
 
     def __init__(
             self,
-            config_path: str = None,
-            api_key: dict = None,
+            config_path: Optional[str] = None,
+            api_key: Optional[dict] = None,
             use: str = "qwen",
             model_name: str = "qwen-turbo",
             context_window: int = 120000,
@@ -124,42 +124,42 @@ class Router:
             embed_model_name: str = "BAAI/bge-large-en-v1.5",
             use_demo: bool = False,
             is_prepare_data: bool = True,
-            data_source: Union[str, List[str], Dict] = None,
-            data_source_dir: str = None,
+            data_source: Union[str, List[str], Dict, None] = None,
+            data_source_dir: Union[str, None] = None,
             overwrite_exist_file: bool = True,
             need_few_shot: bool = False,
             few_shot_num: int = 3,
-            few_shot_save_dir: str = None,
-            few_show_range: Union[int, str, List[str], List[int]] = None,
+            few_shot_save_dir: Optional[str] = None,
+            few_show_range: Union[int, str, List[str], List[int], None] = None,
             need_external: bool = False,
-            external_range: Union[int, str, List[str], List[int]] = None,
-            external_save_dir: str = None,
-            db_path: Union[str, List[str], Dict] = None,
+            external_range: Union[int, str, List[str], List[int], None] = None,
+            external_save_dir: Optional[str] = None,
+            db_path: Union[str, List[str], Dict, None] = None,
             skip_schema_init: bool = False,
             schema_source: Union[None, str, List[str], Dict] = None,
             multi_database: Union[bool, List[bool], Dict] = False,
             vector_store: Union[None, str, List[str], Dict] = "vector_store",
-            schema_source_dir: str = None,
+            schema_source_dir: Optional[str] = None,
             need_build_index: bool = False,
             index_range: Union[bool, List[str]] = False,
-            reduce_type: str = None,
+            reduce_type: Optional[str] = None,
             reduce_output_format: str = "dataframe",
             is_save_reduce: bool = True,
-            reduce_save_dir: str = None,
+            reduce_save_dir: Optional[str] = None,
             parse_type: Union[None, str] = None,
             is_save_parse: bool = True,
             parse_save_dir: Union[None, str] = None,
-            parse_output_format: str = None,
+            parse_output_format: Optional[str] = None,
             generate_type: Union[None, str] = None,
             is_save_generate: bool = True,
-            generate_save_dir: bool = True,
-            task_meta: Union[Dict, List[Dict]] = None,
-            cpx_task_meta: Union[Dict, List[Dict]] = None,
+            generate_save_dir: Optional[str] = None,
+            task_meta: Union[Dict, List[Dict], None] = None,
+            cpx_task_meta: Union[Dict, List[Dict], None] = None,
             is_save_dataset: bool = True,
             open_parallel: bool = True,
             max_workers: int = 5,
             exec_process: Union[None, List[str]] = None,
-            credential: dict = None
+            credential: Optional[dict] = None
     ):
         """ API KEY """
         self._api_key = {} if api_key is None else api_key
@@ -185,13 +185,13 @@ class Router:
 
         """ DATASET """
         self._data_source = data_source
-        self._data_source_dir = data_source_dir
+        self._data_source_dir = data_source_dir if data_source_dir is not None else ""
         self._overwrite_exist_file = overwrite_exist_file
 
         self._need_few_shot = need_few_shot
         self._few_shot_num = few_shot_num
         self._few_shot_save_dir = few_shot_save_dir
-        self._few_show_range = [] if not few_show_range else few_show_range
+        self._few_shot_range = [] if not few_show_range else few_show_range
 
         self._need_external = need_external
         self._external_range = [] if not external_range else external_range
@@ -224,14 +224,14 @@ class Router:
         """ GENERATOR """
         self._generate_type = generate_type
         self._is_save_generate = is_save_generate
-        self._generate_save_dir = generate_save_dir
+        self._generate_save_dir = generate_save_dir if generate_save_dir is not None else ""
 
         """ TASK """
         self._task_meta = {} if not task_meta else task_meta
         self._cpx_task_meta = {} if not cpx_task_meta else cpx_task_meta
         self._is_save_dataset = is_save_dataset
-        self._open_parallel: bool = open_parallel
-        self._max_workers: int = max_workers
+        self._open_parallel = open_parallel
+        self._max_workers = max_workers
 
         """ ENGINE """
         self._exec_process = exec_process
@@ -259,36 +259,66 @@ class Router:
         return config_
 
     def init_config(self, config: Union[Dict, str]):
-        config = config if type(config) == dict else self._load_config_file(config)
-        self._config = config
+        if isinstance(config, dict):
+            config_dict = config
+        else:
+            config_dict = self._load_config_file(config)
+        
+        self._config = config_dict
 
-        setup_keys = list(config.keys())
+        setup_keys = list(config_dict.keys())
         if "api_key" in setup_keys:
-            self.init_api_key_config(config.get("api_key"))
+            api_key_config = config_dict.get("api_key")
+            if api_key_config is not None:
+                self.init_api_key_config(api_key_config)
         if "llm" in setup_keys:
-            self.init_llm_config(config.get("llm"))
+            llm_config = config_dict.get("llm")
+            if llm_config is not None:
+                self.init_llm_config(llm_config)
         if "text_embed" in setup_keys:
-            self.init_text_embed_config(config.get("text_embed"))
+            text_embed_config = config_dict.get("text_embed")
+            if text_embed_config is not None:
+                self.init_text_embed_config(text_embed_config)
         if "router" in setup_keys:
-            self.init_router_config(config.get("router"))
+            router_config = config_dict.get("router")
+            if router_config is not None:
+                self.init_router_config(router_config)
         if "dataloader" in setup_keys:
-            self.init_dataloader_config(config.get("dataloader"))
+            dataloader_config = config_dict.get("dataloader")
+            if dataloader_config is not None:
+                self.init_dataloader_config(dataloader_config)
         if "dataset" in setup_keys:
-            self.init_dataset_config(config.get("dataset"))
+            dataset_config = config_dict.get("dataset")
+            if dataset_config is not None:
+                self.init_dataset_config(dataset_config)
         if "database" in setup_keys:
-            self.init_database_config(config.get("database"))
+            database_config = config_dict.get("database")
+            if database_config is not None:
+                self.init_database_config(database_config)
         if "reducer" in setup_keys:
-            self.init_reducer_config(config.get("reducer"))
+            reducer_config = config_dict.get("reducer")
+            if reducer_config is not None:
+                self.init_reducer_config(reducer_config)
         if "parser" in setup_keys:
-            self.init_parser_config(config.get("parser"))
+            parser_config = config_dict.get("parser")
+            if parser_config is not None:
+                self.init_parser_config(parser_config)
         if "generator" in setup_keys:
-            self.init_generator_config(config.get("generator"))
+            generator_config = config_dict.get("generator")
+            if generator_config is not None:
+                self.init_generator_config(generator_config)
         if "task" in setup_keys:
-            self.init_task_config(config.get("task"))
+            task_config = config_dict.get("task")
+            if task_config is not None:
+                self.init_task_config(task_config)
         if "engine" in setup_keys:
-            self.init_engine_config(config.get("engine"))
+            engine_config = config_dict.get("engine")
+            if engine_config is not None:
+                self.init_engine_config(engine_config)
         if "credential" in setup_keys:
-            self.init_credential_config(config.get("credential"))
+            credential_config = config_dict.get("credential")
+            if credential_config is not None:
+                self.init_credential_config(credential_config)
 
     def _init_system_config(self):
         system_config_ = self._load_config_file(self._sys_config_path)
@@ -340,7 +370,7 @@ class Router:
         self._need_few_shot = dataset_.get("need_few_shot", self._need_few_shot)
         self._few_shot_num = dataset_.get("few_shot_num", self._few_shot_num)
         self._few_shot_save_dir = dataset_.get("few_shot_save_dir", self._few_shot_save_dir)
-        self._few_show_range = dataset_.get("few_show_range", self._few_show_range)
+        self._few_shot_range = dataset_.get("few_shot_range", self._few_shot_range)
 
         self._need_external = dataset_.get("need_external", self._need_external)
         self._external_range = dataset_.get("external_range", self._external_range)
@@ -356,7 +386,7 @@ class Router:
         self._schema_source_dir = database_.get("schema_source_dir", self._schema_source_dir)
 
         self._need_build_index = database_.get("need_build_index", self._need_build_index)
-        self._index_range = database_.get("schema_source", self._schema_source)
+        self._index_range = database_.get("index_range", self._index_range)
 
     def init_reducer_config(self, reducer_: Dict):
         self._reduce_type = reducer_.get("reduce_type", self._reduce_type)
@@ -388,12 +418,13 @@ class Router:
     def init_credential_config(self, credential_: Dict):
         self._credential = credential_
 
-    def get_config_param(self, category: str, item: str = None):
-        category = self._config.get(category, None)
-        if not category or not item:
-            return category
-        item = category.get(item, None)
-        return item
+    def get_config_param(self, category: str, item: Optional[str] = None):
+        category_config = self._config.get(category, None)
+        if not category_config or not item:
+            return category_config
+        if isinstance(category_config, dict):
+            return category_config.get(item, None)
+        return None
 
     def get_credential(self, db_type: str):
         if db_type not in self._credential.keys():
@@ -517,7 +548,7 @@ class Router:
 
     @property
     def few_shot_range(self):
-        return self._few_show_range
+        return self._few_shot_range
 
     @property
     def need_external(self):

@@ -565,7 +565,7 @@ class Engine:
             return None
         if multi_type in ("parallel", "para"):
             execute_task = ParallelTask()
-        elif multi_type == ("sequence", "seq"):
+        elif multi_type in ("sequence", "seq"):
             execute_task = SequenceTask()
         else:
             warnings.warn(f"The `{multi_type}` is incorrect.", category=UserWarning)
@@ -627,7 +627,7 @@ class Engine:
         return execute_task
 
     def parse_exec_process_simple(self):
-        if self.tasks:
+        if not self.tasks:
             return None
         tasks = list(self.tasks.values())
 

@@ -1,3 +1,21 @@
+"""
+Data Management Module for Squrve Framework
+
+This module provides comprehensive data management capabilities for Text-to-SQL processing,
+including dataset handling, schema management, and vector store operations.
+
+Classes:
+    Dataset: Encapsulates dataset and schema for single task runs
+    DataLoader: Manages multiple datasets and schemas for Text-to-SQL processes
+
+Key Features:
+    - Multi-database support with flexible configuration
+    - Vector store integration for schema indexing
+    - Few-shot learning capabilities
+    - External knowledge integration
+    - Comprehensive data validation and preprocessing
+"""
+
 from core.base import Router
 
 from llama_index.core.llms.llm import LLM
@@ -7,7 +25,7 @@ from core.utils import load_dataset, save_dataset
 
 from os import PathLike
 from pathlib import Path
-from typing import Union, Dict, List, Callable
+from typing import Union, Dict, List, Callable, Optional, Any
 import warnings
 import random
 
@@ -16,54 +34,49 @@ class Dataset:
     """
     Dataset encapsulates the core dataset and corresponding database schema for a single task run.
 
-    It supports flexible dataset construction from various sources (JSON file, list of dicts, etc.)
-    and schema definitions, with options for random sampling and filtering. A Dataset can be
-    generated automatically from an existing DataLoader object or manually constructed using
-    dictionary-based configuration.
-
-    The Dataset class is one of the key modules in Squrve. It is essential for downstream
-    components such as Actor (via the act method) and Task (via the run method). Each Dataset
-    instance uniquely maps to a configuration dictionary, enabling reproducibility and ease of integration.
+    Supports flexible dataset construction from various sources (JSON file, list of dicts, etc.)
+    and schema definitions, with options for random sampling and filtering.
 
     Key features:
-    - Supports single and multi-database configurations.
-    - Allows schema finalization and indexing.
-    - Enables vector store configuration and embedding model selection.
-    - Compatible with both pre-defined and custom data sources.
-
+    - Supports single and multi-database configurations
+    - Allows schema finalization and indexing
+    - Enables vector store configuration and embedding model selection
+    - Compatible with both pre-defined and custom data sources
     """
 
     def __init__(
             self,
             data_source: Union[str, PathLike, List[Dict]],
-            schema_source: Union[str, PathLike],  # <schema_save_source> / <schema_index>
+            schema_source: Union[str, PathLike],
             is_schema_final: bool = False,
-            dataset_index: Union[str, int] = None,
-            schema_index: Union[str, int] = None,
-            random_size: float = None,
-            filter_by: str = None,
+            dataset_index: Optional[Union[str, int]] = None,
+            schema_index: Optional[Union[str, int]] = None,
+            random_size: Optional[float] = None,
+            filter_by: Optional[str] = None,
             multi_database: bool = False,
             vector_store: str = "vector_store",
             embed_model_name: str = "BAAI/bge-large-en-v1.5",
-            db_credential: Dict = None,
-            db_path: Union[str, PathLike] = None,
+            db_credential: Optional[Dict] = None,
+            db_path: Optional[Union[str, PathLike]] = None,
             **kwargs
     ):
         """
-        Parameters:
-        * data_source (Union[str, PathLike, List[Dict]]): The input data source.
-        * schema_source (Union[str, PathLike]): The path or identifier for the database schema.
-        * is_schema_final (bool): Whether the schema is finalized and ready for use.
-        * dataset_index (Union[str, int]): Optional identifier for the dataset.
-        * schema_index (Union[str, int]): Optional identifier for the schema.
-        * random_size (float): Proportion of data to sample randomly.
-        * filter_by (str): Filtering condition for dataset records.
-        * multi_database (bool): Whether the dataset involves multiple databases.
-        * vector_store (str): Path or name of the vector store.
-        * embed_model_name (str): Name of the embedding model used for vectorization.
-        * db_credential (Dict): Optional database connection credentials.
-        * db_path (Union[str, PathLike]): Optional path to the database.
+        Initialize a Dataset instance.
 
+        Args:
+            data_source: The input data source (file path or list of dicts)
+            schema_source: Path or identifier for the database schema
+            is_schema_final: Whether the schema is finalized and ready for use
+            dataset_index: Optional identifier for the dataset
+            schema_index: Optional identifier for the schema
+            random_size: Proportion of data to sample randomly
+            filter_by: Filtering condition for dataset records
+            multi_database: Whether the dataset involves multiple databases
+            vector_store: Path or name of the vector store
+            embed_model_name: Name of the embedding model for vectorization
+            db_credential: Optional database connection credentials
+            db_path: Optional path to the database
+            **kwargs: Additional keyword arguments
         """
         self._data_source = data_source
         self._dataset: List[Dict] = self.__init_data_source__(data_source, random_size, filter_by)
@@ -76,7 +89,7 @@ class Dataset:
         self.vector_store = vector_store
         self.embed_model_name = embed_model_name
         self.db_credential: dict = {} if not db_credential else db_credential
-        self.db_path: Union[str, PathLike] = db_path
+        self.db_path: Optional[Union[str, PathLike]] = db_path
 
         self.suffix = self.__init_suffix__(random_size, filter_by)
 
@@ -124,19 +137,27 @@ class Dataset:
     def __init_data_source__(
             cls,
             data_source: Union[str, PathLike, List[Dict]],
-            random_size: Union[float, int] = None,
-            filter_by: str = None
-    ) -> List:
+            random_size: Optional[Union[float, int]] = None,
+            filter_by: Optional[str] = None
+    ) -> List[Dict]:
         if isinstance(data_source, str):
             data_source = Path(data_source)
         if isinstance(data_source, Path):
-            data_source = load_dataset(data_source)
+            loaded_data = load_dataset(data_source)
+            if isinstance(loaded_data, list):
+                data_source = loaded_data
+            else:
+                return []
+
         if not data_source or not isinstance(data_source, list):
             return []
 
         if random_size:
-            random_size = random_size if isinstance(random_size, int) else random_size
-            data_source = random.sample(data_source, random_size)
+            if isinstance(random_size, float):
+                sample_size = int(len(data_source) * random_size)
+            else:
+                sample_size = random_size
+            data_source = random.sample(data_source, sample_size)
 
         if filter_by:
             data_source = filter_dataset(dataset_=data_source, filter_by_=filter_by)
@@ -144,7 +165,7 @@ class Dataset:
         return data_source
 
     @classmethod
-    def __init_suffix__(cls, random_size: Union[float, int] = None, filter_by: str = None):
+    def __init_suffix__(cls, random_size: Optional[Union[float, int]] = None, filter_by: Optional[str] = None):
         suffix = ""
         if random_size is not None:
             suffix += "rnd_" + str(random_size)
@@ -154,7 +175,7 @@ class Dataset:
 
         return suffix
 
-    def get_vector_index(self, item=None, db_id: str = None):
+    def get_vector_index(self, item: Optional[int] = None, db_id: Optional[str] = None):
         if item is not None:
             row = self.__getitem__(item)
             db_id = row.get("db_id")
@@ -163,9 +184,10 @@ class Dataset:
             warnings.warn("Failed to retrieve vector index: 'db_id' must not be None.", category=UserWarning)
             return None
 
+        source_index = str(self.schema_index) if self.schema_index else ""
         vec_store_dir = get_vector_store_dir(
             source=self.schema_source,
-            source_index=self.schema_index,
+            source_index=source_index,
             db_id=db_id,
             vector_store=self.vector_store,
             embed_model_name=self.embed_model_name,
@@ -182,7 +204,7 @@ class Dataset:
 
         return vector_index
 
-    def get_db_schema(self, item: int = None, db_id: str = None):
+    def get_db_schema(self, item: Optional[int] = None, db_id: Optional[str] = None):
         if item is not None:
             row = self.__getitem__(item)
             db_id = row["db_id"]
@@ -217,7 +239,7 @@ class Dataset:
 
         return None
 
-    def save_data(self, dataset_save_path: Union[str, PathLike] = None):
+    def save_data(self, dataset_save_path: Optional[Union[str, PathLike]] = None):
         """Save dataset to the data source, optionally modifying the filename suffix."""
         path = None
         if dataset_save_path:
@@ -225,7 +247,11 @@ class Dataset:
             if dataset_save_path.suffix:
                 path = dataset_save_path
         if not path:
-            path = Path(self._data_source)
+            if isinstance(self._data_source, (str, PathLike)):
+                path = Path(self._data_source)
+            else:
+                warnings.warn("Cannot save dataset: data_source is not a file path", category=UserWarning)
+                return
 
         if self.suffix:
             filename = f"{path.stem}_{self.suffix}_{path.suffix}"
@@ -307,7 +333,7 @@ class Dataset:
         if not {"dataset", "schema"}.issubset(main):
             return None
 
-        main = {
+        main_params = {
             "data_source": main.get("dataset"),
             "schema_source": main.get("schema"),
             "dataset_index": main.get("dataset_index"),
@@ -316,16 +342,27 @@ class Dataset:
         # 合并 sub（如果存在）到 main
         sub = dataset_dict.get("sub")
         if isinstance(sub, dict):
-            main = {**main, **sub}
+            main_params = {**main_params, **sub}
 
-        return Dataset(**main)
+        # Filter out None values for required parameters and provide defaults
+        if main_params.get("data_source") is None or main_params.get("schema_source") is None:
+            warnings.warn("Required parameters data_source and schema_source cannot be None", category=UserWarning)
+            return None
+
+        # Provide default values for optional parameters
+        main_params.setdefault("is_schema_final", False)
+        main_params.setdefault("multi_database", False)
+        main_params.setdefault("vector_store", "vector_store")
+        main_params.setdefault("embed_model_name", "BAAI/bge-large-en-v1.5")
+
+        return Dataset(**main_params)
 
 
 def update_dataset(
         self: Union[Dataset, Dict],
         other: Union[Dataset, Dict],
         merge_dataset: bool = False
-):
+) -> Union[Dataset, Dict, None]:
     if not other:
         warnings.warn("Dataset update error!", category=UserWarning)
     if not self:
@@ -350,9 +387,9 @@ def update_dataset(
     if "sub" in other_dict.keys():
         self_dict.setdefault("sub", dict()).update(other_dict["sub"])
 
-    self = self.resolve_dataset_from_dict(self_dict)
+    result = Dataset.resolve_dataset_from_dict(self_dict)
 
-    return self
+    return result
 
 
 class DataLoader:
@@ -389,59 +426,59 @@ class DataLoader:
 
     def __init__(
             self,
-            router: Router = None,
-            llm: LLM = None,
-            dataset: List = None,
-            schema: List = None,
-            embed_model_source: str = None,
-            embed_model_name: str = None,
-            data_source: Union[str, List[str], Dict] = None,
-            data_source_dir: str = None,
-            overwrite_exist_file: bool = None,
-            need_few_shot: bool = None,
-            few_shot_num: int = None,
-            few_shot_save_dir: str = None,
-            few_shot_range: Union[int, str, List[str], List[int]] = None,
-            need_external: bool = None,
-            external_function: Callable = None,
-            external_range: List[str] = None,
-            external_save_dir: str = None,
-            db_path: Union[str, List[str], Dict] = None,
-            skip_schema_init: bool = None,
-            schema_source: Union[None, str, List[str], Dict] = None,
-            multi_database: Union[bool, List[bool], Dict] = None,
-            vector_store: Union[None, str, List[str], Dict] = None,
-            schema_source_dir: str = None,
-            need_build_index: bool = None,
-            index_range: Union[bool, List[str]] = None,
-            is_prepare_data: bool = None
+            router: Optional[Router] = None,
+            llm: Optional[LLM] = None,
+            dataset: Optional[List] = None,
+            schema: Optional[List] = None,
+            embed_model_source: Optional[str] = None,
+            embed_model_name: Optional[str] = None,
+            data_source: Optional[Union[str, List[str], Dict]] = None,
+            data_source_dir: Optional[str] = None,
+            overwrite_exist_file: Optional[bool] = None,
+            need_few_shot: Optional[bool] = None,
+            few_shot_num: Optional[int] = None,
+            few_shot_save_dir: Optional[str] = None,
+            few_shot_range: Optional[Union[int, str, List[str], List[int]]] = None,
+            need_external: Optional[bool] = None,
+            external_function: Optional[Callable] = None,
+            external_range: Optional[List[str]] = None,
+            external_save_dir: Optional[str] = None,
+            db_path: Optional[Union[str, List[str], Dict]] = None,
+            skip_schema_init: Optional[bool] = None,
+            schema_source: Optional[Union[str, List[str], Dict]] = None,
+            multi_database: Optional[Union[bool, List[bool], Dict]] = None,
+            vector_store: Optional[Union[str, List[str], Dict]] = None,
+            schema_source_dir: Optional[str] = None,
+            need_build_index: Optional[bool] = None,
+            index_range: Optional[Union[bool, List[str]]] = None,
+            is_prepare_data: Optional[bool] = None
     ):
         self.router = router if router else Router()
 
         self.llm = llm if llm else self.init_llm()
 
-        self.embed_model_source = embed_model_source if embed_model_source else router.embed_model_source
-        self.embed_model_name = embed_model_name if embed_model_name else router.embed_model_name
+        self.embed_model_source = embed_model_source if embed_model_source else self.router.embed_model_source
+        self.embed_model_name = embed_model_name if embed_model_name else self.router.embed_model_name
 
-        self.data_source = data_source if data_source else router.data_source
-        self.data_source_dir = data_source_dir if data_source_dir else router.data_source_dir
-        self.default_data_file_name = router.default_data_file_name
-        self.overwrite_exist_file = overwrite_exist_file if overwrite_exist_file is not None else router.overwrite_exist_file
+        self.data_source = data_source if data_source else self.router.data_source
+        self.data_source_dir = data_source_dir if data_source_dir else self.router.data_source_dir
+        self.default_data_file_name = self.router.default_data_file_name
+        self.overwrite_exist_file = overwrite_exist_file if overwrite_exist_file is not None else self.router.overwrite_exist_file
 
-        self.need_few_shot = need_few_shot if need_few_shot is not None else router.need_few_shot
-        self.few_shot_num = few_shot_num if few_shot_num else router.few_shot_num
-        self.sys_few_shot_dir = router.sys_few_shot_dir
-        self.few_shot_save_dir = few_shot_save_dir if few_shot_save_dir else router.few_shot_save_dir
-        self.few_shot_range = few_shot_range if few_shot_range else router.few_shot_range
+        self.need_few_shot = need_few_shot if need_few_shot is not None else self.router.need_few_shot
+        self.few_shot_num = few_shot_num if few_shot_num else self.router.few_shot_num
+        self.sys_few_shot_dir = self.router.sys_few_shot_dir
+        self.few_shot_save_dir = few_shot_save_dir if few_shot_save_dir else self.router.few_shot_save_dir
+        self.few_shot_range = few_shot_range if few_shot_range else self.router.few_shot_range
 
-        self.need_external = need_external if need_external is not None else router.need_external
+        self.need_external = need_external if need_external is not None else self.router.need_external
         self.external_function = external_function if external_function else self.init_default_external_function(
-            router.default_get_external_function)
-        self.external_range = external_range if external_range else router.external_range
-        self.external_save_dir = external_save_dir if external_save_dir else router.external_save_dir
+            self.router.default_get_external_function)
+        self.external_range = external_range if external_range else self.router.external_range
+        self.external_save_dir = external_save_dir if external_save_dir else self.router.external_save_dir
 
-        self.skip_schema_init = skip_schema_init if skip_schema_init is not None else router.skip_schema_init
-        self.schema_source = schema_source if schema_source else router.schema_source
+        self.skip_schema_init = skip_schema_init if skip_schema_init is not None else self.router.skip_schema_init
+        self.schema_source = schema_source if schema_source else self.router.schema_source
         """
         schema_save_source is the actual saved path, obtained through the get_schema_source_by_index method.
         - Example:
@@ -454,22 +491,22 @@ class DataLoader:
         }
         """
         self.schema_save_source: dict = {}
-        self.multi_database = multi_database if multi_database else router.multi_database
-        self.vector_store = vector_store if vector_store else router.vector_store
+        self.multi_database = multi_database if multi_database else self.router.multi_database
+        self.vector_store = vector_store if vector_store else self.router.vector_store
 
-        self.schema_source_dir = schema_source_dir if schema_source_dir else router.schema_source_dir
-        self.default_schema_dir_name = router.default_schema_dir_name
-        self.need_build_index = need_build_index if need_build_index is not None else router.need_build_index
-        self.index_range = index_range if index_range is not None else router.index_range
+        self.schema_source_dir = schema_source_dir if schema_source_dir else self.router.schema_source_dir
+        self.default_schema_dir_name = self.router.default_schema_dir_name
+        self.need_build_index = need_build_index if need_build_index is not None else self.router.need_build_index
+        self.index_range = index_range if index_range is not None else self.router.index_range
 
         self.obtained_db_path: dict = {}
 
-        self.__init_data_source__(dataset, router.db_path if db_path is None else db_path)
+        self.__init_data_source__(dataset, self.router.db_path if db_path is None else db_path)
         self.__init_schema_source__(schema)
-        if is_prepare_data or router.is_prepare_data:
+        if is_prepare_data or self.router.is_prepare_data:
             self.prepare_dataset()
 
-    def get_data_source_index(self, output_format: str = None):
+    def get_data_source_index(self, output_format: Optional[str] = None):
         """ Return the indexes of all data sources. """
         if self.data_source is None:
             return None
@@ -487,7 +524,8 @@ class DataLoader:
 
         return None
 
-    def get_data_source_by_index(self, index_: Union[None, int, str, List[str], List[int]], output_format: str = None):
+    def get_data_source_by_index(self, index_: Optional[Union[int, str, List[str], List[int]]],
+                                 output_format: Optional[str] = None):
         if index_ is None:
             return self.data_source
 
@@ -496,7 +534,7 @@ class DataLoader:
             if isinstance(self.data_source, list):
                 source_ = self.data_source[index_] if 0 <= index_ < len(self.data_source) else None
             elif isinstance(self.data_source, dict):
-                source_ = self.data_source.get(index_, None)
+                source_ = self.data_source.get(str(index_), None)
         elif isinstance(index_, str):
             if isinstance(self.data_source, str):
                 source_ = self.data_source if Path(self.data_source).stem == index_ else None
@@ -504,44 +542,74 @@ class DataLoader:
                 source_ = self.data_source.get(index_, None)
         elif isinstance(index_, list):
             # 传入列表索引列表时，以字典形式返回所有 datasource
-            index_ = list(dict.fromkeys(index_))
+            unique_index = list(dict.fromkeys(index_))
             sub_data_source = {}
             if isinstance(self.data_source, dict):
-                for ind in index_:
-                    sub_data_source[ind] = self.data_source.get(ind, None)
-            elif isinstance(index_[0], int) and isinstance(self.data_source, list):
-                for ind in index_:
-                    sub_data_source[ind] = self.data_source[ind] if 0 <= ind < len(self.data_source) else None
+                for ind in unique_index:
+                    sub_data_source[str(ind)] = self.data_source.get(str(ind), None)
+            elif isinstance(unique_index[0], int) and isinstance(self.data_source, list):
+                for ind in unique_index:
+                    if isinstance(ind, int) and 0 <= ind < len(self.data_source):
+                        sub_data_source[str(ind)] = self.data_source[ind]
+                    else:
+                        sub_data_source[str(ind)] = None
 
             source_ = sub_data_source if sub_data_source else None
 
         if output_format == "dict":
-            return source_ if not source_ or isinstance(source_, dict) else {index_: source_}
+            return source_ if not source_ or isinstance(source_, dict) else {str(index_): source_}
 
         return source_
 
     def get_schema_source_index(self):
         return list(self.schema_save_source.keys()) if self.schema_save_source else None
 
-    def get_schema_source_by_index(self, index_: Union[None, int, str, List[str], List[int]], key: str = None):
+    def get_schema_source_by_index(self, index_: Optional[Union[int, str, List[str], List[int]]],
+                                   key: Optional[str] = None):
+        """
+        Get schema source by index.
+        
+        Args:
+            index_: Index or list of indices to retrieve. If None, returns all schema sources.
+            key: Optional key to extract from the schema source metadata.
+            
+        Returns:
+            Dict containing the requested schema sources, or None if not found.
+        """
         if not index_:
-            return self.schema_save_source
+            # Return all schema sources, optionally filtered by key
+            if key is None:
+                return self.schema_save_source
+            else:
+                # Filter all schema sources by the specified key
+                filtered_sources = {}
+                for idx, meta_source in self.schema_save_source.items():
+                    if meta_source and key in meta_source:
+                        filtered_sources[idx] = meta_source[key]
+                return filtered_sources if filtered_sources else None
 
         sub_data_source = {}
         if isinstance(index_, (int, str)):
-            meta_source = self.schema_save_source.get(index_, None)
+            meta_source = self.schema_save_source.get(str(index_), None)
             if meta_source:
-                sub_data_source[index_] = meta_source if not key else meta_source.get(key, None)
+                if key is None:
+                    sub_data_source[str(index_)] = meta_source
+                elif key in meta_source:
+                    sub_data_source[str(index_)] = meta_source[key]
         else:
-            index_ = list(dict.fromkeys(index_))
-            for ind in index_:
-                meta_source = self.schema_save_source.get(ind, None)
+            # Handle list of indices
+            unique_index = list(dict.fromkeys(index_))
+            for ind in unique_index:
+                meta_source = self.schema_save_source.get(str(ind), None)
                 if meta_source:
-                    sub_data_source[ind] = meta_source if not key else meta_source.get(key, None)
+                    if key is None:
+                        sub_data_source[str(ind)] = meta_source
+                    elif key in meta_source:
+                        sub_data_source[str(ind)] = meta_source[key]
 
         return sub_data_source if sub_data_source else None
 
-    def init_llm(self, use: str = None, **kwargs):
+    def init_llm(self, use: Optional[str] = None, **kwargs):
         llm_ = None
         try:
             init_args = {
@@ -609,22 +677,30 @@ class DataLoader:
 
         return llm_
 
-    def __init_data_source__(self, dataset: List = None, db_path: Union[str, List[str], Dict] = None):
+    def __init_data_source__(self, dataset: Optional[List] = None,
+                             db_path: Optional[Union[str, List[str], Dict]] = None):
 
-        def init_single_item(data_source_: str, index_: Union[int, str] = None):
+        def init_single_item(data_source_: str, index_: Optional[Union[int, str]] = None):
             if data_source_.count(":") != 2:
                 init_single_db_path(index_)
                 return
+            if not isinstance(self.data_source, str):
+                warnings.warn("data_source is not a string, cannot split", category=UserWarning)
+                return
             file_name_ = "_".join(self.data_source.split(":"))
+            if self.data_source_dir is None:
+                warnings.warn("data_source_dir is None", category=UserWarning)
+                return
             save_data_source = Path(self.data_source_dir) / (file_name_ + ".json")
             if self.overwrite_exist_file or not save_data_source.exists():
-                self.init_benchmark_dataset(source_, index_, save_data_source=save_data_source)
+                self.init_benchmark_dataset(data_source_, index_, save_data_source=save_data_source)
             if index_ is None:
                 index_ = file_name_
             if isinstance(self.data_source, str):
                 self.data_source = str(save_data_source)
             else:
-                self.data_source[index_] = str(save_data_source)
+                if isinstance(self.data_source, dict):
+                    self.data_source[index_] = str(save_data_source)
             init_single_db_path(index_)
 
         def check_db_path(db_path_: str):
@@ -633,32 +709,39 @@ class DataLoader:
             if db_path_.count(":") == 1:
                 # use benchmark db path
                 id_, sub_id_ = db_path_.split(":")
-                db_path_ = self.router.get_benchmark_db_path(id_, sub_id_)
+                db_path_result = self.router.get_benchmark_db_path(id_, sub_id_)
+                if db_path_result is not None:
+                    db_path_ = db_path_result
             if db_path_ and Path(db_path_).exists():
                 return db_path_
             return None
 
-        def init_single_db_path(index_: Union[int, str] = None):
+        def init_single_db_path(index_: Optional[Union[int, str]] = None):
             if db_path is None:
                 return
             if isinstance(db_path, str):
                 db_path_ = check_db_path(db_path)
-                if db_path_:
+                if db_path_ and index_ is not None:
                     self.set_db_path(index_, db_path_)
             elif isinstance(db_path, list):
                 if isinstance(self.data_source, list) and len(db_path) == len(self.data_source):
-                    db_path_ = check_db_path(db_path[index_])
-                    if db_path_:
-                        self.set_db_path(index_, db_path_)
+                    if isinstance(index_, int) and 0 <= index_ < len(db_path):
+                        db_path_ = check_db_path(db_path[index_])
+                        if db_path_:
+                            self.set_db_path(index_, db_path_)
             elif isinstance(db_path, dict):
-                db_path_ = check_db_path(db_path.get(index_, None))
-                if db_path_:
-                    self.set_db_path(index_, db_path_)
+                if index_ is not None:
+                    db_path_value = db_path.get(str(index_), None)
+                    if db_path_value is not None:
+                        db_path_ = check_db_path(db_path_value)
+                        if db_path_:
+                            self.set_db_path(index_, db_path_)
 
         if self.data_source is not None:
             if isinstance(self.data_source, str):
                 ind = self.get_data_source_index()
-                init_single_item(self.data_source, ind)
+                if isinstance(ind, (int, str)):
+                    init_single_item(self.data_source, ind)
 
             elif isinstance(self.data_source, list):
                 for ind, source_ in enumerate(self.data_source):
@@ -669,6 +752,9 @@ class DataLoader:
                     init_single_item(source_, key_)
 
         if dataset:
+            if self.data_source_dir is None or self.default_data_file_name is None:
+                warnings.warn("data_source_dir or default_data_file_name is None", category=UserWarning)
+                return
             new_data_source = Path(self.data_source_dir) / self.default_data_file_name
             if self.overwrite_exist_file or not new_data_source.exists():
                 save_dataset(dataset=dataset, new_data_source=new_data_source)
@@ -680,7 +766,7 @@ class DataLoader:
     def update_data_source(
             self,
             save_path_: Union[str, PathLike],
-            data_source_index: Union[int, str] = None
+            data_source_index: Optional[Union[int, str]] = None
     ):
         save_path_ = str(save_path_)
         if self.data_source is None:
@@ -688,16 +774,17 @@ class DataLoader:
         elif isinstance(self.data_source, str):
             origin_data_source = self.get_data_source_index()
             dataset_index = Path(save_path_).stem if data_source_index is None else data_source_index
-            self.data_source = {
-                origin_data_source: self.data_source,
-                dataset_index: save_path_
-            }
+            if isinstance(origin_data_source, (str, int)):
+                self.data_source = {
+                    str(origin_data_source): self.data_source,
+                    str(dataset_index): save_path_
+                }
         elif isinstance(self.data_source, List):
             # data_source_index is not effective if self.data_source is list object.
             self.data_source.append(save_path_)
         elif isinstance(self.data_source, dict):
             dataset_index = Path(self.default_data_file_name).stem if data_source_index is None else data_source_index
-            self.data_source[dataset_index] = save_path_
+            self.data_source[str(dataset_index)] = save_path_
             return dataset_index
 
     @staticmethod
@@ -722,9 +809,9 @@ class DataLoader:
     def init_benchmark_dataset(
             self,
             identifier: str,
-            data_source_index: Union[int, str],
+            data_source_index: Optional[Union[int, str]],
             is_save_dataset: bool = True,
-            save_data_source: Union[str, PathLike] = None,
+            save_data_source: Optional[Union[str, PathLike]] = None,
             update_db_path: bool = True
     ):
         """ Locate dataset by identifier, initialize and return the dataset list. """
@@ -771,18 +858,21 @@ class DataLoader:
             return None
 
         # Add external paths to dataset rows if external_path exists
-        if external_path:
+        if external_path and isinstance(dataset_, list):
             for row in dataset_:
-                file_name = row.get("external_path", "")
-                row["external_path"] = str(external_path / file_name) if file_name else ""
+                if isinstance(row, dict):
+                    file_name = row.get("external_path", "")
+                    row["external_path"] = str(external_path / file_name) if file_name else ""
 
         # Filter dataset
-        dataset_ = filter_dataset(dataset_=dataset_, filter_by_=filter_by_)
+        if isinstance(dataset_, list):
+            dataset_ = filter_dataset(dataset_=dataset_, filter_by_=filter_by_)
 
         # Update database path if requested
-        if update_db_path:
+        if update_db_path and data_source_index is not None:
             benchmark_db_path = self.router.get_benchmark_db_path(id_, sub_id_)
-            self.set_db_path(data_source_index, benchmark_db_path)
+            if benchmark_db_path is not None:
+                self.set_db_path(data_source_index, benchmark_db_path)
 
         # Save dataset if requested
         if is_save_dataset:
@@ -793,13 +883,18 @@ class DataLoader:
 
         return dataset_
 
-    def __init_schema_source__(self, schema: List = None):
+    def __init_schema_source__(self, schema: Optional[List] = None):
+        if schema is None:
+            schema = []
 
-        def init_single_item(source_: str, index_: Union[str, int] = None):
+        def init_single_item(source_: str, index_: Optional[Union[str, int]] = None):
             if ":" in Path(source_).stem:
                 index_ = source_.replace(":", "_") if not index_ else index_
                 multi_db_ = self.query_multi_database(index_, self.multi_database)
                 vector_store_ = self.query_vector_store(index_, self.vector_store)
+                if self.schema_source_dir is None:
+                    warnings.warn("schema_source_dir is None, cannot proceed", category=UserWarning)
+                    return
                 save_schema_source = Path(self.schema_source_dir) / source_.replace(":", "_")
                 if self.skip_schema_init:
                     save_schema_source = save_schema_source / "schema.json"
@@ -810,7 +905,7 @@ class DataLoader:
                 index_ = Path(source_).stem if not index_ else index_
                 multi_db_ = self.query_multi_database(index_, self.multi_database)
                 vector_store_ = self.query_vector_store(index_, self.vector_store)
-                save_schema_source = source_ if self.skip_schema_init else Path(self.schema_source_dir) / index_
+                save_schema_source = source_ if self.skip_schema_init else Path(self.schema_source_dir) / str(index_)
                 if not self.skip_schema_init:
                     self.central_schema_process(source_, save_schema_source=save_schema_source, multi_db=multi_db_)
                 self.update_schema_save_source({index_: str(save_schema_source)}, multi_db_, vector_store_)
@@ -819,7 +914,7 @@ class DataLoader:
             source = self.schema_source
             init_single_item(source)
         elif isinstance(self.schema_source, list):
-            for ind, source in self.schema_source:
+            for ind, source in enumerate(self.schema_source):
                 init_single_item(source, ind)
         elif isinstance(self.schema_source, dict):
             for key_, source in self.schema_source.items():
@@ -828,6 +923,9 @@ class DataLoader:
         if schema:
             multi_db = self.multi_database if isinstance(self.multi_database, bool) else False
             vec_store = self.vector_store if isinstance(self.vector_store, str) else "vector_store"
+            if self.schema_source_dir is None or self.default_schema_dir_name is None:
+                warnings.warn("schema_source_dir or default_schema_dir_name is None", category=UserWarning)
+                return
             save_path = Path(self.schema_source_dir) / self.default_schema_dir_name
             save_path = save_path / "schema.json" if self.skip_schema_init else save_path
             if self.skip_schema_init:
@@ -840,7 +938,7 @@ class DataLoader:
     def query_multi_database(
             self,
             ind: Union[int, str],
-            multi_database: Union[bool, List[bool], Dict] = None
+            multi_database: Optional[Union[bool, List[bool], Dict]] = None
     ):
         if multi_database is None:
             multi_database = self.multi_database
@@ -848,7 +946,9 @@ class DataLoader:
             if isinstance(multi_database, bool):
                 return multi_database
             elif isinstance(multi_database, list):
-                return multi_database[ind]
+                if isinstance(ind, int) and 0 <= ind < len(multi_database):
+                    return multi_database[ind]
+                return False
             elif isinstance(multi_database, Dict):
                 return multi_database.get(ind, False)
         except Exception as e:
@@ -859,7 +959,7 @@ class DataLoader:
     def query_vector_store(
             self,
             ind: Union[int, str],
-            vector_store: Union[str, List[str], Dict] = None
+            vector_store: Optional[Union[str, List[str], Dict]] = None
     ):
         if vector_store is None:
             vector_store = self.vector_store
@@ -867,7 +967,9 @@ class DataLoader:
             if isinstance(vector_store, str):
                 return vector_store
             elif isinstance(vector_store, list):
-                return vector_store[ind]
+                if isinstance(ind, int) and 0 <= ind < len(vector_store):
+                    return vector_store[ind]
+                return "vector_store"
             elif isinstance(vector_store, dict):
                 return vector_store.get(ind, "vector_store")
         except Exception as e:
@@ -912,7 +1014,7 @@ class DataLoader:
             self,
             schema: Union[str, PathLike, List[Dict]],
             is_save_schema: bool = True,
-            save_schema_source: Union[str, PathLike] = None,
+            save_schema_source: Optional[Union[str, PathLike]] = None,
             multi_db: bool = False
     ):
         """
@@ -934,29 +1036,37 @@ class DataLoader:
             if not schema.exists() or schema.is_dir():
                 warnings.warn("Provided schema path does not exist or is a directory.", category=UserWarning)
                 return None
-            schema = load_dataset(schema)
+            loaded_schema = load_dataset(schema)
+            if isinstance(loaded_schema, list):
+                schema = loaded_schema
+            else:
+                warnings.warn("Loaded schema is not a list", category=UserWarning)
+                return None
 
         if not isinstance(schema, list) or not all(isinstance(item, dict) for item in schema):
             warnings.warn("Schema must be a list of dictionaries after loading.", category=UserWarning)
             return None
 
         # Process each central-format schema item into parallel format
-        schema = [single_central_process(row) for row in schema]
+        processed_schema = [single_central_process(row) for row in schema]
 
         # Save schema if required
         if is_save_schema:
             if save_schema_source is None:
+                if self.schema_source_dir is None or self.default_schema_dir_name is None:
+                    warnings.warn("schema_source_dir or default_schema_dir_name is None", category=UserWarning)
+                    return processed_schema
                 save_schema_source = Path(self.schema_source_dir) / self.default_schema_dir_name
-            self.save_schema(schema=schema, multi_db=multi_db, schema_save_source=save_schema_source)
+            self.save_schema(schema=processed_schema, multi_db=multi_db, schema_save_source=save_schema_source)
 
-        return schema
+        return processed_schema
 
     @classmethod
     def save_schema(
             cls,
-            schema: List[List[Dict]] = None,
+            schema: Optional[List[List[Dict]]] = None,
             multi_db: bool = False,
-            schema_save_source: Union[str, PathLike] = None
+            schema_save_source: Optional[Union[str, PathLike]] = None
     ):
         """
         Save the schema in parallel format to the specified directory.
@@ -965,9 +1075,6 @@ class DataLoader:
             schema: A list of lists of dicts, representing the parallel schema format.
             multi_db: Whether the schema contains multiple databases.
             schema_save_source: The directory path where the schema should be saved.
-
-        Returns:
-            None
         """
         if not isinstance(schema, list) or not all(
                 isinstance(table, list) and all(isinstance(column, dict) for column in table)
@@ -996,13 +1103,15 @@ class DataLoader:
                 )
                 save_dataset(row, new_data_source=save_path)
 
+        return None
+
     def init_benchmark_schema(
             self,
             identifier: str,
             multi_db: bool = False,
             is_save_schema: bool = True,
-            save_schema_source: Union[str, PathLike] = None,
-            skip_schema_init: bool = None
+            save_schema_source: Optional[Union[str, PathLike]] = None,
+            skip_schema_init: Optional[bool] = None
     ):
         """
         Initialize benchmark dataset schema based on the given identifier.
@@ -1042,21 +1151,26 @@ class DataLoader:
             if not sub_meta:
                 warnings.warn("Invalid sub-dataset ID.", category=UserWarning)
                 return None
-            origin_schema_source /= sub_id / "schema.json"
+            origin_schema_source = origin_schema_source / sub_id / "schema.json"
         else:
-            origin_schema_source /= "schema.json"
+            origin_schema_source = origin_schema_source / "schema.json"
 
         # Load the dataset schema
         schema = load_dataset(origin_schema_source)
 
         if is_save_schema:
+            if self.schema_source_dir is None:
+                warnings.warn("schema_source_dir is None", category=UserWarning)
+                return schema
             default_path = Path(self.schema_source_dir) / identifier.replace(":", "_")
             if skip_schema_init:
                 save_path = save_schema_source or (default_path / "schema.json")
-                save_dataset(schema, save_path)
+                if isinstance(schema, (list, dict)):
+                    save_dataset(schema, save_path)
             else:
                 save_path = save_schema_source or default_path
-                self.central_schema_process(schema, save_schema_source=save_path, multi_db=multi_db)
+                if isinstance(schema, (list, dict)):
+                    self.central_schema_process(schema, save_schema_source=save_path, multi_db=multi_db)
 
         return schema
 
@@ -1474,3 +1588,7 @@ def single_central_process(row: Dict):
         })
 
     return column_info_lis
+
+
+if __name__ == "__main__":
+    print(1)
