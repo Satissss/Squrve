@@ -857,7 +857,7 @@ class CustomGenerateTask(MetaTask):
 
 Squrve 支持通过 ParallelTask 实现多任务并发执行。
 
-```json
+```python
 from core.task.multi.ParallelTask import ParallelTask
 
 # 创建并行任务

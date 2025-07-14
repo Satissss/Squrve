@@ -5,19 +5,9 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/nest/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/nest/pipeline.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/nest/tree.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/nest/tree.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/engine.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/evaluate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/evaluate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/meta/MetaTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/MetaTask.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/squrve_api.md" beforeDir="false" afterPath="$PROJECT_DIR$/API documents.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/run_spider_dev.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run_spider_dev.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/API documents.md" beforeDir="false" afterPath="$PROJECT_DIR$/API documents.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -115,7 +105,7 @@
       <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.po">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -357,6 +347,7 @@
       <workItem from="1752289913164" duration="1118000" />
       <workItem from="1752457217576" duration="21072000" />
       <workItem from="1752499902711" duration="8094000" />
+      <workItem from="1752509026978" duration="628000" />
     </task>
     <servers />
   </component>
