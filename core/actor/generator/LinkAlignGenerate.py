@@ -1,8 +1,9 @@
 from llama_index.core.llms.llm import LLM
-from typing import Union, List, Callable, Dict
+from typing import Union, List, Callable, Dict, Optional
 import pandas as pd
 from os import PathLike
 from pathlib import Path
+from loguru import logger
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, single_central_process
@@ -23,24 +24,23 @@ class LinkAlignGenerator(BaseGenerator):
 
     def __init__(
             self,
-            dataset: Dataset = None,
-            llm: LLM = None,
-            reducer: LinkAlignReducer = None,
-            parser: LinkAlignParser = None,
+            dataset: Optional[Dataset] = None,
+            llm: Optional[LLM] = None,
+            reducer: Optional[LinkAlignReducer] = None,
+            parser: Optional[LinkAlignParser] = None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
             use_external: bool = True,
             use_few_shot: bool = True,
-            sql_post_process_function: Callable = None,
+            sql_post_process_function: Optional[Callable] = None,
             use_feedback_debug: bool = True,
             debug_turn_n: int = 2,
-            db_path: Union[str, PathLike] = None,
-            credential: Dict = None,
+            db_path: Optional[Union[str, PathLike]] = None,
+            credential: Optional[Dict] = None,
             **kwargs
     ):
-
-        self.dataset: Dataset = dataset
-        self.llm: LLM = llm
+        self.dataset: Optional[Dataset] = dataset
+        self.llm: Optional[LLM] = llm
         self.reducer = reducer
         self.parser = parser
         self.is_save = is_save
@@ -48,12 +48,24 @@ class LinkAlignGenerator(BaseGenerator):
         self.use_external: bool = use_external
         self.use_few_shot: bool = use_few_shot
 
-        self.sql_post_process_function: Callable = sql_post_process_function
+        self.sql_post_process_function: Optional[Callable] = sql_post_process_function
         self.use_feedback_debug: bool = use_feedback_debug
         self.debug_turn_n: int = debug_turn_n
 
-        self.db_path: Union[str, PathLike] = self.dataset.db_path if not db_path else db_path
-        self.credential: Dict = self.dataset.credential if not credential else credential
+        # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
+        if db_path is not None:
+            self.db_path = db_path
+        elif self.dataset is not None:
+            self.db_path = self.dataset.db_path
+        else:
+            self.db_path = None
+            
+        if credential is not None:
+            self.credential = credential
+        elif self.dataset is not None:
+            self.credential = self.dataset.credential
+        else:
+            self.credential = None
 
     @classmethod
     def load_external_knowledge(cls, external: Union[str, Path] = None):
@@ -207,18 +219,22 @@ You need to follow below requirements:
             schema_links: Union[str, List[str]] = None,
             **kwargs
     ):
+        logger.info(f"LinkAlignGenerator 开始处理样本 {item}")
         row = self.dataset[item]
         question = row['question']
         db_type = row['db_type']
         db_id = row["db_id"]
         db_path = Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
+        logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
 
         if self.use_external:
             external_knowledge = self.load_external_knowledge(row.get("external", None))
             if external_knowledge:
                 question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
 
         # Use LinkAlign to reduce the dimensionality of database schema
+        logger.debug("开始处理数据库模式...")
         if isinstance(schema, (str, PathLike)):
             schema = load_dataset(schema)
 
@@ -227,10 +243,13 @@ You need to follow below requirements:
             instance_schema_path = row.get("instance_schemas")
             if instance_schema_path:
                 schema = load_dataset(instance_schema_path)
+                logger.debug(f"从实例模式路径加载模式: {instance_schema_path}")
 
             if schema is None:
+                logger.debug("从数据集获取数据库模式")
                 schema = self.dataset.get_db_schema(item)
                 reducer = self.reducer or LinkAlignReducer(self.dataset, self.llm)
+                logger.debug("使用 LinkAlignReducer 降维模式")
                 schema = reducer.act(item, schema)
 
             if schema is None:
@@ -247,55 +266,72 @@ You need to follow below requirements:
         else:
             raise Exception("Failed to load a valid database schema for the sample!")
 
+        logger.debug("数据库模式处理完成")
+
         # The following follows the DIN-SQL processing procedure
         # Step 1: schema linking
+        logger.debug("开始模式链接...")
         if schema_links is None:
             schema_link_path = row.get("schema_links", None)
             if schema_link_path:
                 schema_links = load_dataset(schema_link_path)
+                logger.debug(f"从路径加载模式链接: {schema_link_path}")
             else:
+                logger.debug("使用 LinkAlignParser 生成模式链接")
                 parser = LinkAlignParser(self.dataset, self.llm) if not self.parser else self.parser
                 schema_links = parser.act(item, schema)
 
         # Step 2: difficulty classification
+        logger.debug("开始难度分类...")
         try:
             class_prompt = self.classification_prompt_maker(question, schema, schema_links)
             classification = self.llm.complete(class_prompt).text
+            logger.debug("难度分类完成")
         except Exception as e:
+            logger.error(f"难度分类失败: {e}")
             print(e)
             raise e
         try:
             sub_questions = classification.split('questions = [')[1].split(']')[0]
+            logger.debug(f"解析子问题: {sub_questions}")
         except Exception as e:
+            logger.warning(f'解析子问题时出错，作为非嵌套处理: {e}')
             print('warning: error when parsing sub_question. treat it as Non-Nested. error:', e)
             sub_questions = classification
 
         # step 3: SQL generation
+        logger.debug("开始 SQL 生成...")
         # load reasoning examples
         reasoning_examples = None
         if self.use_few_shot:
             reasoning_example_path = row.get("reasoning_examples", None)
             if reasoning_example_path:
                 reasoning_examples = load_dataset(reasoning_example_path)
+                logger.debug(f"加载推理示例: {reasoning_example_path}")
 
         try:
             hard_prompt = self.hard_prompt_maker(question, schema, sub_questions, schema_links, reasoning_examples)
             sql = self.llm.complete(hard_prompt).text
             sql_list = [sql]
+            logger.debug("SQL 生成完成")
         except Exception as e:
+            logger.error(f"SQL 生成失败: {e}")
             print(e)
             raise e
 
         # step 4: SQL debugging by experience
+        logger.debug("开始基于经验的 SQL 调试...")
         for idx, sql in enumerate(sql_list):
             debugged_sql = sql_debug_by_experience(self.llm, question, schema, sql, db_type, schema_links)
             # SQL post-process
             if self.sql_post_process_function:
                 debugged_sql = self.sql_post_process_function(debugged_sql, self.dataset)
             sql_list[idx] = debugged_sql
+        logger.debug("基于经验的 SQL 调试完成")
 
         # LinkAlign: SQL debugging by feedback
         if self.use_feedback_debug:
+            logger.debug("开始基于反馈的 SQL 调试...")
             for idx, sql in enumerate(sql_list):
                 debug_args = {
                     "question": question,
@@ -310,9 +346,11 @@ You need to follow below requirements:
                 }
                 _, debugged_sql = sql_debug_by_feedback(**debug_args)
                 sql_list[idx] = debugged_sql
+            logger.debug("基于反馈的 SQL 调试完成")
 
         # Select the Winner SQL
         pred_sql = sql_list[0]
+        logger.debug(f"最终 SQL: {pred_sql[:100]}...")
 
         if self.is_save:
             instance_id = row.get("instance_id")
@@ -322,5 +360,7 @@ You need to follow below requirements:
 
             save_dataset(pred_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
+            logger.debug(f"SQL 已保存到: {save_path}")
 
+        logger.info(f"LinkAlignGenerator 样本 {item} 处理完成")
         return pred_sql

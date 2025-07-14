@@ -4,6 +4,7 @@ from os import PathLike
 import warnings
 import functools
 import time
+from loguru import logger
 
 from core.data_manage import Dataset
 from core.evaluate import Evaluator
@@ -181,14 +182,17 @@ def wrap_run(func):
         start_time = time.time()
         # startup_run the function
         obj = args[0]
+        logger.info(f"开始执行任务: {obj.name} ({obj.task_id})")
         print(f"{obj.name}: {obj.task_id} begin to startup_run!")
         res = func(*args, **kwargs)
-        print(f"{obj.name}: {obj.task_id} end to startup_run!")
         end_time = time.time()
+        execution_time = end_time - start_time
+        logger.info(f"任务执行完成: {obj.name} ({obj.task_id}), 耗时: {execution_time:.6f} s")
+        print(f"{obj.name}: {obj.task_id} end to startup_run!")
         if isinstance(obj, BaseTask):
             obj.end()
             # startup_run the call_back function to collect information
-            obj.call_back(obj, res=res, run_time=end_time - start_time)
+            obj.call_back(obj, res=res, run_time=execution_time)
 
         return res
 

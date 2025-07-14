@@ -1,5 +1,6 @@
+import copy
 from abc import ABC, abstractmethod
-from typing import List, Union
+from typing import List, Union, Optional
 
 from core.data_manage import Dataset
 
@@ -27,19 +28,26 @@ class Actor(ABC):
         return None
 
     def copy_instance(self):
-        new_obj = self.__class__()
-        new_obj.__dict__ = self.__dict__.copy()
+        new_obj = self.__class__.__new__(self.__class__)
+        for k, v in self.__dict__.items():
+            if k == 'llm':
+                setattr(new_obj, k, v)  # 直接引用 llm
+            else:
+                try:
+                    setattr(new_obj, k, copy.deepcopy(v))
+                except Exception:
+                    setattr(new_obj, k, v)  # deepcopy 失败则直接引用
         return new_obj
 
 
 class ComplexActor(Actor):
     def __init__(
             self,
-            dataset: Dataset = None,
-            actors: List[Actor] = None,
+            dataset: Optional[Dataset] = None,
+            actors: Optional[List[Actor]] = None,
             **kwargs
     ):
-        self.dataset: Dataset = dataset
+        self.dataset: Optional[Dataset] = dataset
         self.actors: List[Actor] = [] if actors is None else actors
 
         self.__init_check__()

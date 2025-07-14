@@ -3,6 +3,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Union, List, Dict, Optional
 import time
+from loguru import logger
 
 from core.base import Router
 from core.data_manage import DataLoader, Dataset
@@ -31,13 +32,13 @@ class Engine:
 
     def __init__(
             self,
-            router: Router = None,
-            dataloader: DataLoader = None,
-            tasks: Union[BaseTask, List[BaseTask], Dict] = None,
-            task_meta: Union[Dict, List[Dict]] = None,
-            cpx_task_meta: Union[Dict, List[Dict]] = None,
-            exec_process: Union[List, Dict] = None,
-            actors: Dict = None
+            router: Optional[Router] = None,
+            dataloader: Optional[DataLoader] = None,
+            tasks: Optional[Union[BaseTask, List[BaseTask], Dict]] = None,
+            task_meta: Optional[Union[Dict, List[Dict]]] = None,
+            cpx_task_meta: Optional[Union[Dict, List[Dict]]] = None,
+            exec_process: Optional[Union[List, Dict]] = None,
+            actors: Optional[Dict] = None
     ):
         self.router: Router = Router() if router is None else router
         self.dataloader: DataLoader = DataLoader(self.router) if dataloader is None else dataloader
@@ -47,7 +48,7 @@ class Engine:
         self.init_complex_task(cpx_task_meta=self.router.cpx_task_meta if cpx_task_meta is None else cpx_task_meta)
         self.exec_process: Union[List, Dict] = router.exec_process if exec_process is None else exec_process
 
-    def check_task_id(self, ind, task_id: str, all_tasks: Dict = None):
+    def check_task_id(self, ind, task_id: str, all_tasks: Optional[Dict] = None):
         all_tasks_ = {}
         if all_tasks is None:
             if hasattr(self, "tasks"):
@@ -69,7 +70,7 @@ class Engine:
             return False, task_type
         return True, task_type
 
-    def check_data_source(self, ind, data_source_index: str, dataloader: DataLoader = None):
+    def check_data_source(self, ind, data_source_index: str, dataloader: Optional[DataLoader] = None):
         if dataloader is None:
             dataloader = self.dataloader
 
@@ -652,18 +653,23 @@ class Engine:
         return self.tasks.get(task_id)
 
     def execute(self):
+        logger.info("开始执行 Engine 任务...")
         execute_task = self.parse_exec_process(self.exec_process)
         if execute_task is None:
+            logger.warning("没有找到可执行的任务，退出执行")
             return
         # execute the task
         start_time = time.time()
+        logger.info(f"开始执行任务: {execute_task.name} ({execute_task.task_id})")
         execute_task.run()
         end_time = time.time()
         # save the `task`
         # execute_task.save()
 
+        execution_time = end_time - start_time
+        logger.info(f"Engine 运行完毕. {execute_task.name} ({execute_task.task_id}) 运行时间为 {execution_time:.6f} s.")
         print(
-            f"Engine 运行完毕. {execute_task.name} ({execute_task.task_id}) 运行时间为 {end_time - start_time:.6f} s.")
+            f"Engine 运行完毕. {execute_task.name} ({execute_task.task_id}) 运行时间为 {execution_time:.6f} s.")
 
     def skip_execute(self):
         for id_, task_ in self.tasks.items():

@@ -18,4 +18,4 @@ files/schema_reduce
 files/schema_source
 API.md
 
-startup_run/run_spider_dev.py
+startup_run/spider_dev_config.json

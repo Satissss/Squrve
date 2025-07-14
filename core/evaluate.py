@@ -71,24 +71,47 @@ class Evaluator:
             if type_ not in self._eval_type_lis:
                 warnings.warn(f"The eval_type `{type_}` is incorrect.", category=UserWarning)
                 continue
+            
             valid_num, res_lis, acc_res = 0, [], 0
-            for ind in range(len(self.dataset)):
+            total_items = len(self.dataset)
+            print(f"Evaluating {type_} for {total_items} items...")
+            
+            for ind in range(total_items):
                 try:
                     res = self.eval(ind, type_)
                     if res is None:
+                        print(f"Warning: Evaluation result is None for item {ind} in {type_}")
                         continue
                     res_lis.append([ind, res])
                     acc_res += res
                     valid_num += 1
                 except Exception as e:
-                    print(f"There is something error when evaluating the {type_}. Here is the message: {e}")
-            eval_results[type_] = {
-                "avg": acc_res / valid_num,
-                "results": res_lis,
-                "valid_num": valid_num
-            }
+                    print(f"Error evaluating item {ind} for {type_}: {e}")
+                    continue
+            
+            print(f"Completed {type_}: {valid_num}/{total_items} valid results")
+            
+            # 防止除零错误，当没有有效结果时设置默认值
+            if valid_num == 0:
+                eval_results[type_] = {
+                    "avg": 0.0,
+                    "results": res_lis,
+                    "valid_num": valid_num,
+                    "total_items": total_items,
+                    "warning": f"No valid evaluation results found for {type_}. All {total_items} items failed evaluation."
+                }
+                print(f"Warning: No valid results for {type_}, setting average to 0.0")
+            else:
+                avg_result = acc_res / valid_num
+                eval_results[type_] = {
+                    "avg": avg_result,
+                    "results": res_lis,
+                    "valid_num": valid_num,
+                    "total_items": total_items
+                }
+                print(f"Average for {type_}: {avg_result:.4f}")
+        
         self.eval_results.update(eval_results)
-
         return eval_results
 
     def eval(self, item, eval_type: str):
@@ -117,102 +140,154 @@ class Evaluator:
     """ Reduce """
 
     def eval_reduce_recall(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        gold_schemas = row.get("gold_schemas", None)
-        pred_schemas = load_dataset(row.get("instance_schemas", None))
-        res = self.cal_schema_recall(gold_schemas, pred_schemas)
+            gold_schemas = row.get("gold_schemas", None)
+            pred_schemas = load_dataset(row.get("instance_schemas", None))
+            res = self.cal_schema_recall(gold_schemas, pred_schemas)
 
-        return res
+            return res
+        except Exception as e:
+            print(f"Error in eval_reduce_recall for item {item}: {e}")
+            return None
 
     def eval_reduce_rate(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        db_size = row["db_size"]
-        pred_schemas = load_dataset(row.get("instance_schemas", None))
-        pred_schemas = self._normalize_pred_schemas(pred_schemas)
+            db_size = row.get("db_size", None)
+            if db_size is None or db_size == 0:
+                print(f"Warning: db_size is None or 0 for item {item}")
+                return None
+                
+            pred_schemas = load_dataset(row.get("instance_schemas", None))
+            pred_schemas = self._normalize_pred_schemas(pred_schemas)
 
-        if pred_schemas is None:
+            if pred_schemas is None:
+                return None
+            reduce_rate = len(pred_schemas) / db_size
+
+            return reduce_rate
+        except Exception as e:
+            print(f"Error in eval_reduce_rate for item {item}: {e}")
             return None
-        reduce_rate = len(pred_schemas) / db_size
-
-        return reduce_rate
 
     def eval_reduce_precision(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        gold_schemas = row.get("gold_schemas", None)
-        pred_schemas = load_dataset(row.get("instance_schemas", None))
-        res = self.cal_schema_precision(gold_schemas, pred_schemas)
+            gold_schemas = row.get("gold_schemas", None)
+            pred_schemas = load_dataset(row.get("instance_schemas", None))
+            res = self.cal_schema_precision(gold_schemas, pred_schemas)
 
-        return res
+            return res
+        except Exception as e:
+            print(f"Error in eval_reduce_precision for item {item}: {e}")
+            return None
 
     """ Parse """
 
     def eval_parse_recall(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        gold_schemas = row.get("gold_schemas", None)
-        pred_schemas = load_dataset(row.get("schema_links", None))
-        res = self.cal_schema_recall(gold_schemas, pred_schemas)
+            gold_schemas = row.get("gold_schemas", None)
+            pred_schemas = load_dataset(row.get("schema_links", None))
+            res = self.cal_schema_recall(gold_schemas, pred_schemas)
 
-        return res
+            return res
+        except Exception as e:
+            print(f"Error in eval_parse_recall for item {item}: {e}")
+            return None
 
     def eval_parse_precision(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        gold_schemas = row.get("gold_schemas", None)
-        pred_schemas = load_dataset(row.get("schema_links", None))
-        res = self.cal_schema_precision(gold_schemas, pred_schemas)
+            gold_schemas = row.get("gold_schemas", None)
+            pred_schemas = load_dataset(row.get("schema_links", None))
+            res = self.cal_schema_precision(gold_schemas, pred_schemas)
 
-        return res
+            return res
+        except Exception as e:
+            print(f"Error in eval_parse_precision for item {item}: {e}")
+            return None
 
     def eval_parse_exact_matching(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        gold_schemas = row.get("gold_schemas", None)
-        pred_schemas = load_dataset(row.get("schema_links", None))
-        res = self.cal_schema_exact_matching(gold_schemas, pred_schemas)
+            gold_schemas = row.get("gold_schemas", None)
+            pred_schemas = load_dataset(row.get("schema_links", None))
+            res = self.cal_schema_exact_matching(gold_schemas, pred_schemas)
 
-        return res
+            return res
+        except Exception as e:
+            print(f"Error in eval_parse_exact_matching for item {item}: {e}")
+            return None
 
     """ Generate """
 
     def eval_generate_execute_accuracy(self, item):
-        row = self.dataset[item]
-        assert isinstance(row, dict)
+        try:
+            row = self.dataset[item]
+            if not isinstance(row, dict):
+                print(f"Warning: Row {item} is not a dictionary")
+                return None
 
-        pred_sql = load_dataset(row.get("pred_sql", None))
-        gold_sql = row.get("query", None)
+            pred_sql = load_dataset(row.get("pred_sql", None))
+            gold_sql = row.get("query", None)
 
-        if not pred_sql or not gold_sql:
-            warnings.warn(f"The pred sql or gold sql is not available.", category=UserWarning)
+            if not pred_sql or not gold_sql:
+                print(f"Warning: The pred sql or gold sql is not available for item {item}")
+                return None
+
+            db_id = row.get("db_id", None)
+            db_type = row.get("db_type", None)
+            if not db_id or not db_type:
+                print(f"Warning: Missing db_id or db_type for item {item}")
+                return None
+
+            db_path = Path(self.db_path) / (db_id + ".sqlite")
+            base_exec_args = {
+                "db_type": db_type,
+                "db_path": db_path,
+                "db_id": db_id,
+                "credential_path": self.db_credential.get(db_type, None)
+            }
+            pred_args = {"sql_query": pred_sql, **base_exec_args}
+            gold_args = {"sql_query": gold_sql, **base_exec_args}
+            pred, _ = get_sql_exec_result(**pred_args)
+            gold, _ = get_sql_exec_result(**gold_args)
+
+            if pred is None or gold is None:
+                print(f"Warning: SQL Execution Error for item {item}")
+                return None
+            score = self.compare_pandas_table(pred, gold)
+
+            return score
+        except Exception as e:
+            print(f"Error in eval_generate_execute_accuracy for item {item}: {e}")
             return None
-
-        db_path = Path(self.db_path) / (row["db_id"] + ".sqlite")
-        base_exec_args = {
-            "db_type": row["db_type"],
-            "db_path": db_path,
-            "db_id": row["db_id"],
-            "credential_path": self.db_credential.get(row["db_type"], None)
-        }
-        pred_args = {"sql_query": pred_sql, **base_exec_args}
-        gold_args = {"sql_query": gold_sql, **base_exec_args}
-        pred, _ = get_sql_exec_result(**pred_args)
-        gold, _ = get_sql_exec_result(**gold_args)
-
-        if pred is None or gold is None:
-            warnings.warn(f"SQL Execution Error!", category=UserWarning)
-            return None
-        score = self.compare_pandas_table(pred, gold)
-
-        return score
 
     @classmethod
     def _normalize_pred_schemas(cls, pred_schemas) -> Union[set, None]:
@@ -254,6 +329,10 @@ class Evaluator:
         pred_schemas = cls._normalize_pred_schemas(pred_schemas)
         if pred_schemas is None:
             return None
+
+        # 防止除零错误
+        if len(gold_schemas) == 0:
+            return 0.0
 
         hit_count = sum(
             any(pred in gold for pred in pred_schemas)
