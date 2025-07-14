@@ -16,9 +16,6 @@
   "text_embed": {
     "embed_model_name": "BAAI/bge-large-en-v1.5"
   },
-  "dataloader": {
-    "is_prepare_data": true
-  },
   "dataset": {
     "data_source": "spider:dev:",
     "data_source_dir": "../files/data_source",
@@ -62,7 +59,7 @@
       {
         "task_id": "generate",
         "task_type": "GenerateTask",
-        "data_source": "spider:dev",
+        "data_source": "spider:dev:",
         "schema_source": "spider:dev",
         "is_save_dataset": true,
         "max_workers": 5,
