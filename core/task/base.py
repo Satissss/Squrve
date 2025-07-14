@@ -174,20 +174,20 @@ class TaskCompletion:
 
 
 def wrap_run(func):
-    """ A Decorator for the `run()` function of class Task"""
+    """ A Decorator for the `startup_run()` function of class Task"""
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.time()
-        # run the function
+        # startup_run the function
         obj = args[0]
-        print(f"{obj.name}: {obj.task_id} begin to run!")
+        print(f"{obj.name}: {obj.task_id} begin to startup_run!")
         res = func(*args, **kwargs)
-        print(f"{obj.name}: {obj.task_id} end to run!")
+        print(f"{obj.name}: {obj.task_id} end to startup_run!")
         end_time = time.time()
         if isinstance(obj, BaseTask):
             obj.end()
-            # run the call_back function to collect information
+            # startup_run the call_back function to collect information
             obj.call_back(obj, res=res, run_time=end_time - start_time)
 
         return res
@@ -202,7 +202,7 @@ def run_call_back(
         run_time: float = None,
         **kwargs
 ):
-    """ A simple implement of the call-back function after call the `run` function in Task object """
+    """ A simple implement of the call-back function after call the `startup_run` function in Task object """
 
     run_log = task.log if run_log is None else run_log
     if run_log is None:

@@ -542,7 +542,7 @@ from core.base import Router
 from core.engine import Engine
 
 # 1. 创建配置管理器
-router = Router(config_path="config/spider_dev_config.json")
+router = Router(config_path="startup_run/spider_dev_config.json")
 
 # 2. 创建执行引擎
 engine = Engine(router)

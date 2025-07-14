@@ -32,7 +32,7 @@ import random
 
 class Dataset:
     """
-    Dataset encapsulates the core dataset and corresponding database schema for a single task run.
+    Dataset encapsulates the core dataset and corresponding database schema for a single task startup_run.
 
     Supports flexible dataset construction from various sources (JSON file, list of dicts, etc.)
     and schema definitions, with options for random sampling and filtering.
@@ -785,7 +785,7 @@ class DataLoader:
         elif isinstance(self.data_source, dict):
             dataset_index = Path(self.default_data_file_name).stem if data_source_index is None else data_source_index
             self.data_source[str(dataset_index)] = save_path_
-            return dataset_index
+            # return dataset_index
 
     @staticmethod
     def init_default_external_function(default_external_function: str) -> Callable:

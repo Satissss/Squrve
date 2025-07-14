@@ -9,15 +9,15 @@ class Router:
     Router is the central configuration manager for a Text-to-SQL pipeline.
 
     It supports initialization via a JSON config file, parameter dictionary, or command-line arguments.
-    The Router handles all parameters required for a complete Text-to-SQL run, including model settings,
+    The Router handles all parameters required for a complete Text-to-SQL startup_run, including model settings,
     embedding configuration, dataset sources, database schemas, execution logic, and saving options.
 
     This class is essential for orchestrating the system and is required by other key modules,
     such as the DataLoader (for loading datasets and database schemas) and Engine (for managing the core execution flow).
     """
 
-    _sys_config_path = "config/sys_config.json"
-    _demo_config_path = "config/demo_config.json"
+    _sys_config_path = "../config/sys_config.json"
+    _demo_config_path = "../config/demo_config.json"
 
     """ CONFIG """
     _config: dict

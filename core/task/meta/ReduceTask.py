@@ -19,7 +19,7 @@ class ReduceTask(MetaTask):
             llm: Union[LLM, List[LLM]],
             reduce_type: str = "LinkAlignReducer",
             output_format: str = "str",  # output in `list` or `str`
-            save_dir: Union[str, PathLike] = "../files/schema_reduce",
+            save_dir: Union[str, PathLike] = "../files/instance_schemas",
             **kwargs
     ):
         self.llm: Union[LLM, List[LLM]] = llm

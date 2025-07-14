@@ -50,7 +50,7 @@ pip install -r requirements.txt
 #### 方式一：使用交互式脚本
 
 ```bash
-python run/run_spider_dev.py
+python startup_run/run_spider_dev.py
 ```
 
 脚本会提供以下选项：
@@ -66,7 +66,7 @@ from core.base import Router
 from core.engine import Engine
 
 # 使用 Spider Dev 配置
-router = Router(config_path="../config/spider_dev_config.json")
+router = Router(config_path="spider_dev_config.json")
 engine = Engine(router)
 
 # 执行任务

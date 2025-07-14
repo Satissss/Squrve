@@ -2,7 +2,7 @@ from core.base import Router
 from core.engine import Engine
 
 if __name__ == "__main__":
-    router = Router(config_path="../config/spider_dev_config.json")
+    router = Router(config_path="spider_dev_config.json")
 
     engine = Engine(router)
 

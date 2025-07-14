@@ -25,42 +25,42 @@
   },
   "dataset": {
     "data_source": "spider:dev",
-    "data_source_dir": "files/data_source",
+    "data_source_dir": "../files/data_source",
     "overwrite_exist_file": true,
     "need_few_shot": false,
     "few_shot_num": 3,
-    "few_shot_save_dir": "files/reasoning_examples/user",
+    "few_shot_save_dir": "../files/reasoning_examples/user",
     "few_shot_range": [],
     "need_external": false,
     "external_range": [],
-    "external_save_dir": "files/external",
+    "external_save_dir": "../files/external",
     "db_path": null
   },
   "database": {
     "skip_schema_init": false,
     "schema_source": "spider:dev",
     "multi_database": false,
-    "vector_store": "vector_store",
-    "schema_source_dir": "files/schema_source",
+    "vector_store": "../vector_store",
+    "schema_source_dir": "../files/schema_source",
     "need_build_index": false,
     "index_range": false
   },
   "reducer": {
     "reduce_type": "LinkAlign",
     "is_save_reduce": true,
-    "reduce_save_dir": "files/instance_schemas",
+    "reduce_save_dir": "../files/instance_schemas",
     "reduce_output_format": "dataframe"
   },
   "parser": {
     "parse_type": "LinkAlign",
     "is_save_parse": true,
-    "parse_save_dir": "files/schema_links",
+    "parse_save_dir": "../files/schema_links",
     "parse_output_format": "dataframe"
   },
   "generator": {
     "generate_type": "LinkAlign",
     "is_save_generate": true,
-    "generate_save_dir": "files/pred_sql"
+    "generate_save_dir": "../files/pred_sql"
   },
   "task": {
     "task_meta": [
