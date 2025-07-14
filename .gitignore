@@ -17,3 +17,5 @@ files/schema_links
 files/schema_reduce
 files/schema_source
 API.md
+
+startup_run/run_spider_dev.py
