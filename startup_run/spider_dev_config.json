@@ -1,0 +1,118 @@
+{
+  "api_key": {
+    "deepseek": "sk-b305721c29f54facb3c3849104712519",
+    "qwen": "sk-3f43effded4d49fc934829ee24e79f1d",
+    "zhipu": "7ff727a6f39606898fa5d99a4535a972.tahGD54SmhjkZY4u"
+  },
+  "llm": {
+    "use": "qwen",
+    "model_name": "qwen-turbo",
+    "context_window": 120000,
+    "max_token": 8000,
+    "top_p": 0.9,
+    "temperature": 0.75,
+    "time_out": 300.0
+  },
+  "text_embed": {
+    "embed_model_name": "BAAI/bge-large-en-v1.5"
+  },
+  "dataloader": {
+    "is_prepare_data": true
+  },
+  "dataset": {
+    "data_source": "spider:dev:",
+    "data_source_dir": "../files/data_source",
+    "need_few_shot": false,
+    "need_external": false
+  },
+  "database": {
+    "skip_schema_init": false,
+    "schema_source": "spider:dev",
+    "multi_database": false,
+    "vector_store": "../vector_store",
+    "schema_source_dir": "../files/schema_source",
+    "need_build_index": false
+  },
+  "task": {
+    "task_meta": [
+      {
+        "task_id": "reduce",
+        "task_type": "ReduceTask",
+        "data_source": "spider:dev:",
+        "schema_source": "spider:dev",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "generate_type": "LinkAlignReducer"
+          }
+        }
+      },
+      {
+        "task_id": "parse",
+        "task_type": "ParseTask",
+        "data_source": "spider:dev:",
+        "schema_source": "spider:dev",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "generate_type": "LinkAlignParser"
+          }
+        }
+      },
+      {
+        "task_id": "generate",
+        "task_type": "GenerateTask",
+        "data_source": "spider:dev",
+        "schema_source": "spider:dev",
+        "is_save_dataset": true,
+        "max_workers": 5,
+        "meta": {
+          "task": {
+            "generate_type": "LinkAlignGenerator"
+          }
+        }
+      }
+    ],
+    "cpx_task_meta": [
+      {
+        "task_id": "spider_dev_pipeline",
+        "task_info": "Complete Text-to-SQL pipeline for Spider dev dataset: Reduce -> Parse -> Generate",
+        "task_lis": [
+          "reduce",
+          "parse",
+          "generate"
+        ],
+        "eval_type": [
+          "exact_match",
+          "execution"
+        ],
+        "is_save_dataset": true,
+        "dataset_save_path": "../files/datasets/spider_dev_pipeline.json",
+        "meta": {
+          "task": {
+            "max_workers": 3
+          },
+          "actor": {
+            "reduce": {
+              "save_dir": "../files/instance_schemas/spider_dev"
+            },
+            "parse": {
+              "save_dir": "../files/schema_links/spider_dev"
+            },
+            "generate": {
+              "save_dir": "../files/pred_sql/spider_dev"
+            }
+          }
+        }
+      }
+    ],
+    "is_save_dataset": true,
+    "open_parallel": true,
+    "max_workers": 5
+  },
+  "engine": {
+    "exec_process": [
+      "spider_dev_generate"
+    ]
+  }
+} 
