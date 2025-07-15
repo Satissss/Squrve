@@ -63,6 +63,8 @@ pip install -r requirements.txt
   }
 }
 ```
+### [Opt.] LinkAlign 配置
+若使用 LinkAlign 相关组件，需要按照 https://github.com/Satissss/LinkAlign/blob/master/README.md 进行配置。
 
 ### 3. 运行示例
 
