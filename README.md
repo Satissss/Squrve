@@ -116,68 +116,24 @@ Squrve/
 └── benchmarks/             # 基准数据集
 ```
 
-## 🎯 使用示例
+## 🎯 快速使用
 
-### 1. 简单 SQL 生成
-
+根据场景需求，定义 Text2SQL 任务执行的配置文件，即可自动完成 SQL 生成任务并自动完成评估。具体的 startup 示例可参考 startup_run 目录。
 ```python
-from core.base import Router
+ffrom core.base import Router
 from core.engine import Engine
 
-# 配置简单生成任务
-config = {
-    "llm": {"use": "qwen", "model_name": "qwen-turbo"},
-    "task": {
-        "task_meta": [{
-            "task_id": "simple_generate",
-            "task_type": "generate",
-            "data_source": "spider:dev",
-            "schema_source": "spider:dev"
-        }]
-    }
-}
-
-router = Router(**config)
+# 使用 Spider Dev 配置
+router = Router(config_path="spider_dev_config.json")
 engine = Engine(router)
+
+# 执行任务
 engine.execute()
-```
 
-### 2. 完整 Text-to-SQL 流水线
-
-```python
-# 执行完整的 Reduce -> Parse -> Generate 流程
-config = {
-    "llm": {"use": "qwen", "model_name": "qwen-turbo"},
-    "task": {
-        "cpx_task_meta": [{
-            "task_id": "full_pipeline",
-            "task_lis": ["reduce", "parse", "generate"],
-            "eval_type": ["execute_accuracy"]
-        }]
-    }
-}
-
-router = Router(**config)
-engine = Engine(router)
-engine.execute()
+# 评估结果
 engine.evaluate()
 ```
 
-### 3. 并行任务执行
-
-```python
-# 配置并行执行
-config = {
-    "task": {
-        "open_parallel": True,
-        "max_workers": 5,
-        "task_meta": [
-            {"task_id": "task1", "task_type": "generate"},
-            {"task_id": "task2", "task_type": "generate"}
-        ]
-    }
-}
-```
 
 ## 📊 输出结果
 

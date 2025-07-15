@@ -17,7 +17,7 @@
     "embed_model_name": "BAAI/bge-large-en-v1.5"
   },
   "dataset": {
-    "data_source": "spider:dev:",
+    "data_source": "spider:dev:db_size-10",
     "data_source_dir": "../files/data_source",
     "need_few_shot": false,
     "need_external": false
@@ -35,7 +35,7 @@
       {
         "task_id": "reduce",
         "task_type": "ReduceTask",
-        "data_source": "spider:dev:",
+        "data_source": "spider:dev:db_size-10",
         "schema_source": "spider:dev",
         "is_save_dataset": true,
         "meta": {
@@ -47,7 +47,7 @@
       {
         "task_id": "parse",
         "task_type": "ParseTask",
-        "data_source": "spider:dev:",
+        "data_source": "spider:dev:db_size-10",
         "schema_source": "spider:dev",
         "is_save_dataset": true,
         "meta": {
@@ -59,15 +59,17 @@
       {
         "task_id": "generate",
         "task_type": "GenerateTask",
-        "data_source": "spider:dev:",
+        "data_source": "spider:dev:db_size-10",
         "schema_source": "spider:dev",
+        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
         "is_save_dataset": true,
-        "max_workers": 5,
         "meta": {
           "task": {
             "generate_type": "LinkAlignGenerator"
           }
-        }
+        },
+        "open_parallel": true,
+        "max_workers": 2
       }
     ],
     "cpx_task_meta": [
@@ -80,15 +82,11 @@
           "generate"
         ],
         "eval_type": [
-          "exact_match",
-          "execution"
+          "execute_accuracy"
         ],
         "is_save_dataset": true,
         "dataset_save_path": "../files/datasets/spider_dev_pipeline.json",
         "meta": {
-          "task": {
-            "max_workers": 3
-          },
           "actor": {
             "reduce": {
               "save_dir": "../files/instance_schemas/spider_dev"
@@ -105,11 +103,11 @@
     ],
     "is_save_dataset": true,
     "open_parallel": true,
-    "max_workers": 5
+    "max_workers": 2
   },
   "engine": {
     "exec_process": [
-      "spider_dev_generate"
+      "spider_dev_pipeline"
     ]
   }
 }
