@@ -6,6 +6,7 @@ __pycache__/
 **/__pycache__/
 
 benchmarks
+baselines
 
 files/data_source
 files/external
