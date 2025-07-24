@@ -5,6 +5,8 @@ from llama_index.core.llms.llm import LLM
 
 from core.task.meta.MetaTask import MetaTask
 from core.actor.generator.LinkAlignGenerate import LinkAlignGenerator
+from core.actor.generator.DIN_SQLGenerate import DIN_SQLGenerator
+from core.actor.generator.DAILSQLGenerate import DAILSQLGenerator
 from core.actor.generator.BaseGenerate import BaseGenerator
 
 
@@ -12,7 +14,7 @@ class GenerateTask(MetaTask):
     """ Task For Text-to-SQL """
 
     NAME = "GenerateTask"
-    registered_generate_type = ["LinkAlignGenerator", "LinkAlign"]
+    registered_generate_type = ["LinkAlignGenerator", "LinkAlign", "DIN_SQLGenerator", "DIN_SQL", "DAILSQLGenerator", "DAILSQL"]
 
     def __init__(
             self,
@@ -58,6 +60,14 @@ class GenerateTask(MetaTask):
 
         if actor_type in ("LinkAlignGenerator", "LinkAlign"):
             actor = LinkAlignGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("DIN_SQLGenerator", "DIN_SQL"):
+            actor = DIN_SQLGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("DAILSQLGenerator", "DAILSQL"):
+            actor = DAILSQLGenerator(**generate_args)
             return actor
 
         warnings.warn(f"The generate_type `{actor_type}` is not available.", category=UserWarning)

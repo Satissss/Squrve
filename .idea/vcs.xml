@@ -3,6 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baselines/CHESS-SQL" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/baselines/DAIL-SQL" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baselines/DIN-SQL" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baselines/MAC-SQL" vcs="Git" />
   </component>

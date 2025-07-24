@@ -107,7 +107,7 @@
   },
   "engine": {
     "exec_process": [
-      "spider_dev_pipeline"
+      "generate"
     ]
   }
 }
