@@ -5,12 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/Squrve.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Squrve.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/task/meta/GenerateTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/GenerateTask.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/startup_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/startup_config.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/startup_run/run_spider_dev.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run_spider_dev.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -108,7 +106,7 @@
       <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.po">
+  <component name="RunManager">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -365,6 +363,7 @@
       <workItem from="1753255874843" duration="52000" />
       <workItem from="1753257077654" duration="2000" />
       <workItem from="1753336564427" duration="29000" />
+      <workItem from="1753340154484" duration="58000" />
     </task>
     <servers />
   </component>

@@ -69,6 +69,31 @@ class GenerateTask(MetaTask):
         elif actor_type in ("DAILSQLGenerator", "DAILSQL"):
             actor = DAILSQLGenerator(**generate_args)
             return actor
+        
+        elif actor_type in ("CHESSGenerator", "CHESS"):
+            from core.actor.generator.CHESSGenerate import CHESSGenerator
+            actor = CHESSGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("MACSQLGenerator", "MACSQL"):
+            from core.actor.generator.MACSQLGenerate import MACSQLGenerator
+            actor = MACSQLGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("RSLSQLGenerator", "RSLSQL"):
+            from core.actor.generator.RSLSQLGenerate import RSLSQLGenerator
+            actor = RSLSQLGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("ReFoRCEGenerator", "ReFoRCE"):
+            from core.actor.generator.ReFoRCEGenerate import ReFoRCEGenerator
+            actor = ReFoRCEGenerator(**generate_args)
+            return actor
+        
+        elif actor_type in ("OpenSearchSQLGenerator", "OpenSearchSQL"):
+            from core.actor.generator.OpenSearchSQLGenerate import OpenSearchSQLGenerator
+            actor = OpenSearchSQLGenerator(**generate_args)
+            return actor
 
         warnings.warn(f"The generate_type `{actor_type}` is not available.", category=UserWarning)
         return None

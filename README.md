@@ -163,47 +163,20 @@ engine.evaluate()
 
 ## TODO List
 
-- [ ] **扩展 Schema Reduce 组件库**
-  - 实现 GraphBasedReduce
-  - 实现 RuleBasedReduce
-  - 实现 HybridReduce
-  - 实现 AdaptiveReduce 等降维策略
-
-- [ ] **扩展 Schema Parse 组件库**
-  - 复现 RslSqlParse
-  - 复现 DinSqlParse
-  - 复现 ContextAwareParse 等模式链接方法
-
-- [ ] **扩展 SQL Generate 组件库**
-  - 实现 TemplateBasedGenerate
-  - 实现 FeedbackGenerate
-  - 实现 DebugGenerate 等生成策略
+- [ ] **扩展 Actor 组件库**
 
 - [ ] **扩展数据库连接支持**
-  - 添加 MySQL、PostgreSQL、Oracle、SQL Server 等数据库类型
 
 - [ ] **集成标准数据集**
-  - 添加 BIRD、Spider2.0、WikiSQL、SPARC、CoSQL 等数据集支持
 
 - [ ] **扩展评估指标体系**
-  - 实现多维度评估（准确性、效率、鲁棒性、可解释性）
-
-- [ ] **构建自动化评测流水线**
-  - 实现结果可视化
-  - 实现报告生成
 
 - [ ] **集成强化学习框架**
-  - 实现 PPO、GRPO 等强化学习方法支持
 
-- [ ] **可扩展微服务架构**
-  - 构建 API 网关
-  - 构建任务调度系统
-  - 构建模型服务等微服务
+- [ ] **扩展微服务架构**
 
 - [ ] **构建 baseline 组件库**
-  - 将一般方法和完整方法调用放入 baseline 包
 
-- [ ] **构建社区生态系统**
-  - 支持新方法和基线数据集的社区提交机制
+
 
 
