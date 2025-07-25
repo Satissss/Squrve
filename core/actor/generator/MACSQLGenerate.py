@@ -5,13 +5,14 @@ import time
 import sqlite3
 import pandas as pd
 from pathlib import Path
-from typing import Union, List, Dict, Optional, Any
+from typing import Union, List, Dict, Optional, Any, Tuple
 from loguru import logger
 import re
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, load_dataset, save_dataset
-from core.utils import parse_schema_from_df, single_central_process
+from core.utils import parse_schema_from_df
+from core.data_manage import single_central_process
 from llama_index.core.llms.llm import LLM
 
 # Remove the sys.path.append and direct imports from baselines
