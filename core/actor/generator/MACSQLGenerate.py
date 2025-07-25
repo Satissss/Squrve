@@ -46,6 +46,11 @@ def parse_sql_from_string(input_string):
     else:
         return "error: No SQL found in the input string"
 
+# Add the load_json_file function here
+def load_json_file(file_path: str) -> dict:
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
 # Embedded prompt templates from const.py (simplified for brevity)
 selector_template = '''\nAs an experienced and professional database administrator, your task is to analyze a user question and a database schema to provide relevant information. The database schema consists of table descriptions, each containing multiple column descriptions. Your goal is to identify the relevant tables and columns based on the user question and evidence provided.\n\n[Instruction]:\n1. Discard any table schema that is not related to the user question and evidence.\n2. Sort the columns in each relevant table in descending order of relevance and keep the top 6 columns.\n3. Ensure that at least 3 tables are included in the final output JSON.\n4. The output should be in JSON format.\n\nRequirements:\n1. If a table has less than or equal to 10 columns, mark it as \"keep_all\".\n2. If a table is completely irrelevant to the user question and evidence, mark it as \"drop_all\".\n3. Prioritize the columns in each relevant table based on their relevance.\n\nHere is a typical example:\n\n==========\n【DB_ID】 banking_system\n【Schema】\n# Table: account\n[\n  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),\n  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),\n  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),\n  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)\n]\n# Table: client\n[\n  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),\n  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),\n  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),\n  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)\n]\n# Table: loan\n[\n  (loan_id, the id number identifying the loan data. Value examples: [4959, 4960, 4961].),\n  (account_id, the id number identifying the account. Value examples: [10, 80, 55, 43].),\n  (date, the date when the loan is approved. Value examples: ['1998-07-12', '1998-04-19'].),\n  (amount, the id number identifying the loan data. Value examples: [1567, 7877, 9988].),\n  (duration, the id number identifying the loan data. Value examples: [60, 48, 24, 12, 36].),\n  (payments, the id number identifying the loan data. Value examples: [3456, 8972, 9845].),\n  (status, the id number identifying the loan data. Value examples: ['C', 'A', 'D', 'B'].)\n]\n# Table: district\n[\n  (district_id, location of branch. Value examples: [77, 76].),\n  (A2, area in square kilometers. Value examples: [50.5, 48.9].),\n  (A4, number of inhabitants. Value examples: [95907, 95616].),\n  (A5, number of households. Value examples: [35678, 34892].),\n  (A6, literacy rate. Value examples: [95.6, 92.3, 89.7].),\n  (A7, number of entrepreneurs. Value examples: [1234, 1456].),\n  (A8, number of cities. Value examples: [5, 4].),\n  (A9, number of schools. Value examples: [15, 12, 10].),\n  (A10, number of hospitals. Value examples: [8, 6, 4].),\n  (A11, average salary. Value examples: [12541, 11277].),\n  (A12, poverty rate. Value examples: [12.4, 9.8].),\n  (A13, unemployment rate. Value examples: [8.2, 7.9].),\n  (A15, number of crimes. Value examples: [256, 189].)\n]\n【Foreign keys】\nclient.`district_id` = district.`district_id`\n【Question】\nWhat is the gender of the youngest client who opened account in the lowest average salary branch?\n【Evidence】\nLater birthdate refers to younger age; A11 refers to average salary\n【Answer】\n```json\n{{\n  \"account\": \"keep_all\",\n  \"client\": \"keep_all\",\n  \"loan\": \"drop_all\",\n  \"district\": [\"district_id\", \"A11\", \"A2\", \"A4\", \"A6\", \"A7\"]\n}}\n```\nQuestion Solved.\n\n==========\n\nHere is a new example, please start answering:\n\n【DB_ID】 {db_id}\n【Schema】\n{desc_str}\n【Foreign keys】\n{fk_str}\n【Question】\n{query}\n【Evidence】\n{evidence}\n【Answer】\n'''
 
@@ -236,47 +241,22 @@ Later birthdate refers to younger age; A11 refers to average salary
 Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
 '''
 
-refiner_template = '''Given a 【Database schema】 description, a knowledge 【Evidence】 and the 【Question】, you need to use valid SQLite and understand the database and knowledge, and then decompose the question into subquestions for text-to-SQL generation.
-When generating SQL, we should always consider constraints:
-【Constraints】
-- In `SELECT <column>`, just select needed columns in the 【Question】 without any unnecessary column or value
-- In `FROM <table>` or `JOIN <table>`, do not include unnecessary table
-- If use max or min func, `JOIN <table>` FIRST, THEN use `SELECT MAX(<column>)` or `SELECT MIN(<column>)`
-- If [Value examples] of <column> has 'None' or None, use `JOIN <table>` or `WHERE <column> is NOT NULL` is better
-- If use `ORDER BY <column> ASC|DESC`, add `GROUP BY <column>` before to select distinct values
-
-==========
+refiner_template = '''Given the original SQL query that failed execution, the error message, the database schema, evidence, and question, generate a corrected SQL query.
 
 【Database schema】
-# Table: account
-[
-  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
-  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),
-  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
-]
-# Table: client
-[
-  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
-  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
-  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)
-]
-# Table: district
-[
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
-  (A4, number of inhabitants . Value examples: ['95907', '95616', '94812'].),
-  (A11, average salary. Value examples: [12541, 11277, 8114].)
-]
+{desc_str}
 【Foreign keys】
-account.`district_id` = district.`district_id`
-client.`district_id` = district.`district_id`
+{fk_str}
 【Question】
-What is the gender of the youngest client who opened account in the lowest average salary branch?
+{query}
 【Evidence】
-Later birthdate refers to younger age; A11 refers to average salary
+{evidence}
+【Original SQL】
+{original_sql}
+【Error】
+{error}
 
-Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
+Provide the corrected SQL after thinking step by step:
 '''
 
 # Embedded Selector class
@@ -298,7 +278,7 @@ class Selector:
     def init_db2jsons(self):
         if not os.path.exists(self.tables_json_path):
             raise FileNotFoundError(f"tables.json not found in {self.tables_json_path}")
-        data = load_json_file(self.tables_json_path)  # Embed load_json_file if needed
+        data = load_json_file(self.tables_json_path)
         for item in data:
             db_id = item['db_id']
             table_names = item['table_names']
@@ -323,6 +303,8 @@ class Selector:
         return column_names, column_types
 
     def _get_unique_column_values_str(self, cursor, table, column_name):
+        if cursor is None:
+            return "No values found."
         cursor.execute(f"SELECT DISTINCT `{column_name}` FROM `{table}`")
         values = cursor.fetchall()
         if not values:
@@ -330,6 +312,8 @@ class Selector:
         return ", ".join([str(v[0]) for v in values])
 
     def _get_value_examples_str(self, cursor, table, column_name):
+        if cursor is None:
+            return "No value examples found."
         cursor.execute(f"SELECT `{column_name}` FROM `{table}` LIMIT 5")
         values = cursor.fetchall()
         if not values:
@@ -539,12 +523,19 @@ class Refiner:
         if exec_result.get("success") and exec_result.get("row_count") == 0:
             return True
         return False
-    def _refine(self, query: str, evidence:str, schema_info: str, fk_info: str, error_info: dict) -> str:
+    def _refine(self, query: str, evidence: str, schema_info: str, fk_info: str, original_sql: str, error: str) -> str:
         # Use self.llm.complete for prompt
-        prompt = refiner_template.format(desc_str=schema_info, fk_str=fk_info, query=query, evidence=evidence)
+        prompt = refiner_template.format(
+            desc_str=schema_info,
+            fk_str=fk_info,
+            query=query,
+            evidence=evidence,
+            original_sql=original_sql,
+            error=error
+        )
         response = self.llm.complete(prompt)
         reply = response.text.strip()
-        return reply
+        return parse_sql_from_string(reply)  # Parse the final SQL from the reply
     def talk(self, message):
         # Full code, adapting LLM calls
         if message['send_to'] != self.name: return
@@ -554,45 +545,44 @@ class Refiner:
             message['send_to'] = SYSTEM_NAME
             return
 
-        # 1. Decompose the question into sub-questions
+        # Decompose into sub-questions
         sub_questions = []
         try:
-            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info, evidence=evidence)
+            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info, evidence=evidence)  # Assuming bird for now
             response = self.llm.complete(prompt)
             reply = response.text.strip()
-            sub_questions = [q.strip() for q in reply.split('\n') if q.strip().startswith('Sub question')]
-            if not sub_questions:
-                message['send_to'] = SYSTEM_NAME # Fallback to system if no sub-questions
+            # Improved parsing: extract all sub questions and their SQLs
+            sub_parts = reply.split('Sub question ')
+            qa_pairs = []
+            for part in sub_parts[1:]:
+                if 'SQL' in part:
+                    sub_q = part.split('SQL')[0].strip()
+                    sub_sql = parse_sql_from_string(part)
+                    qa_pairs.append((sub_q, sub_sql))
+            if not qa_pairs:
+                message['send_to'] = SYSTEM_NAME
                 return
         except Exception as e:
             logger.error(f"Decomposition failed: {e}")
-            message['send_to'] = SYSTEM_NAME # Fallback to system on error
+            message['send_to'] = SYSTEM_NAME
             return
 
-        # 2. Generate SQL for each sub-question
-        final_sql = ""
-        for i, sub_q in enumerate(sub_questions):
-            message['send_to'] = DECOMPOSER_NAME # Pass to decomposer
-            sub_q_sql = ""
-            try:
-                prompt = decompose_template_bird.format(query=sub_q, desc_str=schema_info, fk_str=fk_info, evidence=evidence)
-                response = self.llm.complete(prompt)
-                reply = response.text.strip()
-                sub_q_sql = parse_sql_from_string(reply)
-                if not sub_q_sql or sub_q_sql.lower().strip() == "error: no sql found in the input string":
-                    message['send_to'] = SYSTEM_NAME # Fallback to system if SQL generation fails
-                    return
-            except Exception as e:
-                logger.error(f"SQL generation for sub-question {i+1} failed: {e}")
-                message['send_to'] = SYSTEM_NAME # Fallback to system on error
-                return
+        # The last SQL is typically the final one in MAC-SQL decomposition
+        final_sql = qa_pairs[-1][1] if qa_pairs else ""
 
-            final_sql += f"Sub question {i+1}: {sub_q}\nSQL\n```sql\n{sub_q_sql}\n```\n\n"
+        # Execute and check if refinement needed
+        db_id = message.get('db_id')
+        exec_result = self._execute_sql(final_sql, db_id)
+        if self._is_need_refine(exec_result) or not exec_result['success']:
+            logger.info("Refining SQL due to execution issue.")
+            error = exec_result.get('error', 'Empty result set') if not exec_result['success'] else 'Empty result set'
+            refined_sql = self._refine(query, evidence, schema_info, fk_info, final_sql, error)
+            final_sql = refined_sql if refined_sql else final_sql
 
         message['final_sql'] = final_sql
-        message['qa_pairs'] = final_sql # Store SQL as qa_pairs for now
-        message['fixed'] = False
-        message['send_to'] = SYSTEM_NAME # Return to system
+        message['qa_pairs'] = qa_pairs
+        message['fixed'] = True if 'refined_sql' in locals() else False
+        message['send_to'] = SYSTEM_NAME
 
 class ChatManager:
     def __init__(self, llm: LLM, data_path: str, tables_json_path: str, log_path: str, model_name: str, dataset_name:str, lazy: bool=False, without_selector: bool=False):
@@ -924,7 +914,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             chat_manager.start(user_message)
             
             # 获取生成的 SQL
-            pred_sql = user_message.get('pred', '')
+            pred_sql = user_message.get('final_sql', '')
             if not pred_sql:
                 raise Exception("MAC-SQL 未生成有效的 SQL")
 
