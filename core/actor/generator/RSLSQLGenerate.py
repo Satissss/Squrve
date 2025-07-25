@@ -1,3 +1,4 @@
+from os import PathLike
 from typing import Union, List, Optional
 import json
 import pandas as pd
@@ -76,7 +77,6 @@ Your main tasks are:
 - The first three rows of values in the table: sample data.
 - User questions: natural language queries or questions.
 - Query requirements and conditions: specific query requirements and conditions in user questions.
-- Tables involved in SQL statements: tables involved in user questions.
 - Auxiliary query conditions: additional query conditions.
 - definition: Information for prompts, this message is very important.
 
@@ -232,9 +232,9 @@ BINARY_PROMPT = '''{table_info}
 {candidate_sql}
 
 Your answer should be returned by json format.
-{
+{{
     "sql": "...",# your SQL query
-}
+}}
 '''
 
 
@@ -455,7 +455,7 @@ class RSLSQLGenerator(BaseGenerator):
         return sql_data['sql'].replace('\n', ' ')
 
     def self_correction(self, table_info, pre_sql, db_id):
-        messages = [{"role": "system", "content": SELF_CORRECTION_PROMPT}]
+        prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
         num = 0
         while num < 5:
             try:
@@ -463,23 +463,16 @@ class RSLSQLGenerator(BaseGenerator):
             except Exception as e:
                 logger.error(f"SQL execution error: {e}")
                 break
-            user_content = table_info
             if num > 0:
-                user_content = "### Buggy SQL: " + pre_sql.strip() + "\n" + f"### The result of the buggy SQL is [{result.strip()}]. Please fix the SQL to get the correct result.\n\n" + table_info
-            messages.append({"role": "user", "content": user_content + "\n\nReturn your answer in JSON format as {'sql': 'your sql'}."})
+                prompt += f"\n### Buggy SQL: {pre_sql.strip()}\n### The result of the buggy SQL is [{result.strip()}]. Please fix the SQL to get the correct result."
+            response = self.llm.complete(prompt).text
             try:
-                response = self.llm.chat(messages)
-                messages.append({"role": "assistant", "content": response.text})
-                try:
-                    sql_dict = json.loads(response.text)
-                except json.JSONDecodeError:
-                    response.text = response.text.replace("\\", "\\\\")
-                    sql_dict = json.loads(response.text)
-                pre_sql = sql_dict['sql'].strip()
-                if row_count > 0 or column_count > 0:
-                    break
-            except Exception as e:
-                logger.error(f"LLM chat error: {e}")
+                sql_dict = json.loads(response)
+            except json.JSONDecodeError:
+                response = response.replace("\\", "\\\\")
+                sql_dict = json.loads(response)
+            pre_sql = sql_dict['sql'].strip()
+            if row_count > 0 or column_count > 0:
                 break
             num += 1
         return pre_sql.replace('\n', ' ')
@@ -498,6 +491,8 @@ class RSLSQLGenerator(BaseGenerator):
         db_type = row.get('db_type', 'sqlite')  # Assume sqlite
         evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
         example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
+        evidence = evidence or ''
+        example = example or ''
         db_path = self.get_db_path(db_id)
 
         # Assume db_type == 'sqlite' for now

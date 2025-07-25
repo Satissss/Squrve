@@ -106,7 +106,7 @@ def get_bigquery_sql_result(
         print(f"GB processed: {gb_processed:.5f} GB")
 
         if df.empty:
-            return None, "No data found for the specified query.", gb_processed
+            return None, "No data found for the specified query", gb_processed
 
         if save_path:
             save_path = Path(save_path)
@@ -132,3 +132,35 @@ def get_sql_exec_result(db_type: str, **kwargs):
         return get_snowflake_sql_result(**kwargs)
 
     return None
+
+
+def execute_sql(db_type, db_path, sql, credential):
+    if db_type not in ["sqlite", "snowflake", "big_query"]:
+        return "Unsupported db_type"
+    args = {"sql_query": sql}
+    if db_type == "sqlite":
+        args["db_path"] = db_path
+    elif db_type == "snowflake":
+        args["db_id"] = db_path
+        args["credential_path"] = credential
+    elif db_type == "big_query":
+        args["credential_path"] = credential
+    exec_result = get_sql_exec_result(db_type, **args)
+    if isinstance(exec_result, tuple):
+        if len(exec_result) == 3:
+            res, err, _ = exec_result
+        elif len(exec_result) == 2:
+            res, err = exec_result
+        else:
+            res = exec_result[0]
+            err = None
+    else:
+        res = exec_result
+        err = None
+    if err:
+        return err
+    if res is None or (isinstance(res, pd.DataFrame) and res.empty):
+        return "No data found for the specified query"
+    if isinstance(res, pd.DataFrame):
+        return str(res)
+    return str(res)

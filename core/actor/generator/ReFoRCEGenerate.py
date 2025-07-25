@@ -11,26 +11,28 @@ from core.data_manage import Dataset, load_dataset, save_dataset
 from core.utils import parse_schema_from_df
 from core.db_connect import execute_sql  # Assuming db_connect.py has an execute_sql function
 
+
 # Note: This implementation adapts ReFoRCE's logic to Squrve's framework.
 # We use the LLM for prompt responses and assume execute_sql is available for feedback.
 
 class ReFoRCEGenerator(BaseGenerator):
     OUTPUT_NAME = "pred_sql"
+    NAME = "ReFoRCEGenerator"
 
     def __init__(
-        self,
-        dataset: Optional[Dataset] = None,
-        llm: Optional = None,
-        is_save: bool = True,
-        save_dir: Union[str, PathLike] = "../files/pred_sql",
-        use_external: bool = True,
-        use_few_shot: bool = True,
-        do_column_exploration: bool = True,
-        do_self_refinement: bool = True,
-        max_iter: int = 5,
-        max_try: int = 3,
-        csv_max_len: int = 500,
-        **kwargs
+            self,
+            dataset: Optional[Dataset] = None,
+            llm: Optional = None,
+            is_save: bool = True,
+            save_dir: Union[str, PathLike] = "../files/pred_sql",
+            use_external: bool = True,
+            use_few_shot: bool = True,
+            do_column_exploration: bool = True,
+            do_self_refinement: bool = True,
+            max_iter: int = 5,
+            max_try: int = 3,
+            csv_max_len: int = 500,
+            **kwargs
     ):
         self.dataset = dataset
         self.llm = llm
@@ -75,28 +77,32 @@ class ReFoRCEGenerator(BaseGenerator):
 
     def execute_sqls(self, sqls, db_type, db_path, credential, logger):
         result_dic_list = []
-        for sql in sqls:
-            try:
-                results = execute_sql(db_type, db_path, sql, credential)
-            except Exception as e:
-                results = str(e)
+        corrected_count = 0
+        for i, sql in enumerate(sqls):
+            results = execute_sql(db_type, db_path, sql, credential)
             if isinstance(results, str) and results != self.empty_result and 'ERROR' not in results.upper():
                 result_dic_list.append({'sql': sql, 'res': results})
             else:
-                # Self-correct logic
-                corrected_sql = self.self_correct(sql, results, logger)
+                corrected_sql = self.self_correct(sql, results, logger, simplify=(results == self.empty_result))
                 if corrected_sql:
-                    try:
-                        results = execute_sql(db_type, db_path, corrected_sql, credential)
-                    except Exception as e:
-                        results = str(e)
+                    results = execute_sql(db_type, db_path, corrected_sql, credential)
                     if isinstance(results, str) and results != self.empty_result and 'ERROR' not in results.upper():
                         result_dic_list.append({'sql': corrected_sql, 'res': results})
+                        corrected_count += 1
+                        # Refine remaining SQLs if corrected
+                        if i < len(sqls) - 1:
+                            refine_prompt = f"Original SQL: {sql}\nCorrected to: {corrected_sql}\nRefine the following SQLs based on this correction:\n" + '\n'.join(sqls[i+1:])
+                            response = self.llm.complete(refine_prompt).text
+                            refined_sqls = self.parse_sql_from_response(response)
+                            if refined_sqls:
+                                sqls = sqls[:i+1] + refined_sqls
         return result_dic_list
 
-    def self_correct(self, sql, error, logger):
+    def self_correct(self, sql, error, logger, simplify=False):
         # Improved self-correct prompt aligned with original
         prompt = f"Input sql:\n{sql}\nThe error information is:\n{str(error)}\n"
+        if simplify:
+            prompt += "Since the output is empty, please simplify some conditions in the SQL.\n"
         prompt += "Please correct it and output only one complete SQL query with thinking process in ```sql``` format."
         response = self.llm.complete(prompt).text
         corrected = self.parse_sql_from_response(response)
@@ -120,56 +126,64 @@ class ReFoRCEGenerator(BaseGenerator):
     def self_refine(self, question, schema_str, pre_info, db_type, db_path, credential, logger):
         iter_count = 0
         generated_sqls = []  # Collect multiple candidates for voting
+        error_history = []
         while iter_count < self.max_iter:
             prompt = f"Database schema:\n{schema_str}\n"
             if pre_info:
                 prompt += f"Exploration results:\n{pre_info}\n"
             prompt += f"Question: {question}\n"
             prompt += f"Generate one {db_type} SQL query. Think step by step."
+            if error_history:
+                prompt += "\nAvoid previous errors: " + ', '.join(error_history[-3:])
             response = self.llm.complete(prompt).text
             sqls = self.parse_sql_from_response(response)
             if not sqls:
                 iter_count += 1
                 continue
             sql = sqls[0]
-            try:
-                executed_result = execute_sql(db_type, db_path, sql, credential)
-            except Exception as e:
-                executed_result = str(e)
+            executed_result = execute_sql(db_type, db_path, sql, credential)
+            error_history.append(str(executed_result))
+            if len(error_history) > 3 and all(e == self.empty_result for e in error_history[-4:]):
+                logger.info("Early stop due to repeated empty results.")
+                break
             if isinstance(executed_result, str) and executed_result != self.empty_result and 'ERROR' not in executed_result.upper():
-                generated_sqls.append((sql, executed_result))  # Collect successful SQL and result
-            else:
+                # Check for empty columns or nested values
                 refine_prompt = f"Input sql:\n{sql}\nError: {executed_result}\nCorrect it and output one SQL."
+                if executed_result == self.empty_result:
+                    refine_prompt += "\nSimplify conditions as results are empty."
                 response = self.llm.complete(refine_prompt).text
                 refined_sqls = self.parse_sql_from_response(response)
                 if refined_sqls:
                     sql = refined_sqls[0]
-                    try:
-                        executed_result = execute_sql(db_type, db_path, sql, credential)
-                    except Exception as e:
-                        executed_result = str(e)
+                    executed_result = execute_sql(db_type, db_path, sql, credential)
+                    error_history.append(str(executed_result))
                     if isinstance(executed_result, str) and executed_result != self.empty_result and 'ERROR' not in executed_result.upper():
                         generated_sqls.append((sql, executed_result))
             iter_count += 1
         if not generated_sqls:
             return None
-        # Basic self-consistency and voting: select the most consistent result
-        from collections import Counter  # Local import for Counter
-        result_counts = Counter(result for _, result in generated_sqls)
-        most_common_result = result_counts.most_common(1)
-        if most_common_result:
-            common_result = most_common_result[0][0]
-            for sql, res in generated_sqls:
-                if res == common_result:
-                    return sql  # Return the SQL corresponding to the most common result
-        return generated_sqls[0][0] if generated_sqls else None  # Fallback to first if no consensus
+        # Improved voting: group by similar results
+        from collections import defaultdict, Counter
+        result_groups = defaultdict(list)
+        for sql, res in generated_sqls:
+            result_groups[res].append(sql)
+        result_counts = Counter({res: len(sqls) for res, sqls in result_groups.items()})
+        most_common = result_counts.most_common()
+        if len(most_common) > 1 and most_common[0][1] == most_common[1][1]:
+            # Tie, select random from top
+            import random
+            top_results = [res for res, count in most_common if count == most_common[0][1]]
+            selected_res = random.choice(top_results)
+        else:
+            selected_res = most_common[0][0]
+        return result_groups[selected_res][0]  # Return one SQL from the selected group
 
     def act(
-        self,
-        item,
-        schema: Union[str, PathLike, Dict, List] = None,
-        schema_links: Union[str, List[str]] = None,
-        **kwargs
+            self,
+            item,
+            schema: Union[str, PathLike, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            **kwargs
     ):
         if self.dataset is None or self.llm is None:
             raise ValueError("Dataset and LLM must be provided for ReFoRCEGenerator.")
@@ -177,7 +191,8 @@ class ReFoRCEGenerator(BaseGenerator):
         question = row['question']
         db_type = row.get('db_type', 'sqlite')  # Default to sqlite if not specified
         db_id = row.get("db_id")
-        db_path = Path(self.dataset.db_path) / (db_id + ".sqlite") if self.dataset.db_path and db_type == 'sqlite' else row.get('db_path')
+        db_path = Path(self.dataset.db_path) / (
+                    db_id + ".sqlite") if self.dataset.db_path and db_type == 'sqlite' else row.get('db_path')
         credential = self.dataset.credential if self.dataset else None
 
         if self.use_external:
@@ -211,12 +226,12 @@ class ReFoRCEGenerator(BaseGenerator):
             prompt = f"Generate {db_type} SQL for: {question}\nSchema: {schema_str}"
             response = self.llm.complete(prompt).text
             sqls = self.parse_sql_from_response(response)
-            pred_sql = sqls[0] if sqls else ""
+            pred_sql = sqls[0] if sqls else "/* No SQL generated */"
 
-        if pred_sql and self.is_save:
+        if self.is_save:
             instance_id = row.get("instance_id", str(item))
             save_path = Path(self.save_dir) / f"{self.__class__.__name__}_{instance_id}.sql"
             save_dataset(pred_sql, save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
 
-        return pred_sql 
+        return pred_sql

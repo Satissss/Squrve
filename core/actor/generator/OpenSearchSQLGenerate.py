@@ -12,6 +12,7 @@ from core.utils import load_dataset, save_dataset
 from core.actor.generator.sql_debug import sql_debug_by_feedback
 from pathlib import Path
 import time
+import numpy as np
 
 # Prompts from all_prompt.py and prompts.py
 EXTRACT_PROMPT = """/* Some extract examples are provided based on similar problems: */
@@ -464,16 +465,31 @@ class DES_new:
         L_values = []
         if debug:
             print(cols)
-        col_emb = self.bert_model.encode(cols, show_progress_bar=False)
-        val_emb = self.bert_model.encode(values, show_progress_bar=False)
-        col_sim = col_emb @ self.DB_emb.T
-        val_sim = val_emb @ self.DB_emb.T
-        for x in col_sim.argsort()[::-1][:topk]:
-            if col_sim[x] > shold:
-                cols_select.append(cols[x])
-        for x in val_sim.argsort()[::-1][:topk * 3]:
-            if val_sim[x] > shold:
-                L_values.append((self.col_values[x], values[x]))
+        if cols:
+            col_emb = self.bert_model.encode(cols, show_progress_bar=False)
+            col_sim = col_emb @ self.DB_emb.T
+        else:
+            col_sim = np.empty((0, self.DB_emb.shape[1]))
+        if values:
+            val_emb = self.bert_model.encode(values, show_progress_bar=False)
+            val_sim = val_emb @ self.DB_emb.T
+        else:
+            val_sim = np.empty((0, self.DB_emb.shape[1]))
+        for i in range(col_sim.shape[0]):
+            if col_sim.shape[1] == 0:
+                continue
+            indices = np.argsort(col_sim[i])[::-1][:topk]
+            for x in indices:
+                if col_sim[i, x] > shold:
+                    cols_select.append(self.col_values[x])
+        cols_select = list(set(cols_select))
+        for i in range(val_sim.shape[0]):
+            if val_sim.shape[1] == 0:
+                continue
+            indices = np.argsort(val_sim[i])[::-1][:topk * 3]
+            for x in indices:
+                if val_sim[i, x] > shold:
+                    L_values.append((self.col_values[x], values[i]))
         L_values = list(set(L_values))
         return cols_select, L_values
 
