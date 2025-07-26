@@ -9,11 +9,18 @@ from nltk.corpus import stopwords
 from os import PathLike
 from typing import Union, Dict, List, Optional
 from pathlib import Path
+import pandas as pd
 
 from loguru import logger
 from sql_metadata import Parser
 
 from core.actor.generator.BaseGenerate import BaseGenerator
+from core.data_manage import Dataset, single_central_process
+from core.utils import (
+    parse_schema_from_df,
+    load_dataset,
+    save_dataset
+)
 
 import abc
 
@@ -1343,19 +1350,39 @@ class DAILSQLGenerate(BaseGenerator):
     NAME = "DAILSQL"
     OUTPUT_NAME = "pred_sql"
 
-    def __init__(self, llm, dataset, prompt_repr=REPR_TYPE.TEXT_REPRESENTATION, k_shot=0, example_type=EXAMPLE_TYPE.QA,
-                 selector_type=SELECTOR_TYPE.RANDOM, save_dir=None, is_save=False):
+    def __init__(
+            self,
+            dataset: Optional[Dataset] = None,
+            llm = None,
+            is_save: bool = True,
+            save_dir: Union[str, PathLike] = "../files/pred_sql",
+            use_external: bool = True,
+            use_few_shot: bool = True,
+            prompt_repr=REPR_TYPE.TEXT_REPRESENTATION,
+            k_shot=0,
+            example_type=EXAMPLE_TYPE.QA,
+            selector_type=SELECTOR_TYPE.RANDOM,
+            db_path: Optional[Union[str, PathLike]] = None,
+            credential: Optional[dict] = None,
+            **kwargs
+    ):
+        self.dataset = dataset
         self.llm = llm
-        self.dataset = dataset  # Assume provides get_train_json, etc.
+        self.is_save = is_save
+        self.save_dir = save_dir
+        self.use_external = use_external
+        self.use_few_shot = use_few_shot
         self.prompt_repr = prompt_repr
         self.k_shot = k_shot
         self.example_type = example_type
         self.selector_type = selector_type
-        self.save_dir = save_dir
-        self.is_save = is_save
 
-        self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
-            data=self.dataset, tokenizer="approx")
+        self.db_path = db_path or (dataset.db_path if dataset else None)
+        self.credential = credential or (dataset.credential if dataset else None)
+
+        if self.dataset:
+            self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
+                data=self.dataset, tokenizer="approx")
 
     def act(self, item, schema=None, schema_links=None, **kwargs):
         try:
@@ -1363,34 +1390,81 @@ class DAILSQLGenerate(BaseGenerator):
                 row = self.dataset[item]
             else:
                 row = item
-            path_db = schema if isinstance(schema, str) else schema.get('path_db', "") if schema is not None else ""
-            target = {
-                'question': row.get('question', ''),
-                'db_id': row.get('db_id', 'default_db'),
-                'path_db': path_db,
-                'tables': get_tables(path_db),
-                'query': row.get('query', 'SELECT'),
-                'column_names_original': schema.get('column_names_original', []) if schema is not None else [],
-                'table_names_original': schema.get('table_names_original', []) if schema is not None else [],
-                # Add other needed keys with defaults
-            }
+                
+            question = row.get('question', '')
+            db_id = row.get('db_id', 'default_db')
+            db_type = row.get('db_type', 'sqlite')
+            
+            logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
+
+            # Load and process schema
+            logger.debug("Processing database schema...")
+            if isinstance(schema, (str, PathLike)):
+                schema = load_dataset(schema)
 
             if schema is None:
-                logger.warning("Schema not provided, using dummy schema")
-                schema = {'column_names_original': [], 'table_names_original': [], 'connection': None}  # Add dummy connection if needed
+                instance_schema_path = row.get("instance_schemas")
+                if instance_schema_path:
+                    schema = load_dataset(instance_schema_path)
+                    logger.debug(f"Loaded schema from: {instance_schema_path}")
+                else:
+                    logger.debug("Fetching schema from dataset")
+                    schema = self.dataset.get_db_schema(item)
+
+                if schema is None:
+                    raise ValueError("Failed to load a valid database schema for the sample!")
+
+            # Normalize schema type - 参考 DINSQLGenerate 的处理方式
+            if isinstance(schema, dict):
+                schema = single_central_process(schema)
+            elif isinstance(schema, list):
+                schema = pd.DataFrame(schema)
+
+            if isinstance(schema, pd.DataFrame):
+                schema_str = parse_schema_from_df(schema)
+                # 为了兼容原有的 DAIL-SQL 逻辑，需要构建兼容的 schema 字典
+                schema_dict = self._build_compatible_schema_dict(schema)
+            else:
+                raise ValueError("Invalid schema format")
+
+            logger.debug("Database schema processed")
+
+            # 构建 target 对象，使用处理后的 schema
+            path_db = row.get('path_db', '')
+            target = {
+                'question': question,
+                'db_id': db_id,
+                'path_db': path_db,
+                'tables': self._get_tables_from_schema(schema_dict),
+                'query': row.get('query', 'SELECT'),
+                'column_names_original': schema_dict.get('column_names_original', []),
+                'table_names_original': schema_dict.get('table_names_original', []),
+            }
 
             # Compute schema_links if not provided
             if schema_links is None:
                 question_toks = target['question'].split()
-                columns = [c[1] for c in schema['column_names_original']]
-                tables = schema['table_names_original']
-                sc_link = compute_schema_linking(question_toks, columns, tables)
-                cv_link = compute_cell_value_linking(question_toks, schema)  # Assume schema has connection or handle
-                sc_link['q_col_match'], sc_link['q_tab_match'], cv_link['cell_match'] = match_shift(
-                    sc_link['q_col_match'], sc_link['q_tab_match'], cv_link['cell_match'])
-                schema_links = {'sc_link': sc_link, 'cv_link': cv_link}
-
-            # Add to target if needed
+                # 使用简化的 schema linking 实现
+                q_col_match, q_tab_match = self._simplified_schema_linking(question_toks, schema_dict)
+                
+                # 简化的 cell value linking - 只处理数字和日期
+                cv_link = {"num_date_match": {}, "cell_match": {}}
+                for q_id, word in enumerate(question_toks):
+                    # 检查是否为数字
+                    try:
+                        float(word)
+                        # 找到匹配的数字类型列
+                        for col_id, (table_id, col_name) in enumerate(schema_dict['column_names_original']):
+                            col_type = schema_dict['column_types'][col_id] if col_id < len(schema_dict['column_types']) else 'text'
+                            if 'number' in col_type.lower() or 'int' in col_type.lower() or 'float' in col_type.lower():
+                                cv_link['num_date_match'][f"{q_id},{col_id}"] = 'NUMBER'
+                    except ValueError:
+                        pass
+                
+                schema_links = {
+                    'sc_link': {'q_col_match': q_col_match, 'q_tab_match': q_tab_match}, 
+                    'cv_link': cv_link
+                }
 
             prompt_data = self.prompt.format(target, max_seq_len=2048, max_ans_len=200, scope_factor=100,
                                              cross_domain=True)
@@ -1406,25 +1480,99 @@ class DAILSQLGenerate(BaseGenerator):
                 sql = 'SELECT ' + sql
 
             if self.is_save:
-                instance_id = row.get('instance_id', 'unknown')
-                save_path = Path(self.save_dir) / f"{self.NAME}_{instance_id}.sql"
+                instance_id = row.get("instance_id", item)
+                save_path = Path(self.save_dir)
+                save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
+                save_path = save_path / f"{self.name}_{instance_id}.sql"
                 save_path.parent.mkdir(parents=True, exist_ok=True)
-                with open(save_path, 'w') as f:
-                    f.write(sql)
-                # Update dataset if method exists
+                save_dataset(sql, new_data_source=save_path)
+                self.dataset.setitem(item, "pred_sql", str(save_path))
 
             return sql
         except Exception as e:
             logger.error(f"DAILSQL act error: {e}")
             return "SELECT"
 
+    def _build_compatible_schema_dict(self, schema_df: pd.DataFrame) -> Dict:
+        """将 DataFrame 格式的 schema 转换为 DAIL-SQL 兼容的字典格式"""
+        schema_dict = {
+            'column_names_original': [],
+            'table_names_original': [],
+            'column_types': [],
+            'connection': None  # 暂时设为 None，实际使用时可能需要数据库连接
+        }
+        
+        # 获取所有唯一的表名
+        table_names = schema_df['table_name'].unique().tolist()
+        schema_dict['table_names_original'] = table_names
+        
+        # 构建 column_names_original 格式: [(table_id, column_name), ...]
+        # 其中 table_id 是表名在 table_names_original 中的索引
+        for _, row in schema_df.iterrows():
+            table_name = row['table_name']
+            column_name = row['column_name']
+            table_id = table_names.index(table_name)
+            schema_dict['column_names_original'].append((table_id, column_name))
+            schema_dict['column_types'].append(row.get('column_types', 'text'))
+        
+        return schema_dict
+
+    def _get_tables_from_schema(self, schema_dict: Dict) -> List:
+        """从 schema 字典中提取表信息，用于构建 tables 对象"""
+        tables = []
+        table_names = schema_dict.get('table_names_original', [])
+        
+        for table_name in table_names:
+            # 获取该表的所有列
+            table_columns = []
+            for table_id, col_name in schema_dict.get('column_names_original', []):
+                if table_id < len(table_names) and table_names[table_id] == table_name:
+                    table_columns.append(col_name)
+            
+            # 创建 SqliteTable 对象
+            table_obj = SqliteTable(
+                name=table_name,
+                schema=table_columns,
+                data=None
+            )
+            tables.append(table_obj)
+        
+        return tables
+
+    def _simplified_schema_linking(self, question_toks, schema_dict):
+        """简化的 schema linking 实现，避免复杂的数据库连接"""
+        q_col_match = {}
+        q_tab_match = {}
+        
+        # 获取列名和表名
+        columns = [c[1] for c in schema_dict['column_names_original']]
+        tables = schema_dict['table_names_original']
+        
+        # 简单的字符串匹配
+        for q_id, word in enumerate(question_toks):
+            word_lower = word.lower()
+            
+            # 检查列名匹配
+            for col_id, col_name in enumerate(columns):
+                if word_lower in col_name.lower() or col_name.lower() in word_lower:
+                    q_col_match[f"{q_id},{col_id}"] = COL_PARTIAL_MATCH_FLAG
+                    if word_lower == col_name.lower():
+                        q_col_match[f"{q_id},{col_id}"] = COL_EXACT_MATCH_FLAG
+            
+            # 检查表名匹配
+            for tab_id, tab_name in enumerate(tables):
+                if word_lower in tab_name.lower() or tab_name.lower() in word_lower:
+                    q_tab_match[f"{q_id},{tab_id}"] = TAB_PARTIAL_MATCH_FLAG
+                    if word_lower == tab_name.lower():
+                        q_tab_match[f"{q_id},{tab_id}"] = TAB_EXACT_MATCH_FLAG
+        
+        return q_col_match, q_tab_match
+
 
 # Define process_duplication from existing
 def process_duplication(sql):
     return sql.strip().split("/*")[0]
 
-
-# Add any missing definitions
 
 # Add helper functions for sql2skeleton
 def isNegativeInt(string):

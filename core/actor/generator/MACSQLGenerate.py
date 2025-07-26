@@ -933,7 +933,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             instance_id = row.get("instance_id")
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.sql"
+            save_path = save_path / f"{self.name}_{instance_id}.sql"
 
             save_dataset(pred_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
