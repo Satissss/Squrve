@@ -5,9 +5,10 @@ from typing import Union, List, Optional, Dict
 from loguru import logger
 import re
 from os import PathLike
+from llama_index.core.llms.llm import LLM
 
 from core.actor.generator.BaseGenerate import BaseGenerator
-from core.data_manage import Dataset, load_dataset, save_dataset
+from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from core.utils import parse_schema_from_df
 from core.db_connect import execute_sql  # Assuming db_connect.py has an execute_sql function
 
@@ -22,7 +23,7 @@ class ReFoRCEGenerator(BaseGenerator):
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
-            llm: Optional = None,
+            llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
             use_external: bool = True,
@@ -32,6 +33,8 @@ class ReFoRCEGenerator(BaseGenerator):
             max_iter: int = 5,
             max_try: int = 3,
             csv_max_len: int = 500,
+            db_path: Optional[Union[str, PathLike]] = None,
+            credential: Optional[Dict] = None,
             **kwargs
     ):
         self.dataset = dataset
@@ -46,6 +49,10 @@ class ReFoRCEGenerator(BaseGenerator):
         self.max_try = max_try
         self.csv_max_len = csv_max_len
         self.empty_result = "No data found for the specified query."
+        
+        # Safely initialize db_path and credential
+        self.db_path = db_path or (self.dataset.db_path if self.dataset else None)
+        self.credential = credential or (self.dataset.credential if self.dataset else None)
 
     def load_external_knowledge(self, external: Union[str, Path] = None):
         if not external:
@@ -112,6 +119,7 @@ class ReFoRCEGenerator(BaseGenerator):
 
     def exploration(self, question, schema_str, db_type, db_path, credential, logger):
         prompt = self.get_exploration_prompt(db_type, schema_str)
+        prompt += f"\nDatabase schema:\n{schema_str}"
         response = self.llm.complete(prompt).text
         sqls = self.parse_sql_from_response(response)
         if not sqls:
@@ -147,7 +155,10 @@ class ReFoRCEGenerator(BaseGenerator):
                 logger.info("Early stop due to repeated empty results.")
                 break
             if isinstance(executed_result, str) and executed_result != self.empty_result and 'ERROR' not in executed_result.upper():
-                # Check for empty columns or nested values
+                # SQL executed successfully, add to generated SQLs
+                generated_sqls.append((sql, executed_result))
+            else:
+                # SQL failed, try to correct it
                 refine_prompt = f"Input sql:\n{sql}\nError: {executed_result}\nCorrect it and output one SQL."
                 if executed_result == self.empty_result:
                     refine_prompt += "\nSimplify conditions as results are empty."
@@ -167,7 +178,7 @@ class ReFoRCEGenerator(BaseGenerator):
         result_groups = defaultdict(list)
         for sql, res in generated_sqls:
             result_groups[res].append(sql)
-        result_counts = Counter({res: len(sqls) for res, sqls in result_groups.items()})
+        result_counts = Counter({res: len(sql_list) for res, sql_list in result_groups.items()})
         most_common = result_counts.most_common()
         if len(most_common) > 1 and most_common[0][1] == most_common[1][1]:
             # Tie, select random from top
@@ -187,30 +198,57 @@ class ReFoRCEGenerator(BaseGenerator):
     ):
         if self.dataset is None or self.llm is None:
             raise ValueError("Dataset and LLM must be provided for ReFoRCEGenerator.")
+        
+        logger.info(f"ReFoRCEGenerator processing sample {item}")
         row = self.dataset[item]
         question = row['question']
         db_type = row.get('db_type', 'sqlite')  # Default to sqlite if not specified
         db_id = row.get("db_id")
-        db_path = Path(self.dataset.db_path) / (
-                    db_id + ".sqlite") if self.dataset.db_path and db_type == 'sqlite' else row.get('db_path')
-        credential = self.dataset.credential if self.dataset else None
+        db_path = Path(self.db_path) / (db_id + ".sqlite") if self.db_path and db_type == 'sqlite' else row.get('db_path')
+        credential = self.credential if self.credential else None
+
+        logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
 
         if self.use_external:
             external = self.load_external_knowledge(row.get("external", None))
             if external:
                 question += "\n" + external
+                logger.debug("Loaded external knowledge")
 
         # Process schema
+        logger.debug("Processing database schema...")
         if isinstance(schema, (str, PathLike)):
             schema = load_dataset(schema)
+        
+        if schema is None:
+            instance_schema_path = row.get("instance_schemas")
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
+                logger.debug(f"Loaded schema from: {instance_schema_path}")
+            else:
+                logger.debug("Fetching schema from dataset")
+                schema = self.dataset.get_db_schema(item)
+                
+            if schema is None:
+                raise ValueError("Failed to load a valid database schema for the sample!")
+
+        # Normalize schema type
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        elif isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+            
         if isinstance(schema, pd.DataFrame):
             schema_str = parse_schema_from_df(schema)
         elif isinstance(schema, str):
             schema_str = schema
         else:
             schema_str = str(schema)  # Fallback
+            
         if schema_links:
             schema_str += f"\nSchema Links: {schema_links}"
+
+        logger.debug("Database schema processed")
 
         pre_info = ""
         if self.do_column_exploration:
@@ -228,10 +266,17 @@ class ReFoRCEGenerator(BaseGenerator):
             sqls = self.parse_sql_from_response(response)
             pred_sql = sqls[0] if sqls else "/* No SQL generated */"
 
+        logger.debug(f"Final SQL: {pred_sql[:100]}...")
+
         if self.is_save:
             instance_id = row.get("instance_id", str(item))
-            save_path = Path(self.save_dir) / f"{self.__class__.__name__}_{instance_id}.sql"
-            save_dataset(pred_sql, save_path)
+            save_path = Path(self.save_dir)
+            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
+            save_path = save_path / f"{self.name}_{instance_id}.sql"
+            
+            save_dataset(pred_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
+            logger.debug(f"SQL saved to: {save_path}")
 
+        logger.info(f"ReFoRCEGenerator sample {item} processed")
         return pred_sql

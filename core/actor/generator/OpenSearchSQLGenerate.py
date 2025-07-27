@@ -1272,11 +1272,60 @@ Please answer according to the format below and do not output any other content.
                 }
                 _, pred_sql = sql_debug_by_feedback(**debug_args)
 
+            # Ensure pred_sql is not empty or None
+            if not pred_sql or pred_sql.strip() == "":
+                # Try to get a valid SQL from the vote results
+                for v in vote:
+                    if v.get("sql") and v["sql"].strip():
+                        pred_sql = v["sql"]
+                        break
+                
+                # If still empty, use fallback
+                if not pred_sql or pred_sql.strip() == "":
+                    pred_sql = "SELECT * FROM table"  # Fallback SQL
+
+            # Clean up the SQL
+            pred_sql = pred_sql.strip()
+            if not pred_sql.startswith("SELECT"):
+                pred_sql = "SELECT * FROM table"
+
             if self.is_save:
-                save_path = Path(self.save_dir) / f"{self.NAME}_{item}.sql"
-                save_dataset(pred_sql, save_path)
-                self.dataset.setitem(item, "pred_sql", str(save_path))
+                # Use the same save logic as DINSQLGenerate
+                instance_id = row.get("instance_id", item)
+                save_path = Path(self.save_dir)
+                save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
+                save_path = save_path / f"{self.name}_{instance_id}.sql"
+                
+                # Ensure the directory exists
+                save_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Ensure we have valid SQL to save
+                if pred_sql and pred_sql.strip():
+                    save_dataset(pred_sql, new_data_source=save_path)
+                    self.dataset.setitem(item, "pred_sql", str(save_path))
+                else:
+                    # Save fallback SQL if pred_sql is still empty
+                    fallback_sql = "SELECT * FROM table"
+                    save_dataset(fallback_sql, new_data_source=save_path)
+                    self.dataset.setitem(item, "pred_sql", str(save_path))
 
             return pred_sql
         except Exception as e:
+            # Provide a fallback SQL in case of errors
+            fallback_sql = "SELECT * FROM table"
+            if self.is_save:
+                try:
+                    instance_id = row.get("instance_id", item) if 'row' in locals() else item
+                    save_path = Path(self.save_dir)
+                    save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
+                    save_path = save_path / f"{self.name}_{instance_id}.sql"
+                    
+                    # Ensure the directory exists
+                    save_path.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    save_dataset(fallback_sql, new_data_source=save_path)
+                    self.dataset.setitem(item, "pred_sql", str(save_path))
+                except Exception as save_error:
+                    print(f"Error saving fallback SQL: {save_error}")
+            
             raise ValueError(f"Error generating SQL: {str(e)}") 
