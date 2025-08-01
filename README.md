@@ -37,8 +37,6 @@ Squrve 采用模块化架构，主要包含以下核心组件：
 
 Squrve 支持多种 Text-to-SQL baselines，通过模块化组件实现快速集成和比较：
 
-#### Generators（查询生成器）
-
 | Baseline 名称       | 方法介绍 |
 |---------------------|----------|
 | BaseGenerate       | 基础生成器，提供标准的 Text-to-SQL 查询生成功能。 |
@@ -51,14 +49,6 @@ Squrve 支持多种 Text-to-SQL baselines，通过模块化组件实现快速集
 | ReFoRCEGenerate    | ReFoRCE 方法，通过强化学习框架优化 SQL 生成过程。 |
 | RSLSQLGenerate     | RSL-SQL 方法，结合规则系统和学习模型生成可靠 SQL。 |
 
-#### Parsers（模式解析器）
-- **BaseParse**: 基础解析器
-- **LinkAlignParse**: LinkAlign 模式链接解析
-
-#### Reducers（模式降维器）
-- **BaseReduce**: 基础降维
-- **LinkAlignReduce**: LinkAlign 降维
-- **ZeroReduce**: 零降维（无降维）
 
 ### 支持的 Benchmarks
 
