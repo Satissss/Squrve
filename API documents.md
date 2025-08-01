@@ -743,12 +743,12 @@ Squrve 接受的数据行格式应遵循以下规范:
   "db_size": "medium", # 目标数据库规模
   "query": "SELECT * FROM table", # [Opt.] 标准 SQL 标记
   "gold_schemas": ["table1", "table2"], # 标准 SQL 使用的全部 db schemas
-  "schema_links": ["table1.column1", "table2.column2"], # [Opt.] 标准模式链接文件路径
-  "external_path": "path/to/external/knowledge.txt", # [Opt.] 存储外部知识源文档的路径
-  "external": "extracted knowledge content", # [Opt.] 已提取知识的存储路径
-  "reasoning_examples": "path/to/reasoning/examples.txt", # [Opt.] 采样思维链样本存储路径
-  "instance_schemas": "path/to/instance/schemas.csv", # [Opt.] reduce 后的 schema 文件存储路径
-  "pred_sql": "predicted SQL query" # [Opt.] 预测后的 SQL 语句
+  "schema_links": "files/schema_links/xxx.txt", # [Opt.] 标准模式链接文件路径
+  "external_path": "files/external/xxx.txt", # [Opt.] 存储外部知识源文档的路径
+  "external": "extracted knowledge content", # [Opt.] 已提取外部知识字符序列
+  "reasoning_examples": "files/reasoning_examples/xxx.txt", # [Opt.] 采样思维链样本存储路径
+  "instance_schemas": "files/instance_schemas/xxx.csv", # [Opt.] reduce 后的 schema 文件存储路径
+  "pred_sql": "files/pred_sql/xxx.sql", # [Opt.] 预测后的 SQL 语句文件存储路径
 }
 ```
 
@@ -763,19 +763,15 @@ QueryFlow 可接受下面两种数据库 schema 格式：
 ```json
 [
   {
-    "db_id": "Airlines", # 数据库名称
-    "table_name": "aircrafts_data", # 表名
-    "column_name": "aircraft_code",  # 列名
-    "column_types": "character(3)", # 列数据类型
-    "column_descriptions": "[Opt.]",  # [Opt.] 列描述
-    "sample_rows": [
-        "319",
-        "321",
-        "CR2",
-        "320",
-        "CN1"
-    ], # [Opt.] 示例行，str 或 list[str]
-    "table_to_projDataset": null  # [Opt.] 存放表归属的数据集
+  	"db_id": <数据库名称>,
+    "db_size": <数据库字段数量>,
+    "db_type": <需要连接的数据库类型>
+    "table_names_original": [], - 存放所有表元素
+  	"column_names_original": [], - 存放所有字段元素,
+  	"column_types": [],  - 存放所有字段的数据类型
+  	"column_descriptions": [], - [Opt.]存放所有字段的类型描述
+  	"sample_rows": [], -[Opt.] 
+  	"table_to_projDataset":[], - [Opt.] 存放表归属的数据集
   }
 ]
 ```
