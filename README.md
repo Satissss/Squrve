@@ -38,15 +38,18 @@ Squrve 采用模块化架构，主要包含以下核心组件：
 Squrve 支持多种 Text-to-SQL baselines，通过模块化组件实现快速集成和比较：
 
 #### Generators（查询生成器）
-- **BaseGenerate**: 基础生成器
-- **CHESSGenerate**: CHESS 方法实现
-- **DAILSQLGenerate**: DAIL-SQL 方法
-- **DINSQLGenerate**: DIN-SQL 方法
-- **LinkAlignGenerate**: LinkAlign 集成生成
-- **MACSQLGenerate**: MAC-SQL 方法
-- **OpenSearchSQLGenerate**: 基于 OpenSearch 的 SQL 生成
-- **ReFoRCEGenerate**: ReFoRCE 方法
-- **RSLSQLGenerate**: RSL-SQL 方法
+
+| Baseline 名称       | 方法介绍 |
+|---------------------|----------|
+| BaseGenerate       | 基础生成器，提供标准的 Text-to-SQL 查询生成功能。 |
+| CHESSGenerate      | CHESS 方法实现，专注于复杂查询的层次化生成和优化。 |
+| DAILSQLGenerate    | DAIL-SQL 方法，通过分治提示和链式思考实现高效 SQL 生成。 |
+| DINSQLGenerate     | DIN-SQL 方法，使用分解提示处理复杂 SQL 查询生成。 |
+| LinkAlignGenerate  | LinkAlign 集成生成，利用高级模式链接提升查询准确性。 |
+| MACSQLGenerate     | MAC-SQL 方法，采用多代理协作机制生成高质量 SQL。 |
+| OpenSearchSQLGenerate | 基于 OpenSearch 的 SQL 生成，利用搜索增强查询构建。 |
+| ReFoRCEGenerate    | ReFoRCE 方法，通过强化学习框架优化 SQL 生成过程。 |
+| RSLSQLGenerate     | RSL-SQL 方法，结合规则系统和学习模型生成可靠 SQL。 |
 
 #### Parsers（模式解析器）
 - **BaseParse**: 基础解析器
@@ -60,10 +63,13 @@ Squrve 支持多种 Text-to-SQL baselines，通过模块化组件实现快速集
 ### 支持的 Benchmarks
 
 Squrve 内置支持多个标准 Text-to-SQL benchmarks，便于模型评估和比较：
-- **Spider**: 跨域 Text-to-SQL 基准，支持 dev 分割
-- **BIRD**: 带外部知识的 Text-to-SQL 基准
-- **Spider2**: Spider 的扩展版本
-- **AmbiDB**: 歧义数据库查询基准
+
+| Benchmark | 描述 |
+|-----------|------|
+| Spider   | 跨域 Text-to-SQL 基准，支持 dev 分割。 |
+| BIRD     | 带外部知识的 Text-to-SQL 基准。 |
+| Spider2  | Spider 的扩展版本，包含更多复杂场景。 |
+| AmbiDB   | 歧义数据库查询基准，测试歧义处理能力。 |
 
 这些 benchmarks 可通过配置文件轻松加载和评估。
 
@@ -195,17 +201,6 @@ engine.evaluate()
 
 详细配置说明请参考 [API 文档](API%20documents.md)。
 
-## 🤝 贡献指南
-
-我们欢迎社区贡献！请遵循以下步骤：
-
-1. Fork 项目
-2. 创建 feature 分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. Push 到分支 (`git push origin feature/AmazingFeature`)
-5. 打开 Pull Request
-
-请确保代码符合 PEP8 标准，并添加必要的测试和文档更新。
 
 ## 📝 TODO List
 
