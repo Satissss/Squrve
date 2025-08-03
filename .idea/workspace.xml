@@ -4,7 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="" />
+    <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/winner_select.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/files/datasets/spider_dev_pipeline.json" beforeDir="false" afterPath="$PROJECT_DIR$/files/datasets/spider_dev_pipeline.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -57,44 +61,44 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
-    &quot;Python.DAILSQLGenerate.executor&quot;: &quot;Run&quot;,
-    &quot;Python.LinkAlignReduce.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.MetaTask.executor&quot;: &quot;Run&quot;,
-    &quot;Python.QwenModel.executor&quot;: &quot;Run&quot;,
-    &quot;Python.base.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.data_clean.executor&quot;: &quot;Run&quot;,
-    &quot;Python.data_manage.executor&quot;: &quot;Run&quot;,
-    &quot;Python.evaluate.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.evaluate_ablation.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.evaluate_ablation_fixed.executor&quot;: &quot;Run&quot;,
-    &quot;Python.po.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.run.executor&quot;: &quot;Run&quot;,
-    &quot;Python.run_.executor&quot;: &quot;Debug&quot;,
-    &quot;Python.run_spider_dev.executor&quot;: &quot;Run&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/project/Squrve&quot;,
-    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
-    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
-    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
-    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
-    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.DAILSQLGenerate.executor": "Run",
+    "Python.LinkAlignReduce.executor": "Debug",
+    "Python.MetaTask.executor": "Run",
+    "Python.QwenModel.executor": "Run",
+    "Python.base.executor": "Debug",
+    "Python.data_clean.executor": "Run",
+    "Python.data_manage.executor": "Run",
+    "Python.evaluate.executor": "Debug",
+    "Python.evaluate_ablation.executor": "Debug",
+    "Python.evaluate_ablation_fixed.executor": "Run",
+    "Python.po.executor": "Debug",
+    "Python.run.executor": "Run",
+    "Python.run_.executor": "Debug",
+    "Python.run_spider_dev.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "git-widget-placeholder": "main",
+    "last_opened_file_path": "D:/project/Squrve/core/actor/selector",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="D:\project\Squrve\core\actor\selector" />
+      <recent name="D:\project\Squrve\core\actor\scaler" />
+      <recent name="D:\project\Squrve\core\actor\optimizer" />
+      <recent name="D:\project\Squrve\core\actor\decomposer" />
       <recent name="D:\project\Squrve\benchmarks\AmbiDB" />
-      <recent name="D:\project\Squrve\doc" />
-      <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source\qwen" />
-      <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source\v3" />
-      <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source\ds" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="D:\project\Squrve\assets" />
@@ -104,7 +108,7 @@
       <recent name="D:\ScientificResearch\Text2Sql\QueryFlow\files\data_source" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.po">
+  <component name="RunManager">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -404,6 +408,11 @@
       <workItem from="1753929701633" duration="3000000" />
       <workItem from="1754017609537" duration="792000" />
       <workItem from="1754025925136" duration="1812000" />
+      <workItem from="1754030063005" duration="4275000" />
+      <workItem from="1754038330685" duration="16000" />
+      <workItem from="1754038684677" duration="2374000" />
+      <workItem from="1754057381645" duration="34000" />
+      <workItem from="1754207167667" duration="6003000" />
     </task>
     <servers />
   </component>
@@ -453,11 +462,6 @@
           <line>103</line>
           <option name="timeStamp" value="168" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="python-line">
-          <url>file://$PROJECT_DIR$/core/evaluate.py</url>
-          <line>89</line>
-          <option name="timeStamp" value="186" />
-        </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
         <breakpoint type="python-line" />
@@ -498,7 +502,7 @@
     <SUITE FILE_PATH="coverage/Squrve$DAILSQLGenerate.coverage" NAME="DAILSQLGenerate Coverage Results" MODIFIED="1753363733659" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
     <SUITE FILE_PATH="coverage/Squrve$QwenModel.coverage" NAME="QwenModel Coverage Results" MODIFIED="1751181636751" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
     <SUITE FILE_PATH="coverage/QueryFlow$tt.coverage" NAME="tt Coverage Results" MODIFIED="1748335668165" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
-    <SUITE FILE_PATH="coverage/Squrve$run_spider_dev.coverage" NAME="run_spider_dev Coverage Results" MODIFIED="1753586196139" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
+    <SUITE FILE_PATH="coverage/Squrve$run_spider_dev.coverage" NAME="run_spider_dev Coverage Results" MODIFIED="1754038745656" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/QueryFlow$evaluate.coverage" NAME="evaluate Coverage Results" MODIFIED="1747704013340" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
     <SUITE FILE_PATH="coverage/QueryFlow$data_clean.coverage" NAME="data_clean Coverage Results" MODIFIED="1746709865180" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/spider" />
     <SUITE FILE_PATH="coverage/QueryFlow$run.coverage" NAME="run Coverage Results" MODIFIED="1748404194076" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
