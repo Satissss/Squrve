@@ -13,7 +13,14 @@ class ParseTask(MetaTask):
     """ Task For Text-to-SQL """
 
     NAME = "ParseTask"
-    registered_parse_type = ["LinkAlignParser", "LinkAlign"]
+    registered_parse_type = [
+        "LinkAlignParser", "LinkAlign",
+        "DINSQLCoTParser", "DIN_SQL",
+        "CHESSSelectorParser", "CHESS",
+        "MACSQLCoTParser", "MACSQL",
+        "RSLSQLBiDirParser", "RSLSQL",
+        "OpenSearchCoTParser", "OpenSearchSQL"
+    ]
 
     def __init__(
             self,
@@ -68,6 +75,31 @@ class ParseTask(MetaTask):
 
         if actor_type in ("LinkAlignParser", "LinkAlign"):
             actor = LinkAlignParser(**parse_args)
+            return actor
+
+        elif actor_type in ("DINSQLCoTParser", "DIN_SQL"):
+            from core.actor.parser.DINSQLCoTParse import DINSQLCoTParser
+            actor = DINSQLCoTParser(**parse_args)
+            return actor
+
+        elif actor_type in ("CHESSSelectorParser", "CHESS"):
+            from core.actor.parser.CHESSSelectorParse import CHESSSelectorParser
+            actor = CHESSSelectorParser(**parse_args)
+            return actor
+
+        elif actor_type in ("MACSQLCoTParser", "MACSQL"):
+            from core.actor.parser.MACSQLCoTParser import MACSQLCoTParser
+            actor = MACSQLCoTParser(**parse_args)
+            return actor
+
+        elif actor_type in ("RSLSQLBiDirParser", "RSLSQL"):
+            from core.actor.parser.RSLSQLBiDirParser import RSLSQLBiDirParser
+            actor = RSLSQLBiDirParser(**parse_args)
+            return actor
+
+        elif actor_type in ("OpenSearchCoTParser", "OpenSearchSQL"):
+            from core.actor.parser.OpenSearchCoTParser import OpenSearchCoTParser
+            actor = OpenSearchCoTParser(**parse_args)
             return actor
 
         warnings.warn(f"The parse_type `{actor_type}` is not available.", category=UserWarning)
