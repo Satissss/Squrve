@@ -5,8 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/meta/ParseTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/ParseTask.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -413,7 +412,7 @@
       <workItem from="1754057381645" duration="34000" />
       <workItem from="1754207167667" duration="13620000" />
       <workItem from="1754270910422" duration="2904000" />
-      <workItem from="1754274870114" duration="1946000" />
+      <workItem from="1754274870114" duration="16217000" />
     </task>
     <servers />
   </component>

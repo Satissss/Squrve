@@ -5,7 +5,7 @@ from core.actor.base import Actor
 from abc import abstractmethod
 
 
-class BaseSelector(Actor):
+class BaseOptimizer(Actor):
     OUTPUT_NAME: str = "pred_sql"
 
     @abstractmethod
