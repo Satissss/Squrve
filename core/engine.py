@@ -29,7 +29,9 @@ class Engine:
         "ReduceTask",
         "reduce",
         "ScaleTask",
-        "scale"
+        "scale",
+        "DecomposeTask",
+        "decompose"
     ]
 
     def __init__(
@@ -318,6 +320,9 @@ class Engine:
         elif task_type in ("ScaleTask", "scale"):
             task = self.generate_scale_task(**init_args)
 
+        elif task_type in ("DecomposeTask", "decompose"):
+            task = self.generate_decompose_task(**init_args)
+
         return task
 
     def generate_generate_task(self, **kwargs):
@@ -363,6 +368,18 @@ class Engine:
             kwargs["output_format"] = self.router.scale_output_format if hasattr(self.router, 'scale_output_format') else "list"
 
         task = ScaleTask(**kwargs)
+        return task
+
+    def generate_decompose_task(self, **kwargs):
+        from core.task.meta.DecomposeTask import DecomposeTask
+        # initialize parameters by router.
+        if kwargs.get("save_dir", None) is None:
+            kwargs["save_dir"] = self.router.decompose_save_dir if hasattr(self.router, 'decompose_save_dir') else "../files/sub_questions"
+
+        if kwargs.get("output_format", None) is None:
+            kwargs["output_format"] = self.router.decompose_output_format if hasattr(self.router, 'decompose_output_format') else "list"
+
+        task = DecomposeTask(**kwargs)
         return task
 
     def init_complex_task(
