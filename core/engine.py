@@ -27,7 +27,9 @@ class Engine:
         "ParseTask",
         "parse",
         "ReduceTask",
-        "reduce"
+        "reduce",
+        "ScaleTask",
+        "scale"
     ]
 
     def __init__(
@@ -313,6 +315,9 @@ class Engine:
         elif task_type in ("ReduceTask", "reduce"):
             task = self.generate_reduce_task(**init_args)
 
+        elif task_type in ("ScaleTask", "scale"):
+            task = self.generate_scale_task(**init_args)
+
         return task
 
     def generate_generate_task(self, **kwargs):
@@ -346,6 +351,18 @@ class Engine:
             kwargs["output_format"] = self.router.reduce_output_format
 
         task = ReduceTask(**kwargs)
+        return task
+
+    def generate_scale_task(self, **kwargs):
+        from core.task.meta.ScaleTask import ScaleTask
+        # initialize parameters by router.
+        if kwargs.get("save_dir", None) is None:
+            kwargs["save_dir"] = self.router.scale_save_dir if hasattr(self.router, 'scale_save_dir') else "../files/pred_sql"
+
+        if kwargs.get("output_format", None) is None:
+            kwargs["output_format"] = self.router.scale_output_format if hasattr(self.router, 'scale_output_format') else "list"
+
+        task = ScaleTask(**kwargs)
         return task
 
     def init_complex_task(
