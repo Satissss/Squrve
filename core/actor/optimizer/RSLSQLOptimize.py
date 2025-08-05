@@ -14,7 +14,6 @@ from core.utils import parse_schema_from_df
 
 class RSLSQLOptimizer(BaseOptimizer):
     NAME = "RSLSQLOptimizer"
-    OUTPUT_NAME = "optimized_sql"  # Override if needed, but keeping as pred_sql per base
 
     SELF_CORRECTION_PROMPT = '''You are an AI agent responsible for generating the correct SQL statements based on the following information:
 - A small number of SQL Q&A pairs: used for reference and learning common query patterns.

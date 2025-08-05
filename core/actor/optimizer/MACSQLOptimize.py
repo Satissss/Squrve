@@ -25,7 +25,6 @@ class MACSQLOptimizer(BaseOptimizer):
     """Optimizer that debugs and refines SQL queries using MAC-SQL's refinement method with execution feedback."""
 
     NAME = "MACSQLOptimizer"
-    OUTPUT_NAME = "pred_sql"
 
     def __init__(
             self,

@@ -14,6 +14,7 @@ class BaseSelector(Actor):
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            pred_sql: Union[str, PathLike, List[str], List[PathLike]] = None,
             **kwargs
     ):
         pass

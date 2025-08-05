@@ -21,7 +21,6 @@ class MACSQLDecomposer(BaseDecomposer):
     """
 
     NAME = "MACSQLDecomposer"
-    OUTPUT_NAME = "sub_questions"
 
     # Prompt templates from MAC-SQL
     DECOMPOSE_TEMPLATE_BIRD = '''Given a 【Database schema】 description, a knowledge 【Evidence】 and the 【Question】, you need to use valid SQLite and understand the database and knowledge, and then decompose the question into subquestions for text-to-SQL generation.

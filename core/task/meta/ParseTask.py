@@ -88,17 +88,17 @@ class ParseTask(MetaTask):
             return actor
 
         elif actor_type in ("MACSQLCoTParser", "MACSQL"):
-            from core.actor.parser.MACSQLCoTParser import MACSQLCoTParser
+            from core.actor.parser.MACSQLCoTParse import MACSQLCoTParser
             actor = MACSQLCoTParser(**parse_args)
             return actor
 
         elif actor_type in ("RSLSQLBiDirParser", "RSLSQL"):
-            from core.actor.parser.RSLSQLBiDirParser import RSLSQLBiDirParser
+            from core.actor.parser.RSLSQLBiDirParse import RSLSQLBiDirParser
             actor = RSLSQLBiDirParser(**parse_args)
             return actor
 
         elif actor_type in ("OpenSearchCoTParser", "OpenSearchSQL"):
-            from core.actor.parser.OpenSearchCoTParser import OpenSearchCoTParser
+            from core.actor.parser.OpenSearchCoTParse import OpenSearchCoTParser
             actor = OpenSearchCoTParser(**parse_args)
             return actor
 
