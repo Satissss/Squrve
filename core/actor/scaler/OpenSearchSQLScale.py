@@ -1,6 +1,5 @@
 import re
 import pandas as pd
-import sqlite3
 import os
 import chardet
 import json
@@ -8,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from sentence_transformers import SentenceTransformer
 from core.actor.scaler.BaseScale import BaseScaler
 from core.utils import load_dataset, save_dataset
+from core.db_connect import get_sqlite_result
 from pathlib import Path
 import numpy as np
 
@@ -64,11 +64,17 @@ class DB_AGENT:
     def __init__(self, chat_model) -> None:
         self.chat_model = chat_model
 
-    def get_complete_table_info(self, conn, table_name, table_df):
-        cursor = conn.cursor()
-        cursor.execute(f"PRAGMA table_info(`{table_name}`)")
-        columns_info = cursor.fetchall()
-        df = pd.read_sql_query(f"SELECT * FROM `{table_name}`", conn)
+    def get_complete_table_info(self, db_path, table_name, table_df):
+        # Use db_connect module instead of direct sqlite3
+        pragma_result, _ = get_sqlite_result(f"PRAGMA table_info(`{table_name}`)", db_path)
+        if pragma_result is None:
+            return "", {}
+        columns_info = pragma_result.values.tolist()
+        
+        df_result, _ = get_sqlite_result(f"SELECT * FROM `{table_name}`", db_path)
+        if df_result is None:
+            return "", {}
+        df = df_result
         contains_null = {
             column: df[column].isnull().any()
             for column in df.columns
@@ -153,11 +159,15 @@ class DB_AGENT:
         return schema_str, columns
 
     def get_db_des(self, sqllite_dir, db_dir, model):
-        conn = sqlite3.connect(sqllite_dir)
         table_dir = os.path.join(db_dir, 'database_description') if db_dir else None
         sql = "SELECT name FROM sqlite_master WHERE type='table';"
-        cursor = conn.cursor()
-        tables = cursor.execute(sql).fetchall()
+        
+        # Use db_connect module
+        tables_result, _ = get_sqlite_result(sql, sqllite_dir)
+        if tables_result is None:
+            return "", {}
+        tables = tables_result.values.tolist()
+        
         db_info = []
         db_col = dict()
         if table_dir and os.path.exists(table_dir):
@@ -183,12 +193,10 @@ class DB_AGENT:
                     table_df = pd.DataFrame()
             else:
                 table_df = pd.DataFrame()
-            table_info, columns = self.get_complete_table_info(conn, table[0], table_df)
+            table_info, columns = self.get_complete_table_info(sqllite_dir, table[0], table_df)
             db_info.append(table_info)
             db_col.update(columns)
         db_info = "\n".join(db_info)
-        cursor.close()
-        conn.close()
         return db_info, db_col
 
     def db_conclusion(self, db_info):
@@ -572,9 +580,19 @@ class OpenSearchSQLScaler(BaseScaler):
             instance_id = row.get("instance_id", item)
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.json"
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_dataset(pred_sqls, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
+            
+            # Save each SQL candidate in separate files
+            sql_paths = []
+            for i, sql in enumerate(pred_sqls):
+                sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
+                sql_save_path.parent.mkdir(parents=True, exist_ok=True)
+                save_dataset(sql, new_data_source=sql_save_path)
+                sql_paths.append(str(sql_save_path))
+            
+            # Set dataset field - single path if one SQL, list of paths if multiple
+            if len(sql_paths) == 1:
+                self.dataset.setitem(item, "pred_sql", sql_paths[0])
+            else:
+                self.dataset.setitem(item, "pred_sql", sql_paths)
 
         return pred_sqls 

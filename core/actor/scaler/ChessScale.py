@@ -204,8 +204,20 @@ Evidence: {HINT}
         if self.is_save:
             instance_id = row.get("instance_id")
             save_path = Path(self.save_dir)
-            save_path = save_path / f"{self.NAME}_{instance_id}.json"
-            save_dataset(pred_sqls, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
+            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
+            
+            # Save each SQL candidate in separate files
+            sql_paths = []
+            for i, sql in enumerate(pred_sqls):
+                sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
+                sql_save_path.parent.mkdir(parents=True, exist_ok=True)
+                save_dataset(sql, new_data_source=sql_save_path)
+                sql_paths.append(str(sql_save_path))
+            
+            # Set dataset field - single path if one SQL, list of paths if multiple
+            if len(sql_paths) == 1:
+                self.dataset.setitem(item, "pred_sql", sql_paths[0])
+            else:
+                self.dataset.setitem(item, "pred_sql", sql_paths)
 
         return pred_sqls 
