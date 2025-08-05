@@ -3,7 +3,7 @@ from .LinkAlignGenerate import LinkAlignGenerator
 from .CHESSGenerate import CHESSGenerator
 from .DAILSQLGenerate import DAILSQLGenerate
 from .DINSQLGenerate import DIN_SQLGenerator as DINSQLGenerator
-from .MACSQLGenerate import MACSQLGenerate
+from .MACSQLGenerate import MACSQLGenerator
 from .OpenSearchSQLGenerate import OpenSearchSQLGenerator
 from .ReFoRCEGenerate import ReFoRCEGenerator
 from .RSLSQLGenerate import RSLSQLGenerator

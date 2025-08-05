@@ -156,7 +156,7 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
         output = str(schema_links) if self.output_format == "str" else schema_links
 
         if self.is_save:
-            instance_id = row['instance_id']
+            instance_id = row.get("instance_id", item)
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
             file_ext = ".txt" if self.output_format == "str" else ".json"

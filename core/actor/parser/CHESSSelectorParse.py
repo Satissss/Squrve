@@ -188,11 +188,11 @@ Only output a json as your response."""
         return {}
 
     def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
-        row = self.dataset[item]
-        question = row["question"]
-        evidence = row.get("evidence", "")
-        db_size = row.get("db_size", 0)
-        db_type = row.get("db_type", "sqlite")
+        data_row = self.dataset[item]
+        question = data_row["question"]
+        evidence = data_row.get("evidence", "")
+        db_size = data_row.get("db_size", 0)
+        db_type = data_row.get("db_type", "sqlite")
 
         if isinstance(schema, (str, PathLike)):
             schema = load_dataset(schema)
@@ -209,9 +209,9 @@ Only output a json as your response."""
 
         # Step 1: Filter columns
         column_profiles = []
-        for _, row in schema.iterrows():
-            profile = self._format_column_profile(row, db_type)
-            column_profiles.append((row['table_name'], row['column_name'], profile))
+        for _, schema_row in schema.iterrows():
+            profile = self._format_column_profile(schema_row, db_type)
+            column_profiles.append((schema_row['table_name'], schema_row['column_name'], profile))
 
         def filter_single(profile_kwargs):
             table, column, profile = profile_kwargs
@@ -263,7 +263,7 @@ Only output a json as your response."""
         schema_links = list(set(schema_links))
 
         if self.is_save:
-            instance_id = row['instance_id']
+            instance_id = data_row['instance_id']
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
             save_path = save_path / f"{self.NAME}_{instance_id}.json"

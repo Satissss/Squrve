@@ -1,4 +1,3 @@
-import copy
 import warnings
 from os import PathLike
 from typing import Union, List, Optional

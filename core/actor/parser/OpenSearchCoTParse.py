@@ -90,7 +90,7 @@ class OpenSearchCoTParser(BaseParser):
         self.top_k = top_k
         self.tables_json_path = tables_json_path
         self.tables_info_dir = tables_info_dir
-        self.db_path = db_path
+        self.db_path = db_path or (dataset.db_path if dataset else None)
         self.is_save = is_save
         self.save_dir = save_dir
         self.output_format = output_format
@@ -442,7 +442,7 @@ Please conclude the database in the following format:
         row = self.dataset[item]
         question = row["question"]
         db_id = row["db_id"]
-        db_sqlite_path = str(Path(self.db_path) / (db_id + ".sqlite"))
+        db_sqlite_path = str(Path(self.db_path) / (db_id + ".sqlite")) if self.db_path else None
 
         fewshot = ''
         if self.use_few_shot:
