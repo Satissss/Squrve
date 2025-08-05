@@ -163,9 +163,9 @@ class LinkAlignParser(BaseParser):
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
             if self.output_format == "str":
-                save_path = save_path / f"{self.name}_{instance_id}.txt"
+                save_path = save_path / f"{self.NAME}_{instance_id}.txt"
             else:
-                save_path = save_path / f"{self.name}_{instance_id}.json"
+                save_path = save_path / f"{self.NAME}_{instance_id}.json"
             save_dataset(schema_links, new_data_source=save_path)
             self.dataset.setitem(item, "schema_links", str(save_path))
 

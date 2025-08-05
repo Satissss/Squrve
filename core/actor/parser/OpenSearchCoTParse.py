@@ -478,8 +478,7 @@ Please conclude the database in the following format:
         if self.is_save:
             instance_id = row.get("instance_id", item)
             save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
-                                                                               'dataset_index') and self.dataset.dataset_index else save_path
+            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
             file_ext = ".txt" if self.output_format == "str" else ".json"
             save_path = save_path / f"{self.NAME}_{instance_id}{file_ext}"
 
