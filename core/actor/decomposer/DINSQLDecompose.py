@@ -190,6 +190,6 @@ Label: "NESTED"'''
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
             save_path = save_path / f"{self.NAME}_{instance_id}.json"
             save_dataset(sub_questions, new_data_source=save_path)
-            self.dataset.setitem(item, "sub_questions", str(save_path))
+            self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
 
         return sub_questions 

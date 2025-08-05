@@ -11,6 +11,7 @@ from core.utils import load_dataset, save_dataset
 from core.data_manage import Dataset, single_central_process
 from llama_index.core.llms.llm import LLM
 
+
 class MACSQLCoTParser(BaseParser):
     """
     Extract relevant schema links for a query using MAC-SQL approach with table and column selection.
@@ -19,18 +20,18 @@ class MACSQLCoTParser(BaseParser):
     OUTPUT_NAME = "schema_links"
 
     def __init__(
-        self,
-        dataset: Optional[Dataset] = None,
-        llm: Union[LLM, List[LLM]] = None,
-        output_format: str = "list",  # output in `list` or `str`
-        is_save: bool = True,
-        save_dir: Union[str, Path] = "../files/schema_links",
-        use_external: bool = False,
-        generate_num: int = 1,
-        use_llm_scaling: bool = False,
-        open_parallel: bool = False,
-        max_workers: int = None,
-        **kwargs
+            self,
+            dataset: Optional[Dataset] = None,
+            llm: Union[LLM, List[LLM]] = None,
+            output_format: str = "list",  # output in `list` or `str`
+            is_save: bool = True,
+            save_dir: Union[str, Path] = "../files/schema_links",
+            use_external: bool = False,
+            generate_num: int = 1,
+            use_llm_scaling: bool = False,
+            open_parallel: bool = False,
+            max_workers: int = None,
+            **kwargs
     ):
         super().__init__()
         self.dataset: Optional[Dataset] = dataset
@@ -93,6 +94,28 @@ class MACSQLCoTParser(BaseParser):
                 fk_str += f"{row['table_name']}.`{row['column_name']}` = {fk_table}.`{fk_col}`\n"
         return fk_str
 
+    def _process_single_llm(self, llm_model, prompt, schema):
+        """Process a single LLM call and return schema links"""
+        try:
+            response = llm_model.complete(prompt)
+            reply = response.text.strip()
+            extracted_dict = self._parse_json(reply)
+            # Build schema_links
+            schema_links = []
+            table_columns = schema.groupby('table_name')['column_name'].apply(list).to_dict()
+            for table, value in extracted_dict.items():
+                if value == "keep_all":
+                    if table in table_columns:
+                        for col in table_columns[table]:
+                            schema_links.append(f"{table}.{col}")
+                elif isinstance(value, list):
+                    for col in value:
+                        schema_links.append(f"{table}.{col}")
+            return schema_links
+        except Exception as e:
+            logger.error(f"Error in _process_single_llm: {e}")
+            return []
+
     def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
         try:
             row = self.dataset[item]
@@ -123,30 +146,19 @@ class MACSQLCoTParser(BaseParser):
                 schema = single_central_process(schema)
             if not isinstance(schema, pd.DataFrame):
                 raise ValueError("Invalid schema format")
+            if schema.empty:
+                raise ValueError("Schema DataFrame is empty")
 
             desc_str = self._build_desc_str(schema)
             fk_str = self._build_fk_str(schema)
-            prompt = self.selector_template.format(db_id=db_id, desc_str=desc_str, fk_str=fk_str, query=question, evidence=evidence)
+            prompt = self.selector_template.format(db_id=db_id, desc_str=desc_str, fk_str=fk_str, query=question,
+                                                   evidence=evidence)
 
             def process_serial(llm_lis_):
                 links = []
                 for llm_model in llm_lis_:
                     for _ in range(self.generate_num):
-                        response = llm_model.complete(prompt)
-                        reply = response.text.strip()
-                        extracted_dict = self._parse_json(reply)
-                        # Build schema_links
-                        schema_links = []
-                        table_columns = schema.groupby('table_name')['column_name'].apply(list).to_dict()
-                        for table, value in extracted_dict.items():
-                            if value == "keep_all":
-                                if table in table_columns:
-                                    for col in table_columns[table]:
-                                        schema_links.append(f"{table}.{col}")
-                            elif isinstance(value, list):
-                                for col in value:
-                                    schema_links.append(f"{table}.{col}")
-                        links.extend(schema_links)
+                        links.extend(self._process_single_llm(llm_model, prompt, schema))
                 return links
 
             def process_parallel(llm_lis_):
@@ -164,23 +176,6 @@ class MACSQLCoTParser(BaseParser):
                         except Exception as e:
                             logger.error(f"Error occurred: {e}")
                 return links
-
-            def _process_single_llm(llm_model, prompt, schema):
-                response = llm_model.complete(prompt)
-                reply = response.text.strip()
-                extracted_dict = self._parse_json(reply)
-                # Build schema_links
-                schema_links = []
-                table_columns = schema.groupby('table_name')['column_name'].apply(list).to_dict()
-                for table, value in extracted_dict.items():
-                    if value == "keep_all":
-                        if table in table_columns:
-                            for col in table_columns[table]:
-                                schema_links.append(f"{table}.{col}")
-                    elif isinstance(value, list):
-                        for col in value:
-                            schema_links.append(f"{table}.{col}")
-                return schema_links
 
             llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
             schema_links = []
@@ -207,4 +202,4 @@ class MACSQLCoTParser(BaseParser):
         except Exception as e:
             logger.error(f"Error in MACSQLCoTParser.act(): {e}")
             # Return empty schema links as fallback
-            return [] if self.output_format == "list" else "[]" 
+            return [] if self.output_format == "list" else "[]"

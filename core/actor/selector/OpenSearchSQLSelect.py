@@ -164,8 +164,8 @@ class OpenSearchSQLSelector(BaseSelector):
             if self.dataset.dataset_index:
                 save_path /= str(self.dataset.dataset_index)
             save_path /= f"{self.NAME}_{instance_id}.sql"
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_dataset(best_sql, save_path)
+
+            save_dataset(best_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
 
-        return best_sql if is_single else [best_sql]
+        return best_sql

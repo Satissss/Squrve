@@ -14,6 +14,8 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
+# Import for database connection (for future use if needed)
+# from core.db_connect import get_sql_exec_result, execute_sql
 
 class MACSQLDecomposer(BaseDecomposer):
     """
@@ -251,6 +253,13 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
         return self.parse_qa_pairs(response)
 
     def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+        """
+        Decompose complex queries into sub-questions with corresponding SQL statements.
+        
+        Returns:
+            List[Tuple[str, str]]: List of (sub_question, corresponding_sql) pairs.
+            Note: This differs from DINSQLDecomposer which returns List[str] of sub_questions only.
+        """
         row = self.dataset[item]
         query = row.get("question", "")
         evidence = row.get("evidence", "")
