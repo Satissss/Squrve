@@ -210,7 +210,6 @@ Evidence: {HINT}
             sql_paths = []
             for i, sql in enumerate(pred_sqls):
                 sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
-                sql_save_path.parent.mkdir(parents=True, exist_ok=True)
                 save_dataset(sql, new_data_source=sql_save_path)
                 sql_paths.append(str(sql_save_path))
             

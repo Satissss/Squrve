@@ -43,7 +43,6 @@ class ParseTask(MetaTask):
         super().__init__(**kwargs)
 
     def load_actor(self, actor_type: str = None, **kwargs) -> Optional[BaseParser]:
-
         if actor_type is None:
             actor_type = self.parse_type
 

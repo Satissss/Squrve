@@ -12,7 +12,7 @@ class ReduceTask(MetaTask):
     """ Task For Text-to-SQL """
 
     NAME = "ReduceTask"
-    registered_parse_type = ["LinkAlignReducer", "LinkAlign"]
+    registered_reduce_type = ["LinkAlignReducer", "LinkAlign"]
 
     def __init__(
             self,
