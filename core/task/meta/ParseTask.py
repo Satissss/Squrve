@@ -7,6 +7,11 @@ from llama_index.core.llms.llm import LLM
 from core.task.meta.MetaTask import MetaTask
 from core.actor.parser.LinkAlignParse import LinkAlignParser
 from core.actor.parser.BaseParse import BaseParser
+from core.actor.parser.DINSQLCoTParse import DINSQLCoTParser
+from core.actor.parser.CHESSSelectorParse import CHESSSelectorParser
+from core.actor.parser.MACSQLCoTParse import MACSQLCoTParser
+from core.actor.parser.RSLSQLBiDirParse import RSLSQLBiDirParser
+from core.actor.parser.OpenSearchCoTParse import OpenSearchCoTParser
 
 
 class ParseTask(MetaTask):
@@ -78,27 +83,22 @@ class ParseTask(MetaTask):
             return actor
 
         elif actor_type in ("DINSQLCoTParser", "DIN_SQL"):
-            from core.actor.parser.DINSQLCoTParse import DINSQLCoTParser
             actor = DINSQLCoTParser(**parse_args)
             return actor
 
         elif actor_type in ("CHESSSelectorParser", "CHESS"):
-            from core.actor.parser.CHESSSelectorParse import CHESSSelectorParser
             actor = CHESSSelectorParser(**parse_args)
             return actor
 
         elif actor_type in ("MACSQLCoTParser", "MACSQL"):
-            from core.actor.parser.MACSQLCoTParse import MACSQLCoTParser
             actor = MACSQLCoTParser(**parse_args)
             return actor
 
         elif actor_type in ("RSLSQLBiDirParser", "RSLSQL"):
-            from core.actor.parser.RSLSQLBiDirParse import RSLSQLBiDirParser
             actor = RSLSQLBiDirParser(**parse_args)
             return actor
 
         elif actor_type in ("OpenSearchCoTParser", "OpenSearchSQL"):
-            from core.actor.parser.OpenSearchCoTParse import OpenSearchCoTParser
             actor = OpenSearchCoTParser(**parse_args)
             return actor
 

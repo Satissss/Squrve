@@ -92,6 +92,11 @@ class Router:
     _is_save_generate: bool
     _generate_save_dir: Union[str, None]
 
+    """ OPTIMIZER """
+    _optimize_type: Union[None, str]
+    _is_save_optimize: bool
+    _optimize_save_dir: Union[str, None]
+
     """ TASK """
     _task_meta: Union[Dict, List[Dict], None]
     _cpx_task_meta: Union[Dict, List[Dict], None]
@@ -153,6 +158,9 @@ class Router:
             generate_type: Union[None, str] = None,
             is_save_generate: bool = True,
             generate_save_dir: Optional[str] = None,
+            optimize_type: Optional[str] = None,
+            is_save_optimize: bool = True,
+            optimize_save_dir: Optional[str] = None,
             task_meta: Union[Dict, List[Dict], None] = None,
             cpx_task_meta: Union[Dict, List[Dict], None] = None,
             is_save_dataset: bool = True,
@@ -225,6 +233,11 @@ class Router:
         self._generate_type = generate_type
         self._is_save_generate = is_save_generate
         self._generate_save_dir = generate_save_dir if generate_save_dir is not None else ""
+
+        """ OPTIMIZER """
+        self._optimize_type = optimize_type
+        self._is_save_optimize = is_save_optimize
+        self._optimize_save_dir = optimize_save_dir if optimize_save_dir is not None else ""
 
         """ TASK """
         self._task_meta = {} if not task_meta else task_meta
@@ -307,6 +320,10 @@ class Router:
             generator_config = config_dict.get("generator")
             if generator_config is not None:
                 self.init_generator_config(generator_config)
+        if "optimize" in setup_keys:
+            optimize_config = config_dict.get("optimize")
+            if optimize_config is not None:
+                self.init_optimize_config(optimize_config)
         if "task" in setup_keys:
             task_config = config_dict.get("task")
             if task_config is not None:
@@ -404,6 +421,11 @@ class Router:
         self._generate_type = generator.get("generate_type", self._generate_type)
         self._is_save_generate = generator.get("is_save_generate", self._is_save_generate)
         self._generate_save_dir = generator.get("generate_save_dir", self._generate_save_dir)
+
+    def init_optimize_config(self, optimize_: Dict):
+        self._optimize_type = optimize_.get("optimize_type", self._optimize_type)
+        self._is_save_optimize = optimize_.get("is_save_optimize", self._is_save_optimize)
+        self._optimize_save_dir = optimize_.get("optimize_save_dir", self._optimize_save_dir)
 
     def init_task_config(self, task_: Dict):
         self._task_meta = task_.get("task_meta", self._task_meta)
@@ -663,6 +685,20 @@ class Router:
     @property
     def generate_save_dir(self):
         return self._generate_save_dir
+
+    """ Optimizer """
+
+    @property
+    def optimize_type(self):
+        return self._optimize_type
+
+    @property
+    def is_save_optimize(self):
+        return self._is_save_optimize
+
+    @property
+    def optimize_save_dir(self):
+        return self._optimize_save_dir
 
     """ Task """
 
