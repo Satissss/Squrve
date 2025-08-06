@@ -1,8 +1,8 @@
 {
   "api_key": {
-    "qwen": "your_qwen_api_key_here",
-    "deepseek": "your_deepseek_api_key_here",
-    "zhipu": "your_zhipu_api_key_here"
+    "deepseek": "your_api_key_here",
+    "qwen": "your_api_key_here",
+    "zhipu": "your_api_key_here"
   },
   "llm": {
     "use": "qwen",
@@ -52,9 +52,66 @@
         "is_save_dataset": true,
         "meta": {
           "task": {
-            "parse_type": "LinkAlignParser"
+            "parse_type": "OpenSearchCoTParser"
           }
         }
+      },
+      {
+        "task_id": "decompose",
+        "task_type": "DecomposeTask",
+        "data_source": "spider:dev:db_size-10",
+        "schema_source": "spider:dev",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "decompose_type": "DINSQLDecomposer"
+          }
+        }
+      },
+      {
+        "task_id": "scale",
+        "task_type": "ScaleTask",
+        "data_source": "spider:dev:db_size-10",
+        "schema_source": "spider:dev",
+        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "scale_type": "ChessScaler"
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 1
+      },
+      {
+        "task_id": "optimize",
+        "task_type": "OptimizeTask",
+        "data_source": "spider:dev:db_size-10",
+        "schema_source": "spider:dev",
+        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "optimize_type": "DINSQLOptimizer"
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 1
+      },
+      {
+        "task_id": "select",
+        "task_type": "SelectTask",
+        "data_source": "spider:dev:db_size-10",
+        "schema_source": "spider:dev",
+        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
+        "is_save_dataset": true,
+        "meta": {
+          "task": {
+            "select_type": "CHESSSelector"
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 1
       },
       {
         "task_id": "generate",
@@ -65,12 +122,13 @@
         "is_save_dataset": true,
         "meta": {
           "task": {
-            "generate_type": "LinkAlignGenerator"
+            "generate_type": "DIN_SQLGenerator"
           }
         },
         "open_parallel": true,
-        "max_workers": 2
+        "max_workers": 1
       }
+
     ],
     "cpx_task_meta": [
       {
@@ -89,7 +147,7 @@
         "meta": {
           "actor": {
             "reduce": {
-              "save_dir": "../files/instance_schemas/spider_dev"
+              "save_dir": "../files/instance_schemas/bird_dev"
             },
             "parse": {
               "save_dir": "../files/schema_links/spider_dev"
@@ -99,15 +157,53 @@
             }
           }
         }
+      },
+      {
+        "task_id": "task_test",
+        "task_info": "Complete Text-to-SQL pipeline for Spider dev dataset: Reduce -> Parse -> Generate",
+        "task_lis": [
+          "reduce",
+          ["parse", "decompose"],
+          "scale",
+          "optimize",
+          "select"
+        ],
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "is_save_dataset": true,
+        "dataset_save_path": "../files/datasets/spider_dev_pipeline.json",
+        "meta": {
+          "actor": {
+            "reduce": {
+              "save_dir": "../files/instance_schemas/spider_dev"
+            },
+            "parse": {
+              "save_dir": "../files/schema_links/spider_dev"
+            },
+            "decompose": {
+              "save_dir": "../files/sub_questions/spider_dev"
+            },
+            "scale": {
+              "save_dir": "../files/pred_sql/spider_dev"
+            },
+            "optimize": {
+              "save_dir": "../files/pred_sql/spider_dev"
+            },
+            "select": {
+              "save_dir": "../files/pred_sql/spider_dev"
+            }
+          }
+        }
       }
     ],
     "is_save_dataset": true,
     "open_parallel": true,
-    "max_workers": 2
+    "max_workers": 1
   },
   "engine": {
     "exec_process": [
-      "generate"
+      "spider_dev_pipeline"
     ]
   }
 }

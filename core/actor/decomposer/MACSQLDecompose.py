@@ -216,22 +216,27 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
             self,
             dataset: Dataset = None,
             llm: Union[LLM, List[LLM]] = None,
+            generate_num: int = 1,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/sub_questions",
             dataset_name: str = "bird",  # or "spider"
-            generate_num: int = 1,
+            use_llm_scaling: bool = False,
             open_parallel: bool = False,
             max_workers: int = None,
             **kwargs
     ):
-        super().__init__(dataset=dataset, **kwargs)
+        # 直接设置实例属性，不调用父类的 __init__ 方法
+        self.dataset = dataset
+        # 正确处理 llm 参数，与 DINSQLDecompose 保持一致
         self.llm = llm if isinstance(llm, list) else [llm]
+        self.generate_num = generate_num
         self.is_save = is_save
         self.save_dir = save_dir
         self.dataset_name = dataset_name
-        self.generate_num = generate_num
+        self.use_llm_scaling = use_llm_scaling
         self.open_parallel = open_parallel
         self.max_workers = max_workers
+        self.kwargs = kwargs
 
     def parse_qa_pairs(self, response: str) -> List[Tuple[str, str]]:
         qa_pairs = []
@@ -281,25 +286,44 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
         desc_str = parse_schema_from_df(schema)  # Assuming this function generates the schema string in the required format
         fk_str = ""  # TODO: Implement foreign key extraction if needed, or assume it's part of desc_str
 
-        def process_serial():
+        def process_serial(llm_lis_):
             decompositions = []
-            for llm_model in self.llm:
+            for llm_model in llm_lis_:
                 for _ in range(self.generate_num):
                     decompositions.append(self.generate_decomposition(llm_model, query, desc_str, fk_str, evidence))
             return decompositions
 
-        def process_parallel():
+        def process_parallel(llm_lis_):
             decompositions = []
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            max_workers_ = self.max_workers if self.max_workers else len(llm_lis_) * self.generate_num
+            with ThreadPoolExecutor(max_workers=max_workers_) as executor:
                 futures = []
-                for llm_model in self.llm:
+                for llm_model in llm_lis_:
                     for _ in range(self.generate_num):
                         futures.append(executor.submit(self.generate_decomposition, llm_model, query, desc_str, fk_str, evidence))
                 for future in as_completed(futures):
-                    decompositions.append(future.result())
+                    try:
+                        result = future.result()
+                        decompositions.append(result)
+                    except Exception as e:
+                        from loguru import logger
+                        logger.error(f"Error in decomposition: {e}")
             return decompositions
 
-        sub_questions = process_parallel() if self.open_parallel else process_serial()
+        # 与 DINSQLDecompose 保持一致的 llm 处理逻辑
+        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        # 过滤掉 None 值
+        llm_lis = [llm for llm in llm_lis if llm is not None]
+        
+        if not llm_lis:
+            # 如果没有有效的 LLM，返回空结果
+            return []
+            
+        sub_questions = []
+        if self.use_llm_scaling and isinstance(self.llm, list):
+            sub_questions = process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis)
+        else:
+            sub_questions = process_serial([llm_lis[0]])
 
         # Flatten and deduplicate if needed
         # For simplicity, take the first decomposition
