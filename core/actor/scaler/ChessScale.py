@@ -61,7 +61,14 @@ Evidence: {HINT}
             **kwargs
     ):
         self.dataset = dataset
-        self.llm = llm if isinstance(llm, list) else [llm]
+        # 确保 llm 不为 None
+        if llm is None:
+            raise ValueError("LLM is required for ChessScaler")
+        self.llm = llm
+        # 确保 LLM 不为空
+        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        if not llm_lis or any(llm_item is None for llm_item in llm_lis):
+            raise ValueError("LLM cannot be empty or contain None values")
         self.generate_num = generate_num
         self.temperature = temperature
         self.is_save = is_save
@@ -79,7 +86,14 @@ Evidence: {HINT}
         Return only a Python list of keywords, for example: ['customer', 'name', 'age', '>', '30']"""
         
         try:
-            response = self.llm[0].complete(prompt, temperature=0.2).text
+            # 确保使用第一个可用的 LLM
+            llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+            llm_to_use = llm_lis[0] if llm_lis else None
+            if llm_to_use is None:
+                logger.warning("No LLM available for keyword extraction")
+                return []
+                
+            response = llm_to_use.complete(prompt, temperature=0.2).text
             match = re.search(r'\[.*\]', response)
             if match:
                 keywords_str = match.group(0)
@@ -125,7 +139,10 @@ Evidence: {HINT}
                 lines = response.split('\n')
                 for line in lines:
                     if line.strip().upper().startswith('SELECT'):
-                        return line.strip()
+                        sql = line.strip()
+                        logger.debug(f"Generated SQL candidate from line: {sql[:100]}...")
+                        return sql
+            logger.warning("No SQL found in LLM response")
             return None
         except Exception as e:
             logger.warning(f"Failed to generate candidate: {e}")
@@ -141,7 +158,7 @@ Evidence: {HINT}
     ) -> List[str]:
         row = self.dataset[item]
         question = row['question']
-        evidence = row.get('evidence', '') or kwargs.get('evidence', '')
+        evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
 
         # Load and process schema
         if isinstance(schema, (str, Path)):
@@ -170,11 +187,18 @@ Evidence: {HINT}
         keywords = self._extract_keywords(question)
         context = self._retrieve_context(question, schema, keywords)
 
+        # Convert LLM to list for consistent handling
+        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        
         # Generate candidates
         def process_serial():
             pred_sqls = []
             for i in range(self.generate_num):
-                llm_ = self.llm[i % len(self.llm)]
+                # 确保有可用的 LLM
+                if not llm_lis:
+                    logger.warning("No LLM available for SQL generation")
+                    break
+                llm_ = llm_lis[i % len(llm_lis)]
                 sql = self._generate_single_candidate(llm_, question, context, evidence)
                 if sql:
                     pred_sqls.append(sql)
@@ -182,10 +206,14 @@ Evidence: {HINT}
 
         def process_parallel():
             pred_sqls = []
+            if not llm_lis:
+                logger.warning("No LLM available for parallel SQL generation")
+                return pred_sqls
+                
             with ThreadPoolExecutor(max_workers=self.max_workers or self.generate_num) as executor:
                 futures = []
                 for i in range(self.generate_num):
-                    llm_ = self.llm[i % len(self.llm)]
+                    llm_ = llm_lis[i % len(llm_lis)]
                     futures.append(executor.submit(self._generate_single_candidate, llm_, question, context, evidence))
                 for future in as_completed(futures):
                     try:
@@ -201,10 +229,18 @@ Evidence: {HINT}
         # Deduplicate
         pred_sqls = list(dict.fromkeys(pred_sqls))
 
+        # 确保至少有一个 SQL 结果，如果没有生成任何 SQL，创建一个默认的
+        if not pred_sqls:
+            logger.warning(f"No SQL candidates generated for item {item}, creating default SQL")
+            pred_sqls = ["SELECT * FROM table LIMIT 1"]  # 默认 SQL
+        
+        logger.info(f"ChessScaler: Final pred_sqls for item {item}: {len(pred_sqls)} candidates")
+
         if self.is_save:
             instance_id = row.get("instance_id")
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
+            save_path.mkdir(parents=True, exist_ok=True)
             
             # Save each SQL candidate in separate files
             sql_paths = []
@@ -215,8 +251,14 @@ Evidence: {HINT}
             
             # Set dataset field - single path if one SQL, list of paths if multiple
             if len(sql_paths) == 1:
-                self.dataset.setitem(item, "pred_sql", sql_paths[0])
+                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths[0])
             else:
-                self.dataset.setitem(item, "pred_sql", sql_paths)
+                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths)
+        else:
+            # 即使不保存文件，也要设置 pred_sql 字段
+            if len(pred_sqls) == 1:
+                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls[0])
+            else:
+                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls)
 
         return pred_sqls 

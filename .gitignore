@@ -17,6 +17,7 @@ files/reasoning_examples/user
 files/schema_links
 files/schema_reduce
 files/schema_source
+files
 API.md
 
 startup_run/spider_dev_config.json

@@ -59,6 +59,10 @@ class DINSQLOptimizer(BaseOptimizer):
 """
         instruction = instruction.format(db_type=db_type.upper())
 
+        # 限制 schema 长度，避免 prompt 过长
+        if len(schema) > 8000:  # 设置合理的长度限制
+            schema = schema[:8000] + "\n... (schema truncated)"
+
         prompt = (
                 instruction +
                 schema +
@@ -67,8 +71,13 @@ class DINSQLOptimizer(BaseOptimizer):
                 f'\n#### {db_type.upper()} FIXED SQL QUERY\nSELECT'
         )
 
-        debugged_sql = self.llm.complete(prompt).text.strip().replace("\n", " ")
-        return "SELECT " + debugged_sql
+        try:
+            debugged_sql = self.llm.complete(prompt).text.strip().replace("\n", " ")
+            return "SELECT " + debugged_sql
+        except Exception as e:
+            logger.error(f"Error in _sql_debug_by_experience: {e}")
+            # 如果出错，返回原始 SQL
+            return sql_query
 
     def _get_feedback_debug_prompt(self, db_type: str) -> str:
         """Get feedback debug prompt template adapted from DIN-SQL for specific database type."""
@@ -133,15 +142,26 @@ SELECT"""
             )
 
             prompt_template = self._get_feedback_debug_prompt(db_type)
+            
+            # 限制 schema 长度，避免 prompt 过长
+            truncated_schema = schema
+            if len(schema) > 6000:  # 为错误历史留出空间
+                truncated_schema = schema[:6000] + "\n... (schema truncated)"
+            
             prompt = prompt_template.format(
                 question=question,
-                schema=schema,
+                schema=truncated_schema,
                 error_history=error_history_info
             )
 
-            new_sql = self.llm.complete(prompt).text.strip().replace("\n", " ")
-            debug_args["sql_query"] = "SELECT " + new_sql if not new_sql.startswith("SELECT") else new_sql
-            debug_args["sql_query"] = sql_clean(debug_args["sql_query"])
+            try:
+                new_sql = self.llm.complete(prompt).text.strip().replace("\n", " ")
+                debug_args["sql_query"] = "SELECT " + new_sql if not new_sql.startswith("SELECT") else new_sql
+                debug_args["sql_query"] = sql_clean(debug_args["sql_query"])
+            except Exception as e:
+                logger.error(f"Error in _sql_debug_by_feedback turn {turn + 1}: {e}")
+                # 如果出错，保持当前 SQL 不变
+                break
 
         # Final attempt
         exe_flag, _ = get_sql_exec_result(**debug_args)
@@ -198,6 +218,16 @@ SELECT"""
         # Load schema if not provided
         if schema is None:
             schema = self.dataset.get_db_schema(item)
+            if schema is None:
+                raise ValueError("Failed to load database schema")
+            if isinstance(schema, dict):
+                schema = single_central_process(schema)
+            elif isinstance(schema, list):
+                schema = pd.DataFrame(schema)
+            schema = parse_schema_from_df(schema)
+        elif isinstance(schema, (str, Path)):
+            # 如果 schema 是文件路径，加载它
+            schema = load_dataset(schema)
             if isinstance(schema, dict):
                 schema = single_central_process(schema)
             elif isinstance(schema, list):
@@ -210,7 +240,10 @@ SELECT"""
 
         # Handle pred_sql input
         if pred_sql is None:
-            raise ValueError("pred_sql is required for optimization")
+            # 尝试从数据集中获取 pred_sql
+            pred_sql = row.get(self.OUTPUT_NAME)
+            if pred_sql is None:
+                raise ValueError("pred_sql is required for optimization")
 
         # Normalize pred_sql to list
         is_single = not isinstance(pred_sql, list)
