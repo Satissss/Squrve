@@ -81,7 +81,8 @@ class DINSQLOptimizer(BaseOptimizer):
 
     def _get_feedback_debug_prompt(self, db_type: str) -> str:
         """Get feedback debug prompt template adapted from DIN-SQL for specific database type."""
-        base_instruction = """#### For the given question, use the provided tables, columns, foreign keys, and primary keys to fix the given {db_type} SQL QUERY based on the execution errors. If there are any problems, fix them using the error history.
+        db_type_upper = db_type.upper()
+        base_instruction = f"""#### For the given question, use the provided tables, columns, foreign keys, and primary keys to fix the given {db_type} SQL QUERY based on the execution errors. If there are any problems, fix them using the error history.
 #### Use the following instructions for fixing the SQL QUERY:
 1) Use the database values that are explicitly mentioned in the question.
 2) Pay attention to the columns that are used for the JOIN by using the Foreign_keys.
@@ -91,17 +92,17 @@ class DINSQLOptimizer(BaseOptimizer):
 6) Only change the GROUP BY clause when necessary (Avoid redundant columns in GROUP BY).
 7) Use GROUP BY on one column only.
 
-### Question: {question}
+### Question: {{question}}
 
 ### Provided Database Schema: 
-{schema}
+{{schema}}
 
 ### Execution Error History: 
-{error_history}
+{{error_history}}
 
-#### {db_type.upper()} FIXED SQL QUERY
+#### {db_type_upper} FIXED SQL QUERY
 SELECT"""
-        return base_instruction.format(db_type=db_type)
+        return base_instruction
 
     def _sql_debug_by_feedback(
             self,
@@ -217,22 +218,19 @@ SELECT"""
 
         # Load schema if not provided
         if schema is None:
-            schema = self.dataset.get_db_schema(item)
+            instance_schema_path = row.get("instance_schemas", None)
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
             if schema is None:
-                raise ValueError("Failed to load database schema")
-            if isinstance(schema, dict):
-                schema = single_central_process(schema)
-            elif isinstance(schema, list):
-                schema = pd.DataFrame(schema)
-            schema = parse_schema_from_df(schema)
-        elif isinstance(schema, (str, Path)):
-            # 如果 schema 是文件路径，加载它
-            schema = load_dataset(schema)
-            if isinstance(schema, dict):
-                schema = single_central_process(schema)
-            elif isinstance(schema, list):
-                schema = pd.DataFrame(schema)
-            schema = parse_schema_from_df(schema)
+                schema = self.dataset.get_db_schema(item)
+            if schema is None:
+                raise Exception("Failed to load a valid database schema for the sample!")
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        if isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        schema = parse_schema_from_df(schema)
 
         # Load schema_links if not provided
         if schema_links is None:
@@ -273,8 +271,8 @@ SELECT"""
 
         if self.is_save:
             instance_id = row.get("instance_id")
-            save_path_base = self.save_dir / str(
-                self.dataset.dataset_index) if self.dataset.dataset_index else self.save_dir
+            save_path_base = Path(self.save_dir) / str(
+                self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"
