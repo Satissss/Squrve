@@ -6,51 +6,60 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from sentence_transformers import SentenceTransformer
 from core.actor.scaler.BaseScale import BaseScaler
-from core.utils import load_dataset, save_dataset
+from core.utils import load_dataset, save_dataset, parse_schema_from_df
 from core.db_connect import get_sqlite_result
 from pathlib import Path
 import numpy as np
+from typing import Union, List, Optional, Dict
+from loguru import logger
+from llama_index.core.llms.llm import LLM
+from core.data_manage import Dataset
+
 
 def find_foreign_keys_MYSQL_like(DATASET_JSON, db_name):
-    if DATASET_JSON is None:
-        return "", set()
-    schema_df = pd.read_json(DATASET_JSON)
-    schema_df = schema_df.drop(['column_names', 'table_names'], axis=1)
-    f_keys = []
-    for index, row in schema_df.iterrows():
-        tables = row['table_names_original']
-        col_names = row['column_names_original']
-        foreign_keys = row['foreign_keys']
-        for foreign_key in foreign_keys:
-            first, second = foreign_key
-            first_index, first_column = col_names[first]
-            second_index, second_column = col_names[second]
-            f_keys.append([
-                row['db_id'], tables[first_index], tables[second_index],
-                first_column, second_column
-            ])
-    spider_foreign = pd.DataFrame(f_keys,
-                                  columns=[
-                                      'Database name', 'First Table Name',
-                                      'Second Table Name',
-                                      'First Table Foreign Key',
-                                      'Second Table Foreign Key'
-                                  ])
+    try:
+        if DATASET_JSON is None:
+            return "", set()
+        schema_df = pd.read_json(DATASET_JSON)
+        schema_df = schema_df.drop(['column_names', 'table_names'], axis=1)
+        f_keys = []
+        for index, row in schema_df.iterrows():
+            tables = row['table_names_original']
+            col_names = row['column_names_original']
+            foreign_keys = row['foreign_keys']
+            for foreign_key in foreign_keys:
+                first, second = foreign_key
+                first_index, first_column = col_names[first]
+                second_index, second_column = col_names[second]
+                f_keys.append([
+                    row['db_id'], tables[first_index], tables[second_index],
+                    first_column, second_column
+                ])
+        spider_foreign = pd.DataFrame(f_keys,
+                                      columns=[
+                                          'Database name', 'First Table Name',
+                                          'Second Table Name',
+                                          'First Table Foreign Key',
+                                          'Second Table Foreign Key'
+                                      ])
 
-    df = spider_foreign[spider_foreign['Database name'] == db_name]
-    output = []
-    col_set = set()
-    for index, row in df.iterrows():
-        output.append(row['First Table Name'] + '.' +
-                      row['First Table Foreign Key'] + " = " +
-                      row['Second Table Name'] + '.' +
-                      row['Second Table Foreign Key'])
-        col_set.add(row['First Table Name'] + '.' +
-                    row['First Table Foreign Key'])
-        col_set.add(row['Second Table Name'] + '.' +
-                    row['Second Table Foreign Key'])
-    output = ", ".join(output)
-    return output, col_set
+        df = spider_foreign[spider_foreign['Database name'] == db_name]
+        output = []
+        col_set = set()
+        for index, row in df.iterrows():
+            output.append(row['First Table Name'] + '.' +
+                          row['First Table Foreign Key'] + " = " +
+                          row['Second Table Name'] + '.' +
+                          row['Second Table Foreign Key'])
+            col_set.add(row['First Table Name'] + '.' +
+                        row['First Table Foreign Key'])
+            col_set.add(row['Second Table Name'] + '.' +
+                        row['Second Table Foreign Key'])
+        output = ", ".join(output)
+        return output, col_set
+    except Exception as e:
+        logger.warning(f"Error in find_foreign_keys_MYSQL_like: {e}")
+        return "", set()
 
 
 def quote_field(field_name):
@@ -70,7 +79,7 @@ class DB_AGENT:
         if pragma_result is None:
             return "", {}
         columns_info = pragma_result.values.tolist()
-        
+
         df_result, _ = get_sqlite_result(f"SELECT * FROM `{table_name}`", db_path)
         if df_result is None:
             return "", {}
@@ -101,7 +110,13 @@ class DB_AGENT:
                 dic[col] = col_description, val_description
             except Exception as e:
                 dic[col] = "", ""
-        row = list(cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 1").fetchall()[0])
+        # Get sample data for value examples
+        sample_result, _ = get_sqlite_result(f"SELECT * FROM `{table_name}` LIMIT 1", db_path)
+        if sample_result is not None and not sample_result.empty:
+            row = sample_result.iloc[0].tolist()
+        else:
+            row = [None] * len(df.columns)
+
         for i, col in enumerate(df.columns):
             try:
                 df_tmp = df[col].dropna().drop_duplicates()
@@ -155,19 +170,20 @@ class DB_AGENT:
             else:
                 schema_str_single += f"Values format like: {val}"
             schema_str += f"{column_name}: {schema_str_single}\n"
-            columns[f"{table_name}.{column_name}"] = (schema_str_single, col_des, val_des, column_type, include_null, unique, str(val))
+            columns[f"{table_name}.{column_name}"] = (schema_str_single, col_des, val_des, column_type, include_null,
+                                                      unique, str(val))
         return schema_str, columns
 
     def get_db_des(self, sqllite_dir, db_dir, model):
         table_dir = os.path.join(db_dir, 'database_description') if db_dir else None
         sql = "SELECT name FROM sqlite_master WHERE type='table';"
-        
+
         # Use db_connect module
         tables_result, _ = get_sqlite_result(sql, sqllite_dir)
         if tables_result is None:
             return "", {}
         tables = tables_result.values.tolist()
-        
+
         db_info = []
         db_col = dict()
         if table_dir and os.path.exists(table_dir):
@@ -229,7 +245,8 @@ Please conclude the database in the following format:
 
     def get_allinfo(self, db_json_dir, db, sqllite_dir, db_dir, tables_info_dir, model):
         db_info, db_col = self.get_db_des(sqllite_dir, db_dir, model)
-        foreign_keys, foreign_set = find_foreign_keys_MYSQL_like(tables_info_dir, db) if tables_info_dir else ("", set())
+        foreign_keys, foreign_set = find_foreign_keys_MYSQL_like(tables_info_dir, db) if tables_info_dir else ("",
+                                                                                                               set())
         all_info = f"Database Management System: SQLite\n#Database name: {db}\n{db_info}\n#Forigen keys:\n{foreign_keys}\n"
         prompt = self.db_conclusion(all_info)
         db_all = self.chat_model.get_ans(prompt)
@@ -238,22 +255,32 @@ Please conclude the database in the following format:
 
 
 def parse_des(pre_col_values, nouns, debug):
-    pre_col_values = pre_col_values.split("/*")[0].strip()
-    if debug:
-        print(pre_col_values)
-    col, values = pre_col_values.split('#values:')
-    _, col = col.split("#columns:")
-    col = strip_char(col)
-    values = strip_char(values)
+    try:
+        pre_col_values = pre_col_values.split("/*")[0].strip()
+        if debug:
+            print(pre_col_values)
 
-    if values == '':
-        values = []
-    else:
-        values = re.findall(r"([\"'])(.*?)\1", values)
-    nouns_all = re.findall(r"([\"'])(.*?)\1", nouns)
-    values_noun = set(values).union(set(nouns_all))
-    values_noun = [x[1] for x in values_noun]
-    return values_noun, col
+        # 检查是否包含必要的分隔符
+        if '#values:' not in pre_col_values or '#columns:' not in pre_col_values:
+            logger.warning("Missing required separators in pre_col_values")
+            return [], ""
+
+        col, values = pre_col_values.split('#values:')
+        _, col = col.split("#columns:")
+        col = strip_char(col)
+        values = strip_char(values)
+
+        if values == '':
+            values = []
+        else:
+            values = re.findall(r"([\"'])(.*?)\1", values)
+        nouns_all = re.findall(r"([\"'])(.*?)\1", nouns)
+        values_noun = set(values).union(set(nouns_all))
+        values_noun = [x[1] for x in values_noun]
+        return values_noun, col
+    except Exception as e:
+        logger.warning(f"Error in parse_des: {e}")
+        return [], ""
 
 
 def strip_char(s):
@@ -266,17 +293,29 @@ class ColumnRetriever:
         self.tables_info_dir = tables_info_dir
 
     def get_col_retrieve(self, question, db, db_keys_col):
-        db_schema = json.load(open(self.tables_info_dir, 'r'))
-        db_schema = db_schema[db]
-        schema_emb = self.bert_model.encode(db_schema, show_progress_bar=False)
-        question_emb = self.bert_model.encode(question, show_progress_bar=False)
-        schema_sim = schema_emb @ question_emb.T
-        cols = set()
-        for x in schema_sim.argsort()[::-1][:15]:
-            if schema_sim[x] > 0.5:
-                cols.add(db_schema[x])
-        cols = set(cols).intersection(db_keys_col)
-        return cols
+        try:
+            if not self.tables_info_dir or not os.path.exists(self.tables_info_dir):
+                logger.warning(f"Tables info directory not found: {self.tables_info_dir}")
+                return set()
+
+            db_schema = json.load(open(self.tables_info_dir, 'r'))
+            if db not in db_schema:
+                logger.warning(f"Database {db} not found in schema")
+                return set()
+
+            db_schema = db_schema[db]
+            schema_emb = self.bert_model.encode(db_schema, show_progress_bar=False)
+            question_emb = self.bert_model.encode(question, show_progress_bar=False)
+            schema_sim = schema_emb @ question_emb.T
+            cols = set()
+            for x in schema_sim.argsort()[::-1][:15]:
+                if schema_sim[x] > 0.5:
+                    cols.add(db_schema[x])
+            cols = set(cols).intersection(db_keys_col)
+            return cols
+        except Exception as e:
+            logger.warning(f"Error in get_col_retrieve: {e}")
+            return set()
 
 
 class ColumnUpdater:
@@ -340,49 +379,68 @@ class DES_new:
 
 
 def query_order(question, chat_model, select_prompt, temperature):
-    select_prompt = select_prompt.format(question=question)
-    ans = chat_model.get_ans(select_prompt, temperature=temperature)
-    ans = re.sub("```json|```", "", ans)
-    select_json = json.loads(ans)
-    res, judge = json_ext(select_json)
-    return res
+    try:
+        select_prompt = select_prompt.format(question=question)
+        ans = chat_model.get_ans(select_prompt, temperature=temperature)
+        ans = re.sub("```json|```", "", ans)
+        select_json = json.loads(ans)
+        res, judge = json_ext(select_json)
+        return res
+    except Exception as e:
+        logger.warning(f"Error in query_order: {e}")
+        return []
 
 
 def json_ext(jsonf):
-    ans = []
-    judge = False
-    for x in jsonf:
-        if x["Type"] == "QIC":
-            Q = x["Extract"]["Q"].lower()
-            if Q in ["how many", "how much", "which","how often"]:
-                for item in x["Extract"]["I"]:
-                    ans.append(x["Extract"]["Q"] + " " + item)
-            elif Q in ["when", "who", "where"]:
-                ans.append(x["Extract"]["Q"])
-            else:
-                ans.extend(x["Extract"]["I"])
-        elif x["Type"] == "JC":
-            ans.append(x["Extract"]["J"])
-            judge = True
-    return ans, judge
+    try:
+        ans = []
+        judge = False
+        for x in jsonf:
+            if isinstance(x, dict) and "Type" in x and "Extract" in x:
+                if x["Type"] == "QIC":
+                    Q = x["Extract"].get("Q", "").lower()
+                    if Q in ["how many", "how much", "which", "how often"]:
+                        for item in x["Extract"].get("I", []):
+                            ans.append(x["Extract"]["Q"] + " " + item)
+                    elif Q in ["when", "who", "where"]:
+                        ans.append(x["Extract"]["Q"])
+                    else:
+                        ans.extend(x["Extract"].get("I", []))
+                elif x["Type"] == "JC":
+                    ans.append(x["Extract"].get("J", ""))
+                    judge = True
+        return ans, judge
+    except Exception as e:
+        logger.warning(f"Error in json_ext: {e}")
+        return [], False
 
 
 def sql_raw_parse(sql, return_question):
-    sql = sql.split('/*')[0].strip().replace('```sql', '').replace('```', '')
-    sql = re.sub("```.*?", '', sql)
-    rwq = None
-    if return_question:
-        rwq, sql = sql.split('#SQL:')
-    else:
-        sql = sql.split('#SQL:')[-1]
-    if sql.startswith("\"") or sql.startswith("\'"):
-        sql = sql[1:-1]
-    sql = re.sub('\s+', ' ', sql).strip()
-    return sql, rwq
+    try:
+        if not sql:
+            return "", None
+
+        sql = sql.split('/*')[0].strip().replace('```sql', '').replace('```', '')
+        sql = re.sub("```.*?", '', sql)
+        rwq = None
+
+        if return_question and '#SQL:' in sql:
+            rwq, sql = sql.split('#SQL:')
+        else:
+            sql = sql.split('#SQL:')[-1] if '#SQL:' in sql else sql
+
+        if sql.startswith("\"") or sql.startswith("\'"):
+            sql = sql[1:-1]
+        sql = re.sub('\s+', ' ', sql).strip()
+        return sql, rwq
+    except Exception as e:
+        logger.warning(f"Error in sql_raw_parse: {e}")
+        return "", None
 
 
 class OpenSearchSQLScaler(BaseScaler):
     NAME = "OpenSearchSQLScaler"
+    OUTPUT_NAME = "pred_sql"
 
     EXTRACT_PROMPT = """/* Some extract examples are provided based on similar problems: */
     /* Answer the following: Please give the name of the course in which most numbers of the students got an A. Also, list the full name of the students who got an A in this course. most number of students got an A refers MAX(COUNT(student_id WHERE grade = 'A')); full name = f_name, l_name; got an A refers to grade = 'A'; */
@@ -475,8 +533,8 @@ class OpenSearchSQLScaler(BaseScaler):
 
     def __init__(
             self,
-            dataset=None,
-            llm=None,
+            dataset: Optional[Dataset] = None,
+            llm: Union[LLM, List[LLM]] = None,
             bert_model_name="all-mpnet-base-v2",
             n_candidates=21,
             temperature=0.7,
@@ -492,7 +550,7 @@ class OpenSearchSQLScaler(BaseScaler):
             **kwargs
     ):
         self.dataset = dataset
-        self.llm_lis = llm if isinstance(llm, list) else [llm]
+        self.llm = llm
         self.bert_model = SentenceTransformer(bert_model_name)
         self.n_candidates = n_candidates
         self.temperature = temperature
@@ -510,33 +568,98 @@ class OpenSearchSQLScaler(BaseScaler):
         def single_complete(llm_, prompt, temperature):
             return llm_.complete(prompt, temperature=temperature).text
 
+        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        
         if n == 1:
-            return single_complete(self.llm_lis[0], prompt, temperature)
+            return single_complete(llm_lis[0], prompt, temperature)
         else:
             responses = []
             with ThreadPoolExecutor(max_workers=self.max_workers or n) as executor:
                 futures = []
                 for i in range(n):
-                    llm_ = self.llm_lis[i % len(self.llm_lis)]
+                    llm_ = llm_lis[i % len(llm_lis)]
                     futures.append(executor.submit(single_complete, llm_, prompt, temperature))
                 for future in as_completed(futures):
                     responses.append(future.result())
             return responses
 
     def generate_candidates(self, prompt, temperature, n):
-        responses = self.get_ans(prompt, temperature, n)
-        sqls = []
-        for resp in responses:
-            sql, _ = sql_raw_parse(resp, return_question=True)
-            if sql:
-                sqls.append(sql)
-        return sqls
+        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        
+        def process_serial():
+            sqls = []
+            for i in range(n):
+                llm_ = llm_lis[i % len(llm_lis)]
+                response = llm_.complete(prompt, temperature=temperature).text
+                sql, _ = sql_raw_parse(response, return_question=True)
+                if sql:
+                    sqls.append(sql)
+            return sqls
 
-    def act(self, item, schema=None, schema_links=None, sub_questions=None, **kwargs):
+        def process_parallel():
+            sqls = []
+            with ThreadPoolExecutor(max_workers=self.max_workers or n) as executor:
+                futures = []
+                for i in range(n):
+                    llm_ = llm_lis[i % len(llm_lis)]
+                    futures.append(executor.submit(llm_.complete, prompt, temperature=temperature))
+                for future in as_completed(futures):
+                    try:
+                        response = future.result().text
+                        sql, _ = sql_raw_parse(response, return_question=True)
+                        if sql:
+                            sqls.append(sql)
+                    except Exception as e:
+                        logger.warning(f"Error in parallel generation: {e}")
+            return sqls
+
+        return process_parallel() if self.open_parallel else process_serial()
+
+    def act(
+            self,
+            item,
+            schema: Union[str, Path, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            sub_questions: Union[str, List[str]] = None,
+            **kwargs
+    ) -> List[str]:
         row = self.dataset[item]
         question = row['question']
-        db_id = row['db_id']
-        db_path = str(Path(self.db_path) / (db_id + ".sqlite"))
+        evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
+        db_id = row.get('db_id')
+
+        # Load and process schema like ChessScale
+        if isinstance(schema, (str, Path)):
+            schema = load_dataset(schema)
+
+        if schema is None:
+            instance_schema_path = row.get("instance_schemas")
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
+            if schema is None:
+                schema = self.dataset.get_db_schema(item)
+            if schema is None:
+                raise Exception("Failed to load a valid database schema for the sample!")
+
+        if isinstance(schema, dict):
+            schema = pd.DataFrame(schema)
+        if isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        if isinstance(schema, pd.DataFrame):
+            schema = parse_schema_from_df(schema)
+        else:
+            raise Exception("Failed to load a valid database schema for the sample!")
+
+        # 如果没有 db_id，尝试从其他字段获取
+        if not db_id:
+            db_id = row.get('database_id') or row.get('db_name') or f"db_{item}"
+
+        # 构建数据库路径
+        if self.db_path and db_id:
+            db_path = str(Path(self.db_path) / (db_id + ".sqlite"))
+        else:
+            db_path = None
 
         fewshot = ''
         if self.use_few_shot:
@@ -544,54 +667,93 @@ class OpenSearchSQLScaler(BaseScaler):
             if reasoning_example_path:
                 fewshot = load_dataset(reasoning_example_path)
 
-        # Generate DB schema
-        db_agent = DB_AGENT(self)
-        all_info, db_col_dic, foreign_set = db_agent.get_allinfo(self.tables_json_path, db_id, db_path, self.db_path, self.tables_info_dir, self.bert_model)
+        try:
+            # Generate DB schema using DB_AGENT
+            db_agent = DB_AGENT(self)
+            all_info, db_col_dic, foreign_set = db_agent.get_allinfo(
+                self.tables_json_path, db_id, db_path, self.db_path,
+                self.tables_info_dir, self.bert_model
+            )
 
-        # Extract columns and values
-        ext_prompt = self.EXTRACT_PROMPT.format(fewshot=fewshot, db_info=all_info, query=question)
-        key_col_des_raw = self.get_ans(ext_prompt, temperature=0.0)
+            # Extract columns and values
+            ext_prompt = self.EXTRACT_PROMPT.format(fewshot=fewshot, db_info=all_info, query=question)
+            key_col_des_raw = self.get_ans(ext_prompt, temperature=0.0)
 
-        # Extract nouns
-        noun_prompt = self.NOUN_PROMPT.format(raw_question=question)
-        noun_ext = self.get_ans(noun_prompt, temperature=0.0)
-        values_noun, col = parse_des(key_col_des_raw, noun_ext, debug=False)
+            # Extract nouns
+            noun_prompt = self.NOUN_PROMPT.format(raw_question=question)
+            noun_ext = self.get_ans(noun_prompt, temperature=0.0)
+            values_noun, col = parse_des(key_col_des_raw, noun_ext, debug=False)
 
-        # Column retrieval
-        col_retrieve = ColumnRetriever(self.bert_model, self.tables_info_dir).get_col_retrieve(question, db_id, db_col_dic.keys()) if self.tables_info_dir else set()
-        cols = ColumnUpdater(db_col_dic).col_pre_update(col, col_retrieve, foreign_set)
-        des = DES_new(self.bert_model, self.bert_model.encode(list(db_col_dic.keys()), show_progress_bar=False), list(db_col_dic.keys()))
-        cols_select, L_values = des.get_key_col_des(cols, values_noun, debug=False, topk=self.top_k, shold=0.65)
-        column = ColumnUpdater(db_col_dic).col_suffix(cols_select)
-        foreign_keys, _ = find_foreign_keys_MYSQL_like(self.tables_json_path, db_id) if self.tables_json_path else ("", set())
-        q_order_list = query_order(question, self, self.SELECT_PROMPT, temperature=0.3)
-        q_order = " ".join(q_order_list) if q_order_list else ""
+            # Column retrieval
+            col_retrieve = set()
+            if self.tables_info_dir:
+                col_retrieve = ColumnRetriever(self.bert_model, self.tables_info_dir).get_col_retrieve(
+                    question, db_id, db_col_dic.keys()
+                )
 
-        # Build prompt
-        values_str = [f"{x[0]}: '{x[1]}'" for x in L_values]
-        key_col_des = "#Values in Database:\n" + '\n'.join(values_str)
-        new_db_info = f"Database Management System: SQLite\n#Database name: {db_id} \n{column}\n\n#Foreign keys:\n{foreign_keys}\n"
-        new_prompt = self.NEW_PROMPT.format(fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des, question=question, q_order=q_order)
+            cols = ColumnUpdater(db_col_dic).col_pre_update(col, col_retrieve, foreign_set)
+            des = DES_new(
+                self.bert_model,
+                self.bert_model.encode(list(db_col_dic.keys()), show_progress_bar=False),
+                list(db_col_dic.keys())
+            )
+            cols_select, L_values = des.get_key_col_des(cols, values_noun, debug=False, topk=self.top_k, shold=0.65)
+            column = ColumnUpdater(db_col_dic).col_suffix(cols_select)
+            foreign_keys, _ = find_foreign_keys_MYSQL_like(self.tables_json_path, db_id) if self.tables_json_path else (
+                "", set())
+            q_order_list = query_order(question, self, self.SELECT_PROMPT, temperature=0.3)
+            q_order = " ".join(q_order_list) if q_order_list else ""
 
-        # Generate candidates
-        pred_sqls = self.generate_candidates(new_prompt, self.temperature, self.n_candidates)
+            # Build prompt
+            values_str = [f"{x[0]}: '{x[1]}'" for x in L_values]
+            key_col_des = "#Values in Database:\n" + '\n'.join(values_str)
+            new_db_info = f"Database Management System: SQLite\n#Database name: {db_id} \n{column}\n\n#Foreign keys:\n{foreign_keys}\n"
+            new_prompt = self.NEW_PROMPT.format(
+                fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des,
+                question=question, q_order=q_order
+            )
+
+            # Generate candidates
+            pred_sqls = self.generate_candidates(new_prompt, self.temperature, self.n_candidates)
+
+        except Exception as e:
+            logger.warning(f"Error in OpenSearchSQLScaler processing for item {item}: {e}")
+            pred_sqls = ["SELECT * FROM table LIMIT 1"]  # 默认 SQL
+
+        # 确保至少有一个 SQL 结果
+        if not pred_sqls:
+            logger.warning(f"No SQL candidates generated for item {item}, creating default SQL")
+            pred_sqls = ["SELECT * FROM table LIMIT 1"]  # 默认 SQL
+
+        # Deduplicate
+        pred_sqls = list(dict.fromkeys(pred_sqls))
+
+        logger.info(f"OpenSearchSQLScaler: Final pred_sqls for item {item}: {len(pred_sqls)} candidates")
 
         if self.is_save:
             instance_id = row.get("instance_id", item)
             save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
-            
+            save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
+                                                                               'dataset_index') and self.dataset.dataset_index else save_path
+            save_path.mkdir(parents=True, exist_ok=True)
+
             # Save each SQL candidate in separate files
             sql_paths = []
             for i, sql in enumerate(pred_sqls):
                 sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
                 save_dataset(sql, new_data_source=sql_save_path)
                 sql_paths.append(str(sql_save_path))
-            
+
             # Set dataset field - single path if one SQL, list of paths if multiple
             if len(sql_paths) == 1:
-                self.dataset.setitem(item, "pred_sql", sql_paths[0])
+                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths[0])
             else:
-                self.dataset.setitem(item, "pred_sql", sql_paths)
+                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths)
+        else:
+            # 即使不保存文件，也要设置 pred_sql 字段
+            if len(pred_sqls) == 1:
+                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls[0])
+            else:
+                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls)
 
-        return pred_sqls 
+        return pred_sqls

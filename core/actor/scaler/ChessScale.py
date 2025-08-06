@@ -61,14 +61,7 @@ Evidence: {HINT}
             **kwargs
     ):
         self.dataset = dataset
-        # 确保 llm 不为 None
-        if llm is None:
-            raise ValueError("LLM is required for ChessScaler")
         self.llm = llm
-        # 确保 LLM 不为空
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        if not llm_lis or any(llm_item is None for llm_item in llm_lis):
-            raise ValueError("LLM cannot be empty or contain None values")
         self.generate_num = generate_num
         self.temperature = temperature
         self.is_save = is_save
@@ -86,7 +79,6 @@ Evidence: {HINT}
         Return only a Python list of keywords, for example: ['customer', 'name', 'age', '>', '30']"""
         
         try:
-            # 确保使用第一个可用的 LLM
             llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
             llm_to_use = llm_lis[0] if llm_lis else None
             if llm_to_use is None:

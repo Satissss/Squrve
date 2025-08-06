@@ -227,8 +227,8 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
     ):
         # 直接设置实例属性，不调用父类的 __init__ 方法
         self.dataset = dataset
-        # 正确处理 llm 参数，与 DINSQLDecompose 保持一致
-        self.llm = llm if isinstance(llm, list) else [llm]
+        # 不修改 llm 属性，保持原始传入的参数
+        self.llm = llm
         self.generate_num = generate_num
         self.is_save = is_save
         self.save_dir = save_dir
@@ -310,7 +310,7 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
                         logger.error(f"Error in decomposition: {e}")
             return decompositions
 
-        # 与 DINSQLDecompose 保持一致的 llm 处理逻辑
+        # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
         llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
         # 过滤掉 None 值
         llm_lis = [llm for llm in llm_lis if llm is not None]

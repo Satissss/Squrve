@@ -74,7 +74,7 @@ Label: "NESTED"'''
             **kwargs
     ):
         self.dataset = dataset
-        self.llm = llm if isinstance(llm, list) else [llm]
+        self.llm = llm  # 不修改 llm 属性，保持原始传入的参数
         self.generate_num = generate_num
         self.is_save = is_save
         self.save_dir = save_dir
@@ -174,7 +174,15 @@ Label: "NESTED"'''
                         logger.error(f"Error in decomposition: {e}")
             return all_sub_questions
 
+        # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
         llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
+        # 过滤掉 None 值
+        llm_lis = [llm for llm in llm_lis if llm is not None]
+        
+        if not llm_lis:
+            # 如果没有有效的 LLM，返回空结果
+            return []
+            
         sub_questions = []
         if self.use_llm_scaling and isinstance(self.llm, list):
             sub_questions = process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis)
