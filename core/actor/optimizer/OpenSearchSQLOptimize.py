@@ -137,6 +137,7 @@ Answer in the following format:
         question: str,
         schema: str,
         db_type: str,
+        schema_links: Union[str, List] = "None",
         db_id: Optional[str] = None,
         db_path: Optional[Union[str, Path]] = None,
         credential: Optional[dict] = None,
@@ -146,7 +147,9 @@ Answer in the following format:
         hint="",
         db_col={},
         foreign_set={},
-        L_values=[]
+        L_values=[],
+        sub_questions=None,
+        **kwargs
     ) -> str:
         if db_type != "sqlite":
             logger.warning("Currently optimized for SQLite only.")
@@ -188,6 +191,10 @@ Answer in the following format:
         if schema is None:
             schema = ""  # Implement schema loading if required
 
+        # Load schema_links if not provided
+        if schema_links is None:
+            schema_links = row.get("schema_links", "None")
+
         # Handle pred_sql input
         if pred_sql is None:
             raise ValueError("pred_sql is required for optimization")
@@ -200,7 +207,7 @@ Answer in the following format:
 
         def process_sql(sql):
             return self.optimize_single_sql(
-                sql, question, schema, db_type, db_id, db_path, credential, **kwargs
+                sql, question, schema, db_type, schema_links, db_id, db_path, credential, **kwargs
             )
 
         optimized_sqls = []
@@ -217,7 +224,7 @@ Answer in the following format:
 
         if self.is_save:
             instance_id = row.get("instance_id")
-            save_path_base = self.save_dir / str(self.dataset.dataset_index) if self.dataset.dataset_index else self.save_dir
+            save_path_base = Path(self.save_dir) / str(self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"

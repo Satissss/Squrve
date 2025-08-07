@@ -433,29 +433,39 @@ You are an intelligent agent responsible for identifying the conditions in the u
             self,
             sql: str,
             question: str,
-            schema_df,
-            db_id: str,
-            evidence: str = '',
-            example: str = ''
+            schema: str,
+            db_type: str,
+            schema_links: Union[str, List] = "None",
+            db_id: Optional[str] = None,
+            db_path: Optional[Union[str, Path]] = None,
+            credential: Optional[dict] = None
     ) -> str:
         try:
-            db_schema = self.get_all_schema_from_df(schema_df)
-            sl_sql = self.extract_from_text(sql, db_schema)
-            schema_links = {"tables": [t.lower() for t in sl_sql['tables']],
-                            "columns": [c.lower() for c in sl_sql['columns']]}
-
-            simple_ddl, table_list = self.get_simple_ddl_from_schema(schema_df, schema_links['tables'],
-                                                                     schema_links['columns'])
-            ddl_data = self.get_ddl_data_from_schema(schema_df, schema_links['tables'], table_list)
-            foreign_key = self.get_foreign_key_from_schema(schema_df, schema_links['tables'])
-            explanation = self.get_explanation_from_schema(schema_df, schema_links['tables'], schema_links['columns'])
-            table_info_aug = '### Sqlite SQL tables, with their properties:\n' + simple_ddl + '\n### Here are some data information about database references.\n' + ddl_data + '\n### Foreign key information of Sqlite SQL tables, used for table joins:\n' + foreign_key + '\n### The meaning of every column:\n#\n' + explanation.strip() + '\n#\n'
+            # Since schema is already a string format, we need to work with it directly
+            # For RSLSQLOptimizer, we'll use a simplified approach that doesn't require DataFrame conversion
+            
+            # Extract table and column information from the schema string
+            table_info_aug = schema  # Use the schema string directly
+            
+            # Get evidence and example from dataset if available
+            evidence = ""
+            example = ""
+            if self.dataset and db_id:
+                row = self.dataset[db_id] if db_id in self.dataset else None
+                if row:
+                    evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
+                    example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
 
             word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
             cond_aug = self.condition_augmentation(question)
             table_info = table_info_aug + f'\n### sql_keywords: {word_aug.get("sql_keywords", [])}\n### conditions: {cond_aug.get("conditions", [])}'
 
-            optimized_sql = self.self_correction(table_info, sql, db_id)
+            # Ensure db_id is not None for SQL execution
+            if db_id is None:
+                logger.warning("db_id is None, skipping SQL execution in self-correction")
+                optimized_sql = sql
+            else:
+                optimized_sql = self.self_correction(table_info, sql, db_id)
         except Exception as e:
             logger.error(f"Error in optimizing SQL: {e}")
             optimized_sql = sql
@@ -479,28 +489,40 @@ You are an intelligent agent responsible for identifying the conditions in the u
         question = row['question']
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get('db_id')
+        db_path = Path(self.dataset.db_path) / (
+                    db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
+        credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
         evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
         example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
 
         # Load and normalize schema
         if schema is None:
-            instance_schema_path = row.get("instance_schemas")
+            instance_schema_path = row.get("instance_schemas", None)
             if instance_schema_path:
                 schema = load_dataset(instance_schema_path)
-            else:
+            if schema is None:
                 schema = self.dataset.get_db_schema(item)
-
+            if schema is None:
+                raise Exception("Failed to load a valid database schema for the sample!")
         if isinstance(schema, dict):
             schema = single_central_process(schema)
-        elif isinstance(schema, list):
+        if isinstance(schema, list):
             schema = pd.DataFrame(schema)
-        elif not isinstance(schema, pd.DataFrame):
-            raise ValueError("Invalid schema format")
-        schema_df = schema
+
+        # Convert to string format if it's a DataFrame
+        if isinstance(schema, pd.DataFrame):
+            schema = parse_schema_from_df(schema)
+
+        # Load schema_links if not provided
+        if schema_links is None:
+            schema_links = row.get("schema_links", "None")
 
         # Handle pred_sql input
         if pred_sql is None:
-            raise ValueError("pred_sql is required for optimization")
+            # 尝试从数据集中获取 pred_sql
+            pred_sql = row.get(self.OUTPUT_NAME)
+            if pred_sql is None:
+                raise ValueError("pred_sql is required for optimization")
 
         is_single = not isinstance(pred_sql, list)
         sql_list = [pred_sql] if is_single else pred_sql
@@ -509,7 +531,9 @@ You are an intelligent agent responsible for identifying the conditions in the u
                     sql_list]
 
         def process_sql(sql):
-            return self.optimize_single_sql(sql, question, schema_df, db_id, evidence, example)
+            return self.optimize_single_sql(
+                sql, question, schema, db_type, schema_links, db_id, db_path, credential
+            )
 
         optimized_sqls = []
         if self.open_parallel and len(sql_list) > 1:
@@ -525,8 +549,10 @@ You are an intelligent agent responsible for identifying the conditions in the u
 
         if self.is_save:
             instance_id = row.get("instance_id", item)
-            save_path_base = self.save_dir / str(
-                self.dataset.dataset_index) if self.dataset.dataset_index else self.save_dir
+            # Ensure save_dir is a Path object and handle dataset_index properly
+            save_path_base = Path(self.save_dir)
+            if self.dataset.dataset_index is not None:
+                save_path_base = save_path_base / str(self.dataset.dataset_index)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"

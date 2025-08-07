@@ -373,8 +373,8 @@ For the given question, analyze and refine the erroneous SQL statement using the
 
         if self.is_save:
             instance_id = row.get("instance_id")
-            save_path_base = self.save_dir / str(
-                self.dataset.dataset_index) if self.dataset.dataset_index else self.save_dir
+            save_path_base = Path(self.save_dir) / str(
+                self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"

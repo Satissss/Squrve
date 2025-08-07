@@ -6,9 +6,9 @@ from loguru import logger
 import pandas as pd
 
 from core.actor.optimizer.BaseOptimize import BaseOptimizer
-from core.data_manage import Dataset, load_dataset, save_dataset
+from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from core.db_connect import get_sql_exec_result
-from core.utils import sql_clean
+from core.utils import sql_clean, parse_schema_from_df
 from llama_index.core.llms.llm import LLM
 
 def parse_sql_from_string(input_string: str) -> str:
@@ -63,9 +63,11 @@ class MACSQLOptimizer(BaseOptimizer):
 
     def _build_fk_str(self, schema_df: pd.DataFrame) -> str:
         fk_str = ""
-        fks = schema_df[schema_df['referenced_table'].notna() & schema_df['referenced_column'].notna()]
-        for _, row in fks.iterrows():
-            fk_str += f"{row['table_name']}.`{row['column_name']}` = {row['referenced_table']}.`{row['referenced_column']}`\n"
+        # Check if foreign key columns exist before accessing them
+        if 'referenced_table' in schema_df.columns and 'referenced_column' in schema_df.columns:
+            fks = schema_df[schema_df['referenced_table'].notna() & schema_df['referenced_column'].notna()]
+            for _, row in fks.iterrows():
+                fk_str += f"{row['table_name']}.`{row['column_name']}` = {row['referenced_table']}.`{row['referenced_column']}`\n"
         return fk_str
 
     def _refine_sql(
@@ -110,15 +112,17 @@ Provide the corrected SQL after thinking step by step:
             self,
             sql: str,
             question: str,
-            schema_df: pd.DataFrame,
+            schema: str,
             db_type: str,
             db_id: Optional[str] = None,
             db_path: Optional[Union[str, Path]] = None,
             credential: Optional[Dict] = None,
             evidence: str = ""
     ) -> str:
-        desc_str = self._build_desc_str(schema_df)
-        fk_str = self._build_fk_str(schema_df)
+        # For MACSQLOptimizer, we'll use the schema string directly in the prompt
+        # instead of trying to parse it back to DataFrame
+        desc_str = schema  # Use the schema string directly
+        fk_str = ""  # Empty foreign key string since we don't have FK info in the schema string
 
         current_sql = sql_clean(sql)
         for turn in range(self.debug_turn_n):
@@ -178,24 +182,38 @@ Provide the corrected SQL after thinking step by step:
         db_path = Path(self.dataset.db_path) / f"{db_id}.sqlite" if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
-        # Load and normalize schema to DataFrame
+        # Load schema if not provided
         if schema is None:
-            schema = self.dataset.get_db_schema(item)
-        if isinstance(schema, (dict, list)):
-            schema = pd.DataFrame(schema)  # Assume appropriate conversion
-        elif isinstance(schema, (str, Path)):
-            schema = load_dataset(schema)
-            if isinstance(schema, dict):
-                schema = pd.DataFrame(schema)
-        if not isinstance(schema, pd.DataFrame):
-            raise ValueError("Schema must be convertible to pd.DataFrame")
+            instance_schema_path = row.get("instance_schemas", None)
+            if instance_schema_path:
+                schema = load_dataset(instance_schema_path)
+            if schema is None:
+                schema = self.dataset.get_db_schema(item)
+            if schema is None:
+                raise Exception("Failed to load a valid database schema for the sample!")
+        if isinstance(schema, dict):
+            schema = single_central_process(schema)
+        if isinstance(schema, list):
+            schema = pd.DataFrame(schema)
+
+        schema = parse_schema_from_df(schema)
+
+        # Load schema_links if not provided
+        if schema_links is None:
+            schema_links = row.get("schema_links", "None")
 
         # Handle pred_sql input
         if pred_sql is None:
-            raise ValueError("pred_sql is required for optimization")
+            # 尝试从数据集中获取 pred_sql
+            pred_sql = row.get(self.OUTPUT_NAME)
+            if pred_sql is None:
+                raise ValueError("pred_sql is required for optimization")
 
+        # Normalize pred_sql to list
         is_single = not isinstance(pred_sql, list)
         sql_list = [pred_sql] if is_single else pred_sql
+
+        # Load SQL from paths if necessary
         sql_list = [load_dataset(sql) if isinstance(sql, (str, Path)) and Path(sql).exists() else sql for sql in sql_list]
 
         def process_sql(sql):
@@ -213,11 +231,12 @@ Provide the corrected SQL after thinking step by step:
             for sql in sql_list:
                 optimized_sqls.append(process_sql(sql))
 
+        # Return single or list based on input
         output = optimized_sqls[0] if is_single else optimized_sqls
 
         if self.is_save:
             instance_id = row.get("instance_id")
-            save_path_base = self.save_dir / str(self.dataset.dataset_index) if self.dataset.dataset_index else self.save_dir
+            save_path_base = Path(self.save_dir) / str(self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"
