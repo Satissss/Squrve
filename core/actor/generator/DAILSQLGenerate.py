@@ -1007,7 +1007,7 @@ class BasicExampleSelector(object):
         self.data = data
         self.train_json = self.data.get('train_json', [])
         self.db_ids = [d.get('db_id') for d in self.train_json]
-        self.train_questions = [d.get('question') for d in self.train_json]
+        self.train_questions = [d['question'] for d in self.train_json]
 
     def get_examples(self, question, num_example, cross_domain=False):
         pass
@@ -1038,12 +1038,14 @@ class RandomExampleSelector(BasicExampleSelector):
 class CosineSimilarExampleSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity based on question text instead of embeddings
+        similarities = []
+        for i, train_question in enumerate(self.train_questions):
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1061,12 +1063,17 @@ class CosineSimilarExampleSelector(BasicExampleSelector):
 class EuclideanDistanceSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import euclidean_distances
-        distances = np.squeeze(euclidean_distances(target_embedding, self.train_embeddings)).tolist()
+        # Use simple word-based distance instead of embeddings
+        distances = []
+        target_words = set(target['question'].lower().split())
+        for train_question in self.train_questions:
+            train_words = set(train_question.lower().split())
+            # Calculate simple set-based distance
+            distance = len(target_words.symmetric_difference(train_words))
+            distances.append(distance)
+        
         pairs = [(d, i) for d, i in zip(distances, range(len(distances)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0])
         top_pairs = []
@@ -1084,12 +1091,16 @@ class EuclideanDistanceSelector(BasicExampleSelector):
 class EuclideanDistanceThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import euclidean_distances
-        distances = np.squeeze(euclidean_distances(target_embedding, self.train_embeddings)).tolist()
+        # Use simple word-based distance with threshold
+        distances = []
+        target_words = set(target['question'].lower().split())
+        for train_question in self.train_questions:
+            train_words = set(train_question.lower().split())
+            distance = len(target_words.symmetric_difference(train_words))
+            distances.append(distance)
+        
         pairs = [(d, i) for d, i in zip(distances, range(len(distances)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0])
         top_pairs = []
@@ -1098,7 +1109,9 @@ class EuclideanDistanceThresholdSelector(BasicExampleSelector):
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, d))
+            # Apply threshold (e.g., distance < 10)
+            if d < 10:  # Simple threshold
+                top_pairs.append((index, d))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, d) in top_pairs]
@@ -1107,12 +1120,14 @@ class EuclideanDistanceThresholdSelector(BasicExampleSelector):
 class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text with threshold
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1121,7 +1136,9 @@ class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector)
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Apply similarity threshold
+            if s > 0.1:  # Simple threshold
+                top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1130,12 +1147,14 @@ class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector)
 class EuclideanDistanceQuestionMaskSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1153,12 +1172,14 @@ class EuclideanDistanceQuestionMaskSelector(BasicExampleSelector):
 class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text with threshold
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1167,7 +1188,9 @@ class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelect
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Apply similarity threshold
+            if s > 0.1:  # Simple threshold
+                top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1176,12 +1199,14 @@ class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelect
 class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text with enhanced selection
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1190,7 +1215,9 @@ class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Enhanced selection with higher threshold
+            if s > 0.15:  # Higher threshold for better quality
+                top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1199,12 +1226,14 @@ class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
 class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text with mask-based threshold
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1213,7 +1242,9 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSe
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Mask-based threshold
+            if s > 0.1:  # Threshold for masked similarity
+                top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1222,12 +1253,14 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSe
 class EuclideanDistanceMaskPreSkeletonSimilarityThresholdShiftSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
+        # Use Jaccard similarity on question text with shifted threshold
+        similarities = []
+        for train_question in self.train_questions:
+            sim = jaccard_similarity(target['question'], train_question)
+            similarities.append(sim)
+        
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1236,7 +1269,9 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdShiftSelector(BasicExam
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Shifted threshold for better selection
+            if s > 0.05:  # Lower threshold for more examples
+                top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1383,6 +1418,9 @@ class DAILSQLGenerate(BaseGenerator):
         if self.dataset:
             self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
                 data=self.dataset, tokenizer="approx")
+
+        # Import necessary libraries for database operations
+        from core.db_connect import get_sql_exec_result
 
     def act(self, item, schema=None, schema_links=None, **kwargs):
         try:
