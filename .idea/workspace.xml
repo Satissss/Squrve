@@ -5,11 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/sql_debug.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/sql_debug.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/datasets/spider_dev_generate.json" beforeDir="false" afterPath="$PROJECT_DIR$/files/datasets/spider_dev_generate.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -491,11 +490,6 @@
           <option name="timeStamp" value="168" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
-          <url>file://$PROJECT_DIR$/startup_run/run_spider_dev.py</url>
-          <line>15</line>
-          <option name="timeStamp" value="172" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/evaluate.py</url>
           <line>278</line>
           <option name="timeStamp" value="174" />
@@ -544,7 +538,7 @@
     <SUITE FILE_PATH="coverage/Squrve$DAILSQLGenerate.coverage" NAME="DAILSQLGenerate Coverage Results" MODIFIED="1753363733659" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
     <SUITE FILE_PATH="coverage/Squrve$QwenModel.coverage" NAME="QwenModel Coverage Results" MODIFIED="1751181636751" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
     <SUITE FILE_PATH="coverage/QueryFlow$tt.coverage" NAME="tt Coverage Results" MODIFIED="1748335668165" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
-    <SUITE FILE_PATH="coverage/Squrve$run_spider_dev.coverage" NAME="run_spider_dev Coverage Results" MODIFIED="1754742642399" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
+    <SUITE FILE_PATH="coverage/Squrve$run_spider_dev.coverage" NAME="run_spider_dev Coverage Results" MODIFIED="1754748699609" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/QueryFlow$evaluate.coverage" NAME="evaluate Coverage Results" MODIFIED="1747704013340" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
     <SUITE FILE_PATH="coverage/QueryFlow$data_clean.coverage" NAME="data_clean Coverage Results" MODIFIED="1746709865180" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/spider" />
     <SUITE FILE_PATH="coverage/QueryFlow$run.coverage" NAME="run Coverage Results" MODIFIED="1748404194076" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />

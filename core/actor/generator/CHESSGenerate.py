@@ -10,6 +10,8 @@ import ast
 from dataclasses import dataclass, field
 from enum import Enum
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import difflib
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, single_central_process
@@ -227,38 +229,38 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
                     logger.warning(f"Attempt {attempt + 1} failed for {operation}: {e}. Retrying...")
 
     def _safe_extract_list(self, text: str, fallback: List = None) -> List:
-        """Safely extract Python list from text response"""
+        """Safely extract Python list from text response with validation"""
         if fallback is None:
             fallback = []
-
         try:
-            # First try to find list pattern
             match = re.search(r'\[.*?\]', text, re.DOTALL)
             if match:
                 list_str = match.group(0)
-                # Use ast.literal_eval for safe evaluation
                 result = ast.literal_eval(list_str)
-                return result if isinstance(result, list) else fallback
+                if isinstance(result, list) and all(isinstance(item, str) for item in result):
+                    return result
+                else:
+                    logger.warning("Extracted list contains invalid types")
         except (ValueError, SyntaxError) as e:
-            logger.warning(f"Failed to parse list from response: {e}")
-
+            logger.warning(f"Failed to parse list: {e}")
         return fallback
 
     def _safe_extract_json(self, text: str, fallback: Dict = None) -> Dict:
-        """Safely extract JSON from text response"""
+        """Safely extract JSON from text response with validation"""
         if fallback is None:
             fallback = {"score": 0.5, "feedback": "Could not parse evaluation"}
-
         try:
-            # First try to find JSON pattern
             match = re.search(r'\{.*?\}', text, re.DOTALL)
             if match:
                 json_str = match.group(0)
                 result = json.loads(json_str)
-                return result if isinstance(result, dict) else fallback
+                if isinstance(result, dict) and 'score' in result and 'feedback' in result:
+                    if 0 <= result['score'] <= 1:
+                        return result
+                    else:
+                        logger.warning("Score out of range")
         except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Failed to parse JSON from response: {e}")
-
+            logger.warning(f"Failed to parse JSON: {e}")
         return fallback
 
     def _extract_keywords(self, question: str) -> List[str]:
@@ -292,15 +294,17 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
 
         for line in schema_lines:
             line_lower = line.lower()
-            # More sophisticated matching
-            if any(keyword in line_lower for keyword in processed_keywords):
-                relevant_lines.add(line)
-                # Also add context lines (table definitions, etc.)
-                line_idx = schema_lines.index(line)
-                # Add surrounding context
-                for i in range(max(0, line_idx - 2), min(len(schema_lines), line_idx + 3)):
-                    if schema_lines[i].strip():
-                        relevant_lines.add(schema_lines[i])
+            # Improved matching with similarity threshold
+            for keyword in processed_keywords:
+                if difflib.SequenceMatcher(None, keyword, line_lower).ratio() > 0.8 or keyword in line_lower:
+                    relevant_lines.add(line)
+                    # Also add context lines (table definitions, etc.)
+                    line_idx = schema_lines.index(line)
+                    # Add surrounding context
+                    for i in range(max(0, line_idx - 3), min(len(schema_lines), line_idx + 4)):
+                        if schema_lines[i].strip():
+                            relevant_lines.add(schema_lines[i])
+                    break
 
         if relevant_lines:
             return '\n'.join(sorted(relevant_lines, key=lambda x: schema_lines.index(x) if x in schema_lines else 0))
@@ -331,58 +335,62 @@ Please return only the filtered schema as a string, with each table on a new lin
 
     def _extract_sql_from_response(self, response: str) -> Optional[str]:
         """Extract SQL query from LLM response with multiple extraction strategies"""
-        # Strategy 1: Look for FINAL_ANSWER tags
-        sql_match = re.search(r'<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>', response, re.DOTALL | re.IGNORECASE)
-        if sql_match:
-            return sql_match.group(1).strip()
-
-        # Strategy 2: Look for SQL blocks
-        sql_block_match = re.search(r'```sql\s*(.*?)\s*```', response, re.DOTALL | re.IGNORECASE)
-        if sql_block_match:
-            return sql_block_match.group(1).strip()
-
-        # Strategy 3: Look for lines starting with SELECT
+        # Enhanced extraction with multiple strategies
+        patterns = [
+            r'<FINAL_ANSWER>\s*(.*?)\s*</FINAL_ANSWER>',
+            r'```sql\s*(.*?)\s*```',
+            r'SELECT.*?;',  # Fallback to match any SELECT statement
+        ]
+        
+        for pattern in patterns:
+            match = re.search(pattern, response, re.DOTALL | re.IGNORECASE)
+            if match:
+                return match.group(1).strip() if len(match.groups()) > 0 else match.group(0).strip()
+        
+        # If no match, search for lines starting with SQL keywords
         lines = response.split('\n')
         for line in lines:
-            stripped_line = line.strip()
-            if stripped_line.upper().startswith(('SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE')):
-                return stripped_line
-
+            stripped = line.strip().upper()
+            if stripped.startswith(('SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE')):
+                return line.strip()
+        
+        logger.warning("Failed to extract SQL from response")
         return None
 
     def _generate_candidate_sql(self, question: str, schema: str, evidence: str = "") -> List[Dict[str, Any]]:
         """Generate candidate SQL queries with enhanced error handling"""
         candidates = []
-        successful_generations = 0
+        prompt = self.CANDIDATE_TEMPLATE.format(
+            DATABASE_SCHEMA=schema,
+            QUESTION=question,
+            HINT=evidence or "No additional evidence provided."
+        )
 
-        for i in range(self.config.cg_sampling_count):
-            with self._llm_retry_context(f"candidate generation {i + 1}"):
-                try:
-                    prompt = self.CANDIDATE_TEMPLATE.format(
-                        DATABASE_SCHEMA=schema,
-                        QUESTION=question,
-                        HINT=evidence or "No additional evidence provided."
-                    )
+        def generate_single_candidate(_):
+            for attempt in range(3):  # Retry up to 3 times
+                with self._llm_retry_context(f"candidate generation attempt {attempt+1}"):
+                    try:
+                        response = self.llm.complete(prompt, temperature=self.config.cg_temperature).text
+                        sql = self._extract_sql_from_response(response)
+                        if sql:
+                            return {
+                                "SQL": sql,
+                                "chain_of_thought_reasoning": response,
+                                "confidence": self._calculate_confidence(response, sql),
+                                "generation_id": _
+                            }
+                    except Exception as e:
+                        logger.warning(f"Generation attempt {attempt+1} failed: {e}")
+            return None
 
-                    response = self.llm.complete(prompt, temperature=self.config.cg_temperature).text
-                    sql = self._extract_sql_from_response(response)
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(generate_single_candidate, i) for i in range(self.config.cg_sampling_count)]
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    candidates.append(result)
 
-                    if sql:
-                        candidates.append({
-                            "SQL": sql,
-                            "chain_of_thought_reasoning": response,
-                            "confidence": self._calculate_confidence(response, sql),
-                            "generation_id": i
-                        })
-                        successful_generations += 1
-                    else:
-                        logger.warning(f"Could not extract SQL from candidate {i + 1}")
-
-                except Exception as e:
-                    logger.warning(f"Failed to generate candidate {i + 1}: {e}")
-                    continue
-
-        logger.info(f"Successfully generated {successful_generations}/{self.config.cg_sampling_count} SQL candidates")
+        logger.info(f"Successfully generated {len(candidates)}/{self.config.cg_sampling_count} SQL candidates")
         return candidates
 
     def _calculate_confidence(self, response: str, sql: str) -> float:
@@ -471,23 +479,19 @@ Please return only the filtered schema as a string, with each table on a new lin
             return ""
 
         if not evaluations or len(evaluations) != len(candidates):
-            # Fallback to confidence-based selection
             return max(candidates, key=lambda x: x.get("confidence", 0))["SQL"]
 
-        # Weighted scoring: evaluation score (70%) + confidence (30%)
         best_score = -1
         best_sql = candidates[0]["SQL"]
-
-        for i, (candidate, evaluation) in enumerate(zip(candidates, evaluations)):
-            eval_score = evaluation.get("score", 0)
-            confidence_score = candidate.get("confidence", 0)
-            weighted_score = 0.7 * eval_score + 0.3 * confidence_score
-
-            if weighted_score > best_score:
-                best_score = weighted_score
+        for candidate, evaluation in zip(candidates, evaluations):
+            eval_score = evaluation.get("score", 0.5)
+            confidence = candidate.get("confidence", 0.5)
+            weighted = 0.7 * eval_score + 0.3 * confidence
+            if weighted > best_score:
+                best_score = weighted
                 best_sql = candidate["SQL"]
 
-        logger.info(f"Selected SQL with weighted score: {best_score:.3f}")
+        logger.info(f"Selected SQL with score: {best_score:.3f}")
         return best_sql
 
     def _load_and_process_schema(self, item: int, schema: Union[str, PathLike, Dict, List]) -> str:
@@ -626,13 +630,15 @@ Please return only the filtered schema as a string, with each table on a new lin
             pred_sql = self._select_best_sql(candidates, evaluations)
             logger.debug(f"Selected best SQL: {pred_sql[:100]}...")
 
-            # Step 8: Optional SQL revision
-            if evaluations and evaluations[0].get("feedback") and evaluations[0].get("score", 0) < 0.7:
-                logger.debug("Attempting SQL revision...")
-                revised_sql = self._revise_sql(question, context, pred_sql, evaluations[0]["feedback"])
-                if revised_sql and revised_sql != pred_sql:
+            # In act method, after evaluations, revise if average score < 0.7
+            avg_score = sum(e.get('score', 0) for e in evaluations) / len(evaluations) if evaluations else 0
+            if avg_score < 0.7:
+                logger.debug("Attempting SQL revision based on feedback")
+                best_idx = evaluations.index(max(evaluations, key=lambda x: x.get('score', 0)))
+                feedback = evaluations[best_idx].get('feedback', '')
+                revised_sql = self._revise_sql(question, context, candidates[best_idx]['SQL'], feedback)
+                if revised_sql and revised_sql != candidates[best_idx]['SQL']:
                     pred_sql = revised_sql
-                    logger.debug("SQL revision completed")
 
             # Step 9: Post-processing
             if self.sql_post_process_function and pred_sql:

@@ -11,6 +11,7 @@ import re
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, load_dataset, save_dataset
+from core.db_connect import execute_sql
 from core.utils import parse_schema_from_df
 from core.data_manage import single_central_process
 from llama_index.core.llms.llm import LLM
@@ -24,6 +25,7 @@ DECOMPOSER_NAME = 'Decomposer'
 REFINER_NAME = 'Refiner'
 SYSTEM_NAME = 'System'
 
+
 # Simplified utility functions from utils.py
 def parse_json(text: str) -> dict:
     start = text.find("```json")
@@ -36,6 +38,7 @@ def parse_json(text: str) -> dict:
             return {}
     return {}
 
+
 def parse_sql_from_string(input_string):
     sql_pattern = r'```sql(.*?)```'
     all_sqls = []
@@ -46,10 +49,12 @@ def parse_sql_from_string(input_string):
     else:
         return "error: No SQL found in the input string"
 
+
 # Add the load_json_file function here
 def load_json_file(file_path: str) -> dict:
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
 
 # Embedded prompt templates from const.py (simplified for brevity)
 selector_template = '''\nAs an experienced and professional database administrator, your task is to analyze a user question and a database schema to provide relevant information. The database schema consists of table descriptions, each containing multiple column descriptions. Your goal is to identify the relevant tables and columns based on the user question and evidence provided.\n\n[Instruction]:\n1. Discard any table schema that is not related to the user question and evidence.\n2. Sort the columns in each relevant table in descending order of relevance and keep the top 6 columns.\n3. Ensure that at least 3 tables are included in the final output JSON.\n4. The output should be in JSON format.\n\nRequirements:\n1. If a table has less than or equal to 10 columns, mark it as \"keep_all\".\n2. If a table is completely irrelevant to the user question and evidence, mark it as \"drop_all\".\n3. Prioritize the columns in each relevant table based on their relevance.\n\nHere is a typical example:\n\n==========\n【DB_ID】 banking_system\n【Schema】\n# Table: account\n[\n  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),\n  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),\n  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),\n  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)\n]\n# Table: client\n[\n  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),\n  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),\n  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),\n  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)\n]\n# Table: loan\n[\n  (loan_id, the id number identifying the loan data. Value examples: [4959, 4960, 4961].),\n  (account_id, the id number identifying the account. Value examples: [10, 80, 55, 43].),\n  (date, the date when the loan is approved. Value examples: ['1998-07-12', '1998-04-19'].),\n  (amount, the id number identifying the loan data. Value examples: [1567, 7877, 9988].),\n  (duration, the id number identifying the loan data. Value examples: [60, 48, 24, 12, 36].),\n  (payments, the id number identifying the loan data. Value examples: [3456, 8972, 9845].),\n  (status, the id number identifying the loan data. Value examples: ['C', 'A', 'D', 'B'].)\n]\n# Table: district\n[\n  (district_id, location of branch. Value examples: [77, 76].),\n  (A2, area in square kilometers. Value examples: [50.5, 48.9].),\n  (A4, number of inhabitants. Value examples: [95907, 95616].),\n  (A5, number of households. Value examples: [35678, 34892].),\n  (A6, literacy rate. Value examples: [95.6, 92.3, 89.7].),\n  (A7, number of entrepreneurs. Value examples: [1234, 1456].),\n  (A8, number of cities. Value examples: [5, 4].),\n  (A9, number of schools. Value examples: [15, 12, 10].),\n  (A10, number of hospitals. Value examples: [8, 6, 4].),\n  (A11, average salary. Value examples: [12541, 11277].),\n  (A12, poverty rate. Value examples: [12.4, 9.8].),\n  (A13, unemployment rate. Value examples: [8.2, 7.9].),\n  (A15, number of crimes. Value examples: [256, 189].)\n]\n【Foreign keys】\nclient.`district_id` = district.`district_id`\n【Question】\nWhat is the gender of the youngest client who opened account in the lowest average salary branch?\n【Evidence】\nLater birthdate refers to younger age; A11 refers to average salary\n【Answer】\n```json\n{{\n  \"account\": \"keep_all\",\n  \"client\": \"keep_all\",\n  \"loan\": \"drop_all\",\n  \"district\": [\"district_id\", \"A11\", \"A2\", \"A4\", \"A6\", \"A7\"]\n}}\n```\nQuestion Solved.\n\n==========\n\nHere is a new example, please start answering:\n\n【DB_ID】 {db_id}\n【Schema】\n{desc_str}\n【Foreign keys】\n{fk_str}\n【Question】\n{query}\n【Evidence】\n{evidence}\n【Answer】\n'''
@@ -259,10 +264,13 @@ refiner_template = '''Given the original SQL query that failed execution, the er
 Provide the corrected SQL after thinking step by step:
 '''
 
+
 # Embedded Selector class
 class Selector:
     name = SELECTOR_NAME
-    def __init__(self, llm: LLM, data_path: str, tables_json_path: str, model_name: str, dataset_name:str, lazy: bool = False, without_selector: bool = False):
+
+    def __init__(self, llm: LLM, data_path: str, tables_json_path: str, model_name: str, dataset_name: str,
+                 lazy: bool = False, without_selector: bool = False):
         self.llm = llm
         self.data_path = data_path.strip('/').strip('\\')
         self.tables_json_path = tables_json_path
@@ -275,6 +283,7 @@ class Selector:
             self._load_all_db_info()
         self._message = {}
         self.without_selector = without_selector
+
     def init_db2jsons(self):
         if not os.path.exists(self.tables_json_path):
             raise FileNotFoundError(f"tables.json not found in {self.tables_json_path}")
@@ -349,7 +358,7 @@ class Selector:
             cursor.execute(f"PRAGMA foreign_key_list(`{table_name}`)")
             foreign_keys = cursor.fetchall()
             for fk in foreign_keys:
-                if fk[2] == '1': # 1 means 'ON DELETE CASCADE'
+                if fk[2] == '1':  # 1 means 'ON DELETE CASCADE'
                     table_info[table_name]["foreign_keys"].append({
                         "column": fk[3],
                         "referenced_table": fk[4],
@@ -358,7 +367,7 @@ class Selector:
 
             # Get primary keys
             cursor.execute(f"PRAGMA table_info(`{table_name}`)")
-            primary_keys = [row[1] for row in cursor.fetchall() if row[5] == 1] # 1 means 'PRIMARY KEY'
+            primary_keys = [row[1] for row in cursor.fetchall() if row[5] == 1]  # 1 means 'PRIMARY KEY'
             table_info[table_name]["primary_keys"] = primary_keys
 
         conn.close()
@@ -374,11 +383,17 @@ class Selector:
         for table_name, info in table_info.items():
             schema_str += f"# Table: {table_name}\n[\n"
             for col_name in info["column_names"]:
-                schema_str += f"  ({col_name}, {col_name} description. Value examples: [{self._get_value_examples_str(None, table_name, col_name)}].),\n"
+                # Attempt to get value examples if cursor is available, otherwise note limitation
+                value_examples_str = self._get_value_examples_str(None, table_name, col_name)
+                if value_examples_str == "No value examples found.":
+                    schema_str += f"  ({col_name}, {col_name} description. Value examples: [...].),\n"
+                else:
+                    schema_str += f"  ({col_name}, {col_name} description. Value examples: [{value_examples_str}].),\n"
             schema_str += "]\n"
         return schema_str
 
-    def _get_db_desc_str(self, db_id: str, extracted_schema: Dict, use_gold_schema: bool = False) -> Tuple[str, str, Dict]:
+    def _get_db_desc_str(self, db_id: str, extracted_schema: Dict, use_gold_schema: bool = False) -> Tuple[
+        str, str, Dict]:
         if use_gold_schema:
             table_info = self._load_single_db_info(db_id)
             desc_str = self._build_bird_table_schema_list_str(table_info)
@@ -429,21 +444,25 @@ class Selector:
     def talk(self, message):
         if message['send_to'] != self.name: return
         self._message = message
-        db_id, ext_sch, query, evidence = message.get('db_id'), message.get('extracted_schema', {}), message.get('query'), message.get('evidence')
+        db_id, ext_sch, query, evidence = message.get('db_id'), message.get('extracted_schema', {}), message.get(
+            'query'), message.get('evidence')
         use_gold_schema = False
         if ext_sch:
             use_gold_schema = True
-        db_schema, db_fk, chosen_db_schem_dict = self._get_db_desc_str(db_id=db_id, extracted_schema=ext_sch, use_gold_schema=use_gold_schema)
+        db_schema, db_fk, chosen_db_schem_dict = self._get_db_desc_str(db_id=db_id, extracted_schema=ext_sch,
+                                                                       use_gold_schema=use_gold_schema)
         need_prune = self._is_need_prune(db_id, db_schema)
         if self.without_selector:
             need_prune = False
         if ext_sch == {} and need_prune:
             try:
-                raw_extracted_schema_dict = self._prune(db_id=db_id, query=query, db_schema=db_schema, db_fk=db_fk, evidence=evidence)
+                raw_extracted_schema_dict = self._prune(db_id=db_id, query=query, db_schema=db_schema, db_fk=db_fk,
+                                                        evidence=evidence)
             except Exception as e:
                 logger.error(f"Prune failed: {e}")
                 raw_extracted_schema_dict = {}
-            db_schema_str, db_fk, chosen_db_schem_dict = self._get_db_desc_str(db_id=db_id, extracted_schema=raw_extracted_schema_dict)
+            db_schema_str, db_fk, chosen_db_schem_dict = self._get_db_desc_str(db_id=db_id,
+                                                                               extracted_schema=raw_extracted_schema_dict)
             message['extracted_schema'] = raw_extracted_schema_dict
             message['chosen_db_schem_dict'] = chosen_db_schem_dict
             message['desc_str'] = db_schema_str
@@ -457,19 +476,24 @@ class Selector:
             message['pruned'] = False
             message['send_to'] = DECOMPOSER_NAME
 
+
 # Similarly embed Decomposer, Refiner, and ChatManager classes
 class Decomposer:
     name = DECOMPOSER_NAME
+
     def __init__(self, llm: LLM, dataset_name: str):
         self.llm = llm
         self.dataset_name = dataset_name
         self._message = {}
+
     def talk(self, message):
         if message['send_to'] != self.name: return
         self._message = message
-        query, evidence, schema_info, fk_info = message.get('query'), message.get('evidence'), message.get('desc_str'), message.get('fk_str')
+        query, evidence, schema_info, fk_info = message.get('query'), message.get('evidence'), message.get(
+            'desc_str'), message.get('fk_str')
         if self.dataset_name == 'bird':
-            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info, evidence=evidence)
+            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info,
+                                                    evidence=evidence)
         else:
             prompt = decompose_template_spider.format(query=query, desc_str=schema_info, fk_str=fk_info)
         response = self.llm.complete(prompt)  # Adapt to Squrve's LLM
@@ -480,49 +504,48 @@ class Decomposer:
         message['fixed'] = False
         message['send_to'] = REFINER_NAME
 
+
 class Refiner:
     name = REFINER_NAME
+
     def __init__(self, llm: LLM, data_path: str, dataset_name: str):
         self.llm = llm
         self.data_path = data_path
         self.dataset_name = dataset_name
         self._message = {}
+
     # Paste _execute_sql, _is_need_refine, _refine, talk from agents.py
     # Add @func_set_timeout if needed, but since it's not in Squrve, use try-except
-    def _execute_sql(self, sql: str, db_id: str) -> dict:
-        # Full code
+    def _execute_sql(self, sql: str, db_id: str, db_type: str = 'sqlite', db_path: str = None, credential: Any = None) -> dict:
         try:
-            db_file = os.path.join(self.data_path, f"{db_id}.sqlite")
-            if not os.path.exists(db_file):
-                logger.warning(f"数据库文件不存在: {db_file}")
-                return {"success": False, "error": "Database file not found"}
-
-            conn = sqlite3.connect(db_file)
-            cursor = conn.cursor()
+            if db_path is None:
+                db_path = os.path.join(self.data_path, f"{db_id}.sqlite")  # Fallback
+            exec_result = execute_sql(db_type, db_path if db_type == 'sqlite' else db_id, sql, credential)
             
-            # 执行 SQL
-            cursor.execute(sql)
-            result = cursor.fetchall()
+            if isinstance(exec_result, tuple):
+                res, err = exec_result[:2]
+            else:
+                res = exec_result
+                err = None
             
-            # 获取列名
-            column_names = [description[0] for description in cursor.description] if cursor.description else []
-            
-            conn.close()
+            success = err is None
+            row_count = len(res) if success and isinstance(res, (list, pd.DataFrame)) else 0
             
             return {
-                "success": True,
-                "result": result,
-                "column_names": column_names,
-                "row_count": len(result)
+                "success": success,
+                "result": res if success else None,
+                "error": err,
+                "row_count": row_count
             }
         except Exception as e:
-            logger.error(f"SQL 执行失败: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "result": None, "error": str(e), "row_count": 0}
+
     def _is_need_refine(self, exec_result: dict):
         # Full code
         if exec_result.get("success") and exec_result.get("row_count") == 0:
             return True
         return False
+
     def _refine(self, query: str, evidence: str, schema_info: str, fk_info: str, original_sql: str, error: str) -> str:
         # Use self.llm.complete for prompt
         prompt = refiner_template.format(
@@ -536,43 +559,29 @@ class Refiner:
         response = self.llm.complete(prompt)
         reply = response.text.strip()
         return parse_sql_from_string(reply)  # Parse the final SQL from the reply
+
     def talk(self, message):
         # Full code, adapting LLM calls
         if message['send_to'] != self.name: return
         self._message = message
-        query, evidence, schema_info, fk_info = message.get('query'), message.get('evidence'), message.get('desc_str'), message.get('fk_str')
+        query, evidence, schema_info, fk_info = message.get('query'), message.get('evidence'), message.get(
+            'desc_str'), message.get('fk_str')
         if not query:
             message['send_to'] = SYSTEM_NAME
             return
 
-        # Decompose into sub-questions
-        sub_questions = []
-        try:
-            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info, evidence=evidence)  # Assuming bird for now
-            response = self.llm.complete(prompt)
-            reply = response.text.strip()
-            # Improved parsing: extract all sub questions and their SQLs
-            sub_parts = reply.split('Sub question ')
-            qa_pairs = []
-            for part in sub_parts[1:]:
-                if 'SQL' in part:
-                    sub_q = part.split('SQL')[0].strip()
-                    sub_sql = parse_sql_from_string(part)
-                    qa_pairs.append((sub_q, sub_sql))
-            if not qa_pairs:
-                message['send_to'] = SYSTEM_NAME
-                return
-        except Exception as e:
-            logger.error(f"Decomposition failed: {e}")
-            message['send_to'] = SYSTEM_NAME
-            return
-
-        # The last SQL is typically the final one in MAC-SQL decomposition
-        final_sql = qa_pairs[-1][1] if qa_pairs else ""
+        # Use existing qa_pairs and final_sql from message (from Decomposer)
+        qa_pairs = message.get('qa_pairs', [])
+        final_sql = message.get('final_sql', '')
+        if not final_sql and qa_pairs:
+            final_sql = qa_pairs[-1][1] if qa_pairs else ""
 
         # Execute and check if refinement needed
         db_id = message.get('db_id')
-        exec_result = self._execute_sql(final_sql, db_id)
+        db_type = message.get('db_type', 'sqlite')  # Add db_type from message
+        db_path = message.get('db_path')  # Assume added to message
+        credential = message.get('credential')
+        exec_result = self._execute_sql(final_sql, db_id, db_type, db_path, credential)
         if self._is_need_refine(exec_result) or not exec_result['success']:
             logger.info("Refining SQL due to execution issue.")
             error = exec_result.get('error', 'Empty result set') if not exec_result['success'] else 'Empty result set'
@@ -584,8 +593,10 @@ class Refiner:
         message['fixed'] = True if 'refined_sql' in locals() else False
         message['send_to'] = SYSTEM_NAME
 
+
 class ChatManager:
-    def __init__(self, llm: LLM, data_path: str, tables_json_path: str, log_path: str, model_name: str, dataset_name:str, lazy: bool=False, without_selector: bool=False):
+    def __init__(self, llm: LLM, data_path: str, tables_json_path: str, log_path: str, model_name: str,
+                 dataset_name: str, lazy: bool = False, without_selector: bool = False):
         self.llm = llm
         self.data_path = data_path
         self.tables_json_path = tables_json_path
@@ -594,18 +605,22 @@ class ChatManager:
         self.dataset_name = dataset_name
         self.ping_network()
         self.chat_group = [
-            Selector(llm=llm, data_path=data_path, tables_json_path=tables_json_path, model_name=model_name, dataset_name=dataset_name, lazy=lazy, without_selector=without_selector),
+            Selector(llm=llm, data_path=data_path, tables_json_path=tables_json_path, model_name=model_name,
+                     dataset_name=dataset_name, lazy=lazy, without_selector=without_selector),
             Decomposer(llm=llm, dataset_name=dataset_name),
             Refiner(llm=llm, data_path=data_path, dataset_name=dataset_name)
         ]
         # INIT_LOG__PATH_FUNC(log_path) - adapt or remove if not needed
+
     def ping_network(self):
         # Simplified or remove
         pass
+
     def _chat_single_round(self, message):
         for agent in self.chat_group:
             if message['send_to'] == agent.name:
                 agent.talk(message)
+
     def start(self, user_message):
         start_time = time.time()
         if user_message['send_to'] == SYSTEM_NAME:
@@ -618,6 +633,7 @@ class ChatManager:
         exec_time = end_time - start_time
         logger.info(f"Execute {exec_time} seconds")
 
+
 # Now, in MACSQLGenerator, use these embedded classes instead of importing
 
 class MACSQLGenerator(BaseGenerator):
@@ -627,7 +643,6 @@ class MACSQLGenerator(BaseGenerator):
     """
 
     NAME = "MACSQLGenerator"
-    OUTPUT_NAME = "pred_sql"
 
     def __init__(
             self,
@@ -648,13 +663,13 @@ class MACSQLGenerator(BaseGenerator):
         self.max_round = max_round
         self.model_name = model_name
         self.without_selector = without_selector
-        
+
         # 安全地初始化 db_path 和 credential
         if hasattr(dataset, 'db_path') and dataset.db_path:
             self.db_path = dataset.db_path
         else:
             self.db_path = None
-            
+
         if hasattr(dataset, 'credential') and dataset.credential:
             self.credential = dataset.credential
         else:
@@ -667,12 +682,12 @@ class MACSQLGenerator(BaseGenerator):
             mac_sql_path = os.path.join(os.path.dirname(__file__), '../../../baselines/MAC-SQL')
             if mac_sql_path not in sys.path:
                 sys.path.insert(0, mac_sql_path)
-            
+
             # 导入 MAC-SQL 核心组件
             from core.chat_manager import ChatManager
             from core.const import SYSTEM_NAME, SELECTOR_NAME, DECOMPOSER_NAME, REFINER_NAME
             from core.agents import Selector, Decomposer, Refiner
-            
+
             return ChatManager, Selector, Decomposer, Refiner
         except ImportError as e:
             logger.error(f"无法导入 MAC-SQL 组件: {e}")
@@ -703,11 +718,11 @@ class MACSQLGenerator(BaseGenerator):
             table_name = item.get('table_name', '')
             column_name = item.get('column_name', '')
             column_type = item.get('column_types', '')
-            
+
             if table_name not in table_groups:
                 table_groups[table_name] = []
                 tables_json["table_names"].append(table_name)
-            
+
             table_groups[table_name].append({
                 'column_name': column_name,
                 'column_type': column_type
@@ -742,7 +757,7 @@ class MACSQLGenerator(BaseGenerator):
                 lazy=True,
                 without_selector=self.without_selector
             )
-            
+
             return chat_manager, temp_tables_path
         except Exception as e:
             logger.error(f"创建 ChatManager 失败: {e}")
@@ -753,10 +768,10 @@ class MACSQLGenerator(BaseGenerator):
         question = item.get('question', '')
         evidence = item.get('evidence', '')
         ground_truth = item.get('query', '')
-        
+
         # 评估难度
         difficulty = self._evaluate_difficulty(item)
-        
+
         user_message = {
             "idx": item.get('instance_id', 0),
             "db_id": db_id,
@@ -767,7 +782,7 @@ class MACSQLGenerator(BaseGenerator):
             "difficulty": difficulty,
             "send_to": "System"
         }
-        
+
         return user_message
 
     def _evaluate_difficulty(self, item: Dict) -> str:
@@ -775,10 +790,10 @@ class MACSQLGenerator(BaseGenerator):
         # 简单的难度评估逻辑
         question = item.get('question', '')
         query = item.get('query', '')
-        
+
         if not query:
             return 'easy'
-        
+
         # 基于 SQL 复杂度评估难度
         query_lower = query.lower()
         if any(keyword in query_lower for keyword in ['union', 'intersect', 'except', 'with', 'cte']):
@@ -789,34 +804,25 @@ class MACSQLGenerator(BaseGenerator):
             return 'easy'
 
     def _execute_sql_with_feedback(self, sql: str, db_id: str, db_path: str) -> Dict:
-        """执行 SQL 并获取反馈"""
         try:
-            db_file = os.path.join(db_path, f"{db_id}.sqlite")
-            if not os.path.exists(db_file):
-                logger.warning(f"数据库文件不存在: {db_file}")
-                return {"success": False, "error": "Database file not found"}
-
-            conn = sqlite3.connect(db_file)
-            cursor = conn.cursor()
+            # Use db_connect
+            res = execute_sql('sqlite', db_path, sql, None)  # Assuming sqlite for now; make db_type dynamic
+            if isinstance(res, tuple):
+                result, err = res
+            else:
+                result = res
+                err = None
             
-            # 执行 SQL
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            
-            # 获取列名
-            column_names = [description[0] for description in cursor.description] if cursor.description else []
-            
-            conn.close()
-            
+            success = err is None
             return {
-                "success": True,
-                "result": result,
-                "column_names": column_names,
-                "row_count": len(result)
+                "success": success,
+                "result": result if success else None,
+                "error": err,
+                "row_count": len(result) if success and hasattr(result, '__len__') else 0
             }
         except Exception as e:
             logger.error(f"SQL 执行失败: {e}")
-            return {"success": False, "error": str(e)}
+            return {"success": False, "result": None, "error": str(e), "row_count": 0}
 
     def _refine_sql_with_llm(self, question: str, schema: str, sql: str, error_info: Dict) -> str:
         """使用 LLM 优化 SQL"""
@@ -836,13 +842,13 @@ Please provide the corrected SQL query. Only return the SQL statement without an
 
             response = self.llm.complete(prompt)
             refined_sql = response.text.strip()
-            
+
             # 清理 SQL 输出
             if refined_sql.startswith('```sql'):
                 refined_sql = refined_sql[6:]
             if refined_sql.endswith('```'):
                 refined_sql = refined_sql[:-3]
-            
+
             return refined_sql.strip()
         except Exception as e:
             logger.error(f"SQL 优化失败: {e}")
@@ -857,13 +863,13 @@ Please provide the corrected SQL query. Only return the SQL statement without an
     ):
         """实现 MAC-SQL 的端到端 SQL 生成逻辑"""
         logger.info(f"MACSQLGenerator 开始处理样本 {item}")
-        
+
         # 获取数据样本
         row = self.dataset[item]
         question = row['question']
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
-        
+
         logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
 
         # 加载和处理 schema
@@ -907,12 +913,15 @@ Please provide the corrected SQL query. Only return the SQL statement without an
 
         # 初始化用户消息
         user_message = self._init_user_message(row, schema_str, db_id)
+        user_message['db_type'] = db_type
+        user_message['db_path'] = db_path
+        user_message['credential'] = self.credential
 
         # 执行 MAC-SQL 流程
         try:
             logger.debug("开始 MAC-SQL 多智能体协作生成...")
             chat_manager.start(user_message)
-            
+
             # 获取生成的 SQL
             pred_sql = user_message.get('final_sql', '')
             if not pred_sql:
@@ -952,7 +961,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
     def _fallback_sql_generation(self, question: str, schema: str, row: Dict) -> str:
         """回退的 SQL 生成方法"""
         logger.warning("使用回退 SQL 生成方法")
-        
+
         prompt = f"""You are an expert SQL developer. Please generate a SQL query for the following question.
 
 Question: {question}
@@ -965,13 +974,13 @@ Please generate a valid SQL query. Only return the SQL statement without any exp
         try:
             response = self.llm.complete(prompt)
             sql = response.text.strip()
-            
+
             # 清理 SQL 输出
             if sql.startswith('```sql'):
                 sql = sql[6:]
             if sql.endswith('```'):
                 sql = sql[:-3]
-            
+
             return sql.strip()
         except Exception as e:
             logger.error(f"回退 SQL 生成失败: {e}")
@@ -984,12 +993,12 @@ Please generate a valid SQL query. Only return the SQL statement without any exp
 
         # 执行 SQL 验证
         exec_result = self._execute_sql_with_feedback(sql, db_id, db_path)
-        
+
         if not exec_result["success"]:
             logger.warning(f"SQL 执行失败，尝试优化: {exec_result.get('error', 'Unknown error')}")
             # 使用 LLM 优化 SQL
             refined_sql = self._refine_sql_with_llm(question, schema, sql, exec_result)
-            
+
             # 再次验证
             refined_result = self._execute_sql_with_feedback(refined_sql, db_id, db_path)
             if refined_result["success"]:
@@ -998,5 +1007,5 @@ Please generate a valid SQL query. Only return the SQL statement without any exp
             else:
                 logger.warning("SQL 优化后仍失败，返回原始 SQL")
                 return sql
-        
-        return sql 
+
+        return sql
