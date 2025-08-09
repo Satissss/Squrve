@@ -862,7 +862,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             **kwargs
     ):
         """实现 MAC-SQL 的端到端 SQL 生成逻辑"""
-        logger.info(f"MACSQLGenerator 开始处理样本 {item}")
+        logger.info(f"Starting MACSQLGenerator processing for item {item}")
 
         # 获取数据样本
         row = self.dataset[item]
@@ -870,7 +870,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
 
-        logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
+        logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
 
         # 加载和处理 schema
         if isinstance(schema, (str, Path)):
@@ -881,6 +881,8 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             schema = self.dataset.get_db_schema(item)
             if schema is None:
                 raise Exception("无法获取有效的数据库模式!")
+
+        logger.debug("Database schema loaded successfully")
 
         # 标准化 schema 格式
         if isinstance(schema, dict):
@@ -896,6 +898,8 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         # 转换为 MAC-SQL 格式
         tables_json = self._create_tables_json(schema)
         tables_json["db_id"] = db_id
+
+        logger.debug("Converted schema to MAC-SQL tables.json format")
 
         # 设置数据库路径
         if self.db_path:
@@ -927,10 +931,10 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             if not pred_sql:
                 raise Exception("MAC-SQL 未生成有效的 SQL")
 
-            logger.debug(f"MAC-SQL 生成完成: {pred_sql[:100]}...")
+            logger.info(f"MAC-SQL generation completed: {pred_sql[:100]}...")
 
         except Exception as e:
-            logger.error(f"MAC-SQL 执行失败: {e}")
+            logger.error(f"MAC-SQL execution failed: {e}")
             # 回退到简单生成
             pred_sql = self._fallback_sql_generation(question, schema_str, row)
 
@@ -955,7 +959,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         except:
             pass
 
-        logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
+        logger.info(f"MACSQLGenerator processing for item {item} completed")
         return pred_sql
 
     def _fallback_sql_generation(self, question: str, schema: str, row: Dict) -> str:

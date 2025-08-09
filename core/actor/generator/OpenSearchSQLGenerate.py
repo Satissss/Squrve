@@ -1,7 +1,5 @@
-from typing import Union, List, Dict, Optional, Any
 import pandas as pd
 import re
-import sqlite3
 import os
 import chardet
 import json
@@ -13,6 +11,8 @@ from core.actor.generator.sql_debug import sql_debug_by_feedback
 from pathlib import Path
 import time
 import numpy as np
+from core.db_connect import get_sql_exec_result
+from loguru import logger
 
 # Prompts from all_prompt.py and prompts.py
 EXTRACT_PROMPT = """/* Some extract examples are provided based on similar problems: */
@@ -175,6 +175,7 @@ VOTE_PROMPT = """现在有问题如下:
 请在上面的几个SQL中选择最符合题目要求的SQL, 不要回复其他内容:
 #SQL:"""
 
+
 def find_foreign_keys_MYSQL_like(DATASET_JSON, db_name):
     if DATASET_JSON is None:
         return "", set()
@@ -228,19 +229,24 @@ class DB_AGENT:
     def __init__(self, chat_model) -> None:
         self.chat_model = chat_model
 
-    def get_complete_table_info(self, conn, table_name, table_df):
-        cursor = conn.cursor()
-        cursor.execute(f"PRAGMA table_info(`{table_name}`)")
-        columns_info = cursor.fetchall()
-        df = pd.read_sql_query(f"SELECT * FROM `{table_name}`", conn)
-        contains_null = {
-            column: df[column].isnull().any()
-            for column in df.columns
-        }
-        contains_duplicates = {
-            column: df[column].duplicated().any()
-            for column in df.columns
-        }
+    def get_complete_table_info(self, db_type, db_path, table_name, table_df):
+        # Removed direct conn and cursor
+        # Execute PRAGMA (SQLite-specific, assume db_type='sqlite')
+        pragma_query = f"PRAGMA table_info(`{table_name}`)"
+        columns_info_df, err = get_sql_exec_result(db_type, sql_query=pragma_query, db_path=db_path)
+        if err:
+            raise ValueError(f"Error fetching table info: {err}")
+        columns_info = [tuple(row) for row in columns_info_df.values]  # Convert DF to list of tuples
+
+        # Read table data
+        data_query = f"SELECT * FROM `{table_name}`"
+        df, err = get_sql_exec_result(db_type, sql_query=data_query, db_path=db_path)
+        if err:
+            raise ValueError(f"Error reading table data: {err}")
+
+        contains_null = {column: df[column].isnull().any() for column in df.columns}
+        contains_duplicates = {column: df[column].duplicated().any() for column in df.columns}
+
         dic = {}
         for _, row in table_df.iterrows():
             try:
@@ -259,7 +265,15 @@ class DB_AGENT:
                 dic[col] = col_description, val_description
             except Exception as e:
                 dic[col] = "", ""
-        row = list(cursor.execute(f"SELECT * FROM `{table_name}` LIMIT 1").fetchall()[0])
+
+        # For the LIMIT 1 query
+        limit_query = f"SELECT * FROM `{table_name}` LIMIT 1"
+        limit_df, err = get_sql_exec_result(db_type, sql_query=limit_query, db_path=db_path)
+        if err:
+            raise ValueError(f"Error fetching sample row: {err}")
+        row = list(limit_df.values[0]) if not limit_df.empty else []  # Adjust to DF
+
+        # Process values for each column
         for i, col in enumerate(df.columns):
             try:
                 df_tmp = df[col].dropna().drop_duplicates()
@@ -275,9 +289,11 @@ class DB_AGENT:
                         val_p.append(val)
                 if len(vals) == 0:
                     raise ValueError
-                row[i] = val_p
+                if i < len(row):
+                    row[i] = val_p
             except:
                 pass
+
         schema_str = f"## Table {table_name}:\n"
         columns = {}
         for column, val in zip(columns_info, row):
@@ -313,17 +329,21 @@ class DB_AGENT:
             else:
                 schema_str_single += f"Values format like: {val}"
             schema_str += f"{column_name}: {schema_str_single}\n"
-            columns[f"{table_name}.{column_name}"] = (schema_str_single, col_des, val_des, column_type, include_null, unique, str(val))
+            columns[f"{table_name}.{column_name}"] = (schema_str_single, col_des, val_des, column_type, include_null,
+                                                      unique, str(val))
         return schema_str, columns
 
-    def get_db_des(self, sqllite_dir, db_dir, model):
-        conn = sqlite3.connect(sqllite_dir)
-        table_dir = os.path.join(db_dir, 'database_description') if db_dir else None
-        sql = "SELECT name FROM sqlite_master WHERE type='table';"
-        cursor = conn.cursor()
-        tables = cursor.execute(sql).fetchall()
+    def get_db_des(self, db_type, db_path, db_dir, model):
+        # Removed direct conn
+        tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
+        tables_df, err = get_sql_exec_result(db_type, sql_query=tables_query, db_path=db_path)
+        if err:
+            raise ValueError(f"Error fetching tables: {err}")
+        tables = [(row[0],) for row in tables_df.values]  # Adjust to DF
+
         db_info = []
         db_col = dict()
+        table_dir = os.path.join(db_dir, 'database_description') if db_dir else None
         if table_dir and os.path.exists(table_dir):
             file_list = os.listdir(table_dir)
             files_emb = model.encode(file_list, show_progress_bar=False)
@@ -347,12 +367,10 @@ class DB_AGENT:
                     table_df = pd.DataFrame()
             else:
                 table_df = pd.DataFrame()
-            table_info, columns = self.get_complete_table_info(conn, table[0], table_df)
+            table_info, columns = self.get_complete_table_info(db_type, db_path, table[0], table_df)
             db_info.append(table_info)
             db_col.update(columns)
         db_info = "\n".join(db_info)
-        cursor.close()
-        conn.close()
         return db_info, db_col
 
     def db_conclusion(self, db_info):
@@ -384,13 +402,15 @@ Please conclude the database in the following format:
         return prompt
 
     def get_allinfo(self, db_json_dir, db, sqllite_dir, db_dir, tables_info_dir, model):
-        db_info, db_col = self.get_db_des(sqllite_dir, db_dir, model)
-        foreign_keys, foreign_set = find_foreign_keys_MYSQL_like(tables_info_dir, db) if tables_info_dir else ("", set())
+        db_info, db_col = self.get_db_des('sqlite', sqllite_dir, db_dir, model)
+        foreign_keys, foreign_set = find_foreign_keys_MYSQL_like(tables_info_dir, db) if tables_info_dir else ("",
+                                                                                                               set())
         all_info = f"Database Management System: SQLite\n#Database name: {db}\n{db_info}\n#Forigen keys:\n{foreign_keys}\n"
         prompt = self.db_conclusion(all_info)
         db_all = self.chat_model.get_ans(prompt)
         all_info = f"{all_info}\n{db_all}\n"
         return all_info, db_col, foreign_set
+
 
 def parse_des(pre_col_values, nouns, debug):
     pre_col_values = pre_col_values.split("/*")[0].strip()
@@ -509,7 +529,7 @@ def json_ext(jsonf):
     for x in jsonf:
         if x["Type"] == "QIC":
             Q = x["Extract"]["Q"].lower()
-            if Q in ["how many", "how much", "which","how often"]:
+            if Q in ["how many", "how much", "which", "how often"]:
                 for item in x["Extract"]["I"]:
                     ans.append(x["Extract"]["Q"] + " " + item)
             elif Q in ["when", "who", "where"]:
@@ -520,6 +540,7 @@ def json_ext(jsonf):
             ans.append(x["Extract"]["J"])
             judge = True
     return ans, judge
+
 
 # Ported from check_and_correct.py
 def sql_raw_parse(sql, return_question):
@@ -535,11 +556,13 @@ def sql_raw_parse(sql, return_question):
     sql = re.sub('\s+', ' ', sql).strip()
     return sql, rwq
 
+
 def retable(sql):
     table_as = re.findall(' ([^ ]*) +AS +([^ ]*)', sql)
     for x in table_as:
         sql = sql.replace(f"{x[1]}.", f"{x[0]}.")
     return sql
+
 
 def max_fun_check(sql_retable):
     fun_amb = re.findall("= *\( *SELECT *(MAX|MIN)\((.*?)\) +FROM +(\w+)", sql_retable)
@@ -547,10 +570,12 @@ def max_fun_check(sql_retable):
     select_amb = set(re.findall("^SELECT[^\(\)]*? ((MIN|MAX)\([^\)]*?\)).*?LIMIT 1", sql_retable))
     return fun_amb, order_amb, select_amb
 
+
 def foreign_pick(sql):
     matchs = re.findall("ON\s+(\w+\.\w+)\s*=\s*(\w+\.\w+) ", sql)
     ma_all = [x for y in matchs for x in y]
     return set(ma_all)
+
 
 def column_pick(sql, db_col, foreign_set):
     matchs = foreign_pick(sql)
@@ -584,6 +609,7 @@ def column_pick(sql, db_col, foreign_set):
                 ans.add(amb_des)
     return sorted(list(ans))
 
+
 def values_pick(vals, sql):
     val_dic = {}
     ans = set()
@@ -605,6 +631,7 @@ def values_pick(vals, sql):
     except:
         return []
 
+
 def func_find(sql):
     fun_amb = re.findall("\( *SELECT *(MAX|MIN)\((.*?)\) +FROM +(\w+)", sql)
     fun_str = []
@@ -620,33 +647,37 @@ def func_find(sql):
         fun_str.append(str_fun)
     return "\n".join(fun_str)
 
+
 t1_tabe_value = re.compile("(\w+\\.[\w]+) =\\s*'([^']+(?:''[^']*)*)'")
 t2_tab_val = re.compile("(\\w+\\.`[^`]*?`) =\\s*'([^']+(?:''[^']*)*)'")
 
-def filter_sql(b, bx, conn, SQL, chars=""):
+
+def join_exec(db_type, db_path, bx, al, question, SQL, chat_model):
     flag = False
-    for x in b:
-        sql_t = SQL.replace(bx, f"{chars}{x}")
-        try:
-            df = pd.read_sql_query(sql_t, conn)
-        except Exception as e:
-            df = []
-        if len(df):
-            SQL = sql_t
-            flag = True
-            break
+    if bx.startswith("IN"):
+        b = bx[2:].strip(" ()").split(',')
+        for x in b:
+            sql_t = SQL.replace(bx, f"= {x}")
+            df, err = get_sql_exec_result(db_type, sql_query=sql_t, db_path=db_path)
+            if err:
+                continue
+            if len(df):
+                SQL = sql_t
+                flag = True
+                break
+    elif al.find("OR") != -1:
+        a = al.split("OR")
+        for x in a:
+            sql_t = SQL.replace(al, x.strip())
+            df, err = get_sql_exec_result(db_type, sql_query=sql_t, db_path=db_path)
+            if err:
+                continue
+            if len(df):
+                SQL = sql_t
+                flag = True
+                break
     return SQL, flag
 
-def join_exec(db, bx, al, question, SQL, chat_model):
-    flag = False
-    with sqlite3.connect(db, timeout=180) as conn:
-        if bx.startswith("IN"):
-            b = bx[2:].strip(" ()").split(',')
-            SQL, flag = filter_sql(b, bx, conn, SQL, chars="= ")
-        elif al.find("OR") != -1:
-            a = al.split("OR")
-            SQL, flag = filter_sql(a, al, conn, SQL)
-    return SQL, flag
 
 def gpt_join_corect(SQL, question, chat_model):
     prompt = f"""下面的question对应的SQL错误的使用了JOIN函数,使用了JOIN table AS T ON Ta.column1 = Tb.column2 OR Ta.column1 = Tb.column3或JOIN table AS T ON Ta.column1 IN的JOIN方式,请你只保留 OR之中优先级最高的一组 Ta.column = Tb.column即可.
@@ -658,6 +689,7 @@ SQL: {SQL}
 #SQL:"""
     SQL = chat_model.get_ans(prompt, 0.0).split("SQL:")[-1]
     return SQL
+
 
 def select_check(SQL, db_col, chat_model, question):
     select = re.findall("^SELECT.*?\\|\\| ' ' \\|\\| .*?FROM", SQL)
@@ -675,6 +707,7 @@ SQL:{SQL}
 #SQL:"""
         SQL = chat_model.get_ans(prompt, 0.0).split("SQL:")[-1]
     return SQL
+
 
 class soft_check:
 
@@ -704,7 +737,8 @@ class soft_check:
             SQL = self.chat_model.get_ans(new_prompt, 1.0)
         return SQL, soft_json["Judgment"]
 
-    def double_check(self, new_prompt, values: list, values_final, SQL: str, question: str, new_db_info: str, db_col: list, db: str, hint="") -> str:
+    def double_check(self, new_prompt, values: list, values_final, SQL: str, question: str, new_db_info: str,
+                     db_col: list, db: str, hint="") -> str:
         SQL = re.sub("(COUNT)(\\([^\\(\\)]*? THEN 1 ELSE 0.*?\\))", r"SUM\2", SQL)
         sql_retable = retable(SQL)
         SQL = self.values_check(sql_retable, values, values_final, SQL, question, new_db_info, db_col, hint)
@@ -716,7 +750,7 @@ class soft_check:
         SQL = select_check(SQL, db_col, self.chat_model, question)
         return SQL, True
 
-    def double_check_style_align(self, SQL: str, question: str, db_col: list, sql_retable:str) -> str:
+    def double_check_style_align(self, SQL: str, question: str, db_col: list, sql_retable: str) -> str:
         SQL = self.func_check(sql_retable, SQL, question)
         SQL = self.is_not_null(SQL)
         SQL = select_check(SQL, db_col, self.chat_model, question)
@@ -728,17 +762,20 @@ class soft_check:
         SQL = self.time_check(SQL)
         return SQL, True
 
-    def double_check_agent_align(self, sql_retable:str, values: list, values_final, SQL: str, question: str, new_db_info: str, db_col: list, hint="") -> str:
+    def double_check_agent_align(self, sql_retable: str, values: list, values_final, SQL: str, question: str,
+                                 new_db_info: str, db_col: list, hint="") -> str:
         SQL = self.values_check(sql_retable, values, values_final, SQL, question, new_db_info, db_col, hint)
         return SQL, True
 
     def JOIN_error(self, SQL, question, db):
-        join_mutil = re.findall("JOIN\\s+\\w+(\\s+AS\\s+\\w+){0,1}\\s+ON(\\s+\\w+\\.\\w+\\s*(=\\s*\\w+\\.\\w+(?:\\s+OR\\s+\\w+\\.\\w+\\s*=\\s*\\w+\\.\\w+)+|IN\\s+\\(.*?\\)))", SQL)
+        join_mutil = re.findall(
+            "JOIN\\s+\\w+(\\s+AS\\s+\\w+){0,1}\\s+ON(\\s+\\w+\\.\\w+\\s*(=\\s*\\w+\\.\\w+(?:\\s+OR\\s+\\w+\\.\\w+\\s*=\\s*\\w+\\.\\w+)+|IN\\s+\\(.*?\\)))",
+            SQL)
         flag = False
         if join_mutil:
             _, al, bx = join_mutil[0]
             try:
-                SQL, flag = join_exec(db, bx, al, question, SQL, self.chat_model)
+                SQL, flag = join_exec('sqlite', db, bx, al, question, SQL, self.chat_model)
             except:
                 pass
         if not flag and join_mutil:
@@ -841,7 +878,8 @@ ERROR:{",".join(origin_f)} 不符合要求, 请使用 JOIN ORDER BY LIMIT 形式
                 continue
             tmp_col = dic_v.get(val)
             if not tmp_col and len(l_v):
-                val_close = self.bert_model.encode(val, show_progress_bar=False) @ self.bert_model.encode(l_v, show_progress_bar=False).T
+                val_close = self.bert_model.encode(val, show_progress_bar=False) @ self.bert_model.encode(l_v,
+                                                                                                          show_progress_bar=False).T
                 if val_close.max() > 0.95:
                     val_new = l_v[val_close.argmax()]
                     sql = sql.replace(f"'{val}'", f"'{val_new}'")
@@ -869,16 +907,18 @@ ERROR: 数据库中不存在: {', '.join(badval_l)}
             sql = self.chat_model.get_ans(prompt, 0.0)
         return sql
 
-    def correct_sql(self, db_sqlite_path, sql, query, db_info, hint, key_col_des, new_prompt, db_col={}, foreign_set={}, L_values=[]):
-        conn = sqlite3.connect(db_sqlite_path, timeout=180)
+    def correct_sql(self, db_type, db_path, sql, query, db_info, hint, key_col_des, new_prompt, db_col={},
+                    foreign_set={}, L_values=[]):
         count = 0
         raw = sql
         none_case = False
         while count <= 3:
+            df, err = get_sql_exec_result(db_type, sql_query=sql, db_path=db_path)
             try:
-                df = pd.read_sql_query(sql, conn)
+                if err:
+                    raise ValueError(err)
                 if len(df) == 0:
-                    raise ValueError("Error':Result: None")
+                    raise ValueError("Error: Result: None")
                 else:
                     break
             except Exception as e:
@@ -889,7 +929,7 @@ ERROR: 数据库中不存在: {', '.join(badval_l)}
                     break
                 count += 1
                 tag = str(e)
-                e_s = str(e).split("':")[-1]
+                e_s = str(e).split("':")[-1] if "':" in str(e) else str(e)
                 result_info = f"{sql}\nError: {e_s}"
             if sql.find("SELECT") == -1:
                 sql = self.chat_model.get_ans(new_prompt, 0.3)
@@ -913,24 +953,28 @@ ERROR: 数据库中不存在: {', '.join(badval_l)}
                         elif x == "no such column":
                             advice += "Please check if this column exists in other tables"
                         break
-                cor_prompt = self.correct_prompt.format(fewshot=fewshot, db_info=db_info, key_col_des=key_col_des, q=query, hint=hint, result_info=result_info, advice=advice)
+                cor_prompt = self.correct_prompt.format(fewshot=fewshot, db_info=db_info, key_col_des=key_col_des,
+                                                        q=query, hint=hint, result_info=result_info, advice=advice)
                 sql = self.chat_model.get_ans(cor_prompt, 0.2 + count / 5)
             raw = sql
-        conn.close()
         return sql, none_case
 
-def get_sql_ans(SQL, db_sqlite_path):
+
+def get_sql_ans(SQL, db_type, db_path):
     try:
-        with sqlite3.connect(db_sqlite_path) as conn:
-            s = time.time()
-            df = pd.read_sql_query(SQL, conn)
-            ans = set(tuple(x) for x in df.values)
-            time_cost = time.time() - s
+        s = time.time()
+        df, err = get_sql_exec_result(db_type, sql_query=SQL, db_path=db_path)
+        if err:
+            raise ValueError(err)
+        ans = set(tuple(x) for x in df.values)
+        time_cost = time.time() - s
     except:
         ans, time_cost = [], 100000
     return ans, time_cost
 
-def process_sql(dcheck, sql, l_values, values, question, new_db_info, db_col_keys, hint, key_col_des, tmp_prompt, db_col, foreign_set, align_methods, db_sqlite_path):
+
+def process_sql(dcheck, sql, l_values, values, question, new_db_info, db_col_keys, hint, key_col_des, tmp_prompt,
+                db_col, foreign_set, align_methods, db_type, db_path):
     node_names = align_methods.split('+')
     align_functions = {
         "agent_align": dcheck.double_check_agent_align,
@@ -945,11 +989,12 @@ def process_sql(dcheck, sql, l_values, values, question, new_db_info, db_col_key
     for node_name in node_names:
         if node_name in align_functions:
             if node_name == "agent_align":
-                sql, judgment = align_functions[node_name](sql_retable, l_values, values, sql, question, new_db_info, db_col_keys, hint)
+                sql, judgment = align_functions[node_name](sql_retable, l_values, values, sql, question, new_db_info,
+                                                           db_col_keys, hint)
             elif node_name == "style_align":
                 sql, judgment = align_functions[node_name](sql, question, db_col_keys, sql_retable)
             elif node_name == "function_align":
-                sql, judgment = align_functions[node_name](sql, question, db_sqlite_path)
+                sql, judgment = align_functions[node_name](sql, question, db_path)
             sql_history[node_name] = sql
     align_sql = sql
     can_ex = True
@@ -957,18 +1002,25 @@ def process_sql(dcheck, sql, l_values, values, question, new_db_info, db_col_key
     ans = set()
     time_cost = 10000000
     try:
-        sql, nocse = dcheck.correct_sql(db_sqlite_path, sql, question, new_db_info, hint, key_col_des, tmp_prompt, db_col, foreign_set, l_values)
+        sql, nocse = dcheck.correct_sql(db_type, db_path, sql, question, new_db_info, hint, key_col_des, tmp_prompt,
+                                        db_col, foreign_set, l_values)
     except:
         can_ex = False
     if can_ex:
-        ans, time_cost = get_sql_ans(sql, db_sqlite_path)
+        ans, time_cost = get_sql_ans(sql, db_type, db_path)
     return sql_history, sql, ans, nocse, time_cost, align_sql, ans, sql_correct, ans
 
-def muti_process_sql(dcheck, sqls, l_values, values, question, new_db_info, hint, key_col_des, tmp_prompt, db_col, foreign_set, align_methods, db_sqlite_path, n):
+
+def muti_process_sql(dcheck, sqls, l_values, values, question, new_db_info, hint, key_col_des, tmp_prompt, db_col,
+                     foreign_set, align_methods, db_type, db_path, n):
     vote = []
     none_case = False
     with ThreadPoolExecutor(max_workers=n) as executor:
-        future_to_sql = {executor.submit(process_sql, dcheck, sql, l_values, values, question, new_db_info, db_col.keys(), hint, key_col_des, tmp_prompt, db_col, foreign_set, align_methods, db_sqlite_path): (sqls[sql], sql) for sql in sqls}
+        future_to_sql = {
+            executor.submit(process_sql, dcheck, sql, l_values, values, question, new_db_info, db_col.keys(), hint,
+                            key_col_des, tmp_prompt, db_col, foreign_set, align_methods, db_type, db_path): (sqls[sql],
+                                                                                                             sql) for
+            sql in sqls}
         for future in as_completed(future_to_sql):
             count, tmp_sql = future_to_sql[future]
             try:
@@ -991,7 +1043,7 @@ def muti_process_sql(dcheck, sqls, l_values, values, question, new_db_info, hint
                     "sql": tmp_sql,
                     "answer": [],
                     "count": 1,
-                    "time_cost": time_cost,
+                    "time_cost": 10000000,
                     "align_sql": tmp_sql,
                     "correct_sql": tmp_sql,
                     "align_ans": [],
@@ -999,6 +1051,7 @@ def muti_process_sql(dcheck, sqls, l_values, values, question, new_db_info, hint
                 })
                 none_case = True
     return vote, none_case
+
 
 class OpenSearchSQLGenerator(BaseGenerator):
     NAME = "OpenSearchSQLGenerator"
@@ -1163,7 +1216,9 @@ Please answer according to the format below and do not output any other content.
 请在上面的几个SQL中选择最符合题目要求的SQL, 不要回复其他内容:
 #SQL:"""
 
-    def __init__(self, dataset=None, llm=None, bert_model_name="all-mpnet-base-v2", n_candidates=21, temperature=0.7, top_k=10, use_few_shot=True, use_feedback_debug=True, debug_turn_n=2, db_path=None, credential=None, is_save=True, save_dir="../files/pred_sql", tables_json_path=None, tables_info_dir=None, **kwargs):
+    def __init__(self, dataset=None, llm=None, bert_model_name="all-mpnet-base-v2", n_candidates=21, temperature=0.7,
+                 top_k=10, use_few_shot=True, use_feedback_debug=True, debug_turn_n=2, db_path=None, credential=None,
+                 is_save=True, save_dir="../files/pred_sql", tables_json_path=None, tables_info_dir=None, **kwargs):
         self.dataset = dataset
         self.llm = llm
         self.bert_model = SentenceTransformer(bert_model_name)
@@ -1182,7 +1237,7 @@ Please answer according to the format below and do not output any other content.
         self.correct_dic = {"default": ""}  # Simplified
 
     def get_ans(self, prompt, temperature=0.0, n=1, single=True):
-        if single and n==1:
+        if single and n == 1:
             return self.llm.complete(prompt, temperature=temperature).text
         else:
             responses = [self.llm.complete(prompt, temperature=temperature).text for _ in range(n)]
@@ -1205,7 +1260,10 @@ Please answer according to the format below and do not output any other content.
             evidence = row.get('evidence', 'None')
             if evidence == '':
                 evidence = 'None'
+            db_type = row.get('db_type', 'sqlite')
             db_path = str(Path(self.db_path) / (db_id + ".sqlite"))
+
+            logger.info(f"Starting SQL generation for question: {question} in database: {db_id}")
 
             fewshot = ''
             if self.use_few_shot:
@@ -1215,47 +1273,71 @@ Please answer according to the format below and do not output any other content.
 
             # Step 1: generate_db_schema
             db_agent = DB_AGENT(self)
-            all_info, db_col_dic, foreign_set = db_agent.get_allinfo(self.tables_json_path, db_id, db_path, self.db_path, self.tables_info_dir, self.bert_model)
+            all_info, db_col_dic, foreign_set = db_agent.get_allinfo(self.tables_json_path, db_id, db_path,
+                                                                     self.db_path, self.tables_info_dir,
+                                                                     self.bert_model)
+
+            logger.info(f"Generated database schema for {db_id}")
 
             # Step 2: extract_col_value
             ext_prompt = self.EXTRACT_PROMPT.format(fewshot=fewshot, db_info=all_info, query=question)
             key_col_des_raw = self.get_ans(ext_prompt, temperature=0.0)
+
+            logger.info("Extracted column and value information")
 
             # Step 3: extract_query_noun
             noun_prompt = self.NOUN_PROMPT.format(raw_question=question)
             noun_ext = self.get_ans(noun_prompt, temperature=0.0)
             values_noun, col = parse_des(key_col_des_raw, noun_ext, debug=False)
 
+            logger.info(f"Extracted nouns: {values_noun}")
+
             # Step 4: column_retrieve_and_other_info
-            col_retrieve = ColumnRetriever(self.bert_model, self.tables_info_dir).get_col_retrieve(question, db_id, db_col_dic.keys()) if self.tables_info_dir else set()
+            col_retrieve = ColumnRetriever(self.bert_model, self.tables_info_dir).get_col_retrieve(question, db_id,
+                                                                                                   db_col_dic.keys()) if self.tables_info_dir else set()
             cols = ColumnUpdater(db_col_dic).col_pre_update(col, col_retrieve, foreign_set)
-            des = DES_new(self.bert_model, self.bert_model.encode(list(db_col_dic.keys()), show_progress_bar=False), list(db_col_dic.keys()))
+            des = DES_new(self.bert_model, self.bert_model.encode(list(db_col_dic.keys()), show_progress_bar=False),
+                          list(db_col_dic.keys()))
             cols_select, L_values = des.get_key_col_des(cols, values_noun, debug=False, topk=self.top_k, shold=0.65)
             column = ColumnUpdater(db_col_dic).col_suffix(cols_select)
-            foreign_keys, _ = find_foreign_keys_MYSQL_like(self.tables_json_path, db_id) if self.tables_json_path else ("", set())
+            foreign_keys, _ = find_foreign_keys_MYSQL_like(self.tables_json_path, db_id) if self.tables_json_path else (
+                "", set())
             q_order = query_order(question, self, self.SELECT_PROMPT, temperature=0.3)
             q_order = " ".join(q_order) if q_order else ""
+
+            logger.info(f"Retrieved and updated columns: {cols_select}")
 
             # Step 5: candidate_generate
             values_str = [f"{x[0]}: '{x[1]}'" for x in L_values]
             key_col_des = "#Values in Database:\n" + '\n'.join(values_str)
             new_db_info = f"Database Management System: SQLite\n#Database name: {db_id} \n{column}\n\n#Foreign keys:\n{foreign_keys}\n"
-            new_prompt = self.NEW_PROMPT.format(fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des, question=question, q_order=q_order)
-            SQLs, _ = self.get_sql(new_prompt, self.temperature, return_question=True, n=self.n_candidates, single=False)
+            new_prompt = self.NEW_PROMPT.format(fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des,
+                                                question=question, q_order=q_order)
+            SQLs, _ = self.get_sql(new_prompt, self.temperature, return_question=True, n=self.n_candidates,
+                                   single=False)
+
+            logger.info(f"Generated {len(SQLs)} candidate SQL queries")
 
             # Step 6: align_correct
-            dcheck = soft_check(self.bert_model, self, self.SOFT_PROMPT, self.correct_dic, self.CORRECT_PROMPT, self.VOTE_PROMPT)
+            dcheck = soft_check(self.bert_model, self, self.SOFT_PROMPT, self.correct_dic, self.CORRECT_PROMPT,
+                                self.VOTE_PROMPT)
             SQLs_dic = {}
             for sql in SQLs:
                 sql, _ = sql_raw_parse(sql, False)
                 SQLs_dic.setdefault(sql, 0)
                 SQLs_dic[sql] += 1
-            tmp_prompt = self.TMP_PROMPT.format(fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des, question=question)
-            vote, none_case = muti_process_sql(dcheck, SQLs_dic, L_values, values_noun, question, new_db_info, evidence, key_col_des, tmp_prompt, db_col_dic, foreign_set, "style_align+function_align+agent_align", db_path, self.n_candidates)
+            tmp_prompt = self.TMP_PROMPT.format(fewshot=fewshot, db_info=new_db_info, key_col_des=key_col_des,
+                                                question=question)
+            vote, none_case = muti_process_sql(dcheck, SQLs_dic, L_values, values_noun, question, new_db_info, evidence,
+                                               key_col_des, tmp_prompt, db_col_dic, foreign_set,
+                                               "style_align+function_align+agent_align", db_type, db_path,
+                                               self.n_candidates)
 
             # Step 7: vote
             vote_sqls = [v["sql"] for v in vote]
             pred_sql = dcheck.vote_chose(vote_sqls, question)
+
+            logger.info(f"Selected SQL after voting: {pred_sql}")
 
             # Optional debugging
             if self.use_feedback_debug:
@@ -1272,6 +1354,8 @@ Please answer according to the format below and do not output any other content.
                 }
                 _, pred_sql = sql_debug_by_feedback(**debug_args)
 
+                logger.info(f"SQL after feedback debug: {pred_sql}")
+
             # Ensure pred_sql is not empty or None
             if not pred_sql or pred_sql.strip() == "":
                 # Try to get a valid SQL from the vote results
@@ -1279,7 +1363,7 @@ Please answer according to the format below and do not output any other content.
                     if v.get("sql") and v["sql"].strip():
                         pred_sql = v["sql"]
                         break
-                
+
                 # If still empty, use fallback
                 if not pred_sql or pred_sql.strip() == "":
                     pred_sql = "SELECT * FROM table"  # Fallback SQL
@@ -1293,12 +1377,13 @@ Please answer according to the format below and do not output any other content.
                 # Use the same save logic as DINSQLGenerate
                 instance_id = row.get("instance_id", item)
                 save_path = Path(self.save_dir)
-                save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
+                save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
+                                                                                   'dataset_index') and self.dataset.dataset_index else save_path
                 save_path = save_path / f"{self.name}_{instance_id}.sql"
-                
+
                 # Ensure the directory exists
                 save_path.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 # Ensure we have valid SQL to save
                 if pred_sql and pred_sql.strip():
                     save_dataset(pred_sql, new_data_source=save_path)
@@ -1309,23 +1394,27 @@ Please answer according to the format below and do not output any other content.
                     save_dataset(fallback_sql, new_data_source=save_path)
                     self.dataset.setitem(item, "pred_sql", str(save_path))
 
+            logger.info(f"Final predicted SQL: {pred_sql}")
+
             return pred_sql
         except Exception as e:
+            logger.error(f"Error generating SQL: {str(e)}")
             # Provide a fallback SQL in case of errors
             fallback_sql = "SELECT * FROM table"
             if self.is_save:
                 try:
                     instance_id = row.get("instance_id", item) if 'row' in locals() else item
                     save_path = Path(self.save_dir)
-                    save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset, 'dataset_index') and self.dataset.dataset_index else save_path
+                    save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
+                                                                                       'dataset_index') and self.dataset.dataset_index else save_path
                     save_path = save_path / f"{self.name}_{instance_id}.sql"
-                    
+
                     # Ensure the directory exists
                     save_path.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     save_dataset(fallback_sql, new_data_source=save_path)
                     self.dataset.setitem(item, "pred_sql", str(save_path))
                 except Exception as save_error:
-                    print(f"Error saving fallback SQL: {save_error}")
-            
-            raise ValueError(f"Error generating SQL: {str(e)}") 
+                    logger.error(f"Error saving fallback SQL: {save_error}")
+
+            raise ValueError(f"Error generating SQL: {str(e)}")
