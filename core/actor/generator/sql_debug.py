@@ -87,7 +87,7 @@ def sql_debug_by_feedback(
     for turn in range(debug_turn_n):
         res = get_sql_exec_result(**debug_args)
         if not res:
-            raise ValueError(f"Invalid 'db_type' argument: failed to execute query on `{db_type}` database.")
+            raise ValueError(f"Invalid db_type: {db_type}")
 
         exe_flag, dbms_error_info = res
         if exe_flag is not None:
@@ -102,7 +102,7 @@ def sql_debug_by_feedback(
 
         prompt_template = feedback_debug_prompt(db_type)
         if not prompt_template:
-            raise ValueError(f"Invalid 'db_type' argument: failed to load prompt template for `{db_type}` database.")
+            raise ValueError(f"No prompt for db_type: {db_type}")
 
         prompt = prompt_template.format(
             question=question,
@@ -110,11 +110,9 @@ def sql_debug_by_feedback(
             error_history=error_history_info
         )
 
-        # Get revised SQL from LLM
         new_sql = llm.complete(prompt).text
         debug_args["sql_query"] = sql_clean(new_sql)
 
-    # Final attempt
     exe_flag, _ = get_sql_exec_result(**debug_args)
     return (True, debug_args["sql_query"]) if exe_flag is not None else (False, debug_args["sql_query"])
 

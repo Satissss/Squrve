@@ -20,6 +20,7 @@ files/schema_source
 files/datasets
 files
 API.md
+test
 
 startup_run/spider_dev_config.json
 startup_run/voter_1
