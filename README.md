@@ -6,83 +6,78 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Framework](https://img.shields.io/badge/Framework-Text--to--SQL-orange.svg)
 
-**Squrve** 是一个轻量级、模块化的端到端 Text-to-SQL 模型开发和评估框架
+**Squrve** is a lightweight, modular framework for end-to-end Text-to-SQL model development and evaluation.
 
 </div>
 
-## 📖 概述
+## 📖 Overview
 
-**Squrve** 是一个专为快速开发和评估端到端 **Text-to-SQL** 模型而设计的轻量级、模块化框架。它将模式降维（schema reduction）、模式链接（schema linking）和查询生成（query generation）集成到一个灵活的、基于配置的流水线中。
+**Squrve** is a lightweight, modular framework designed for rapid development and evaluation of end-to-end **Text-to-SQL** models. It integrates schema reduction, schema linking, and query generation into a flexible, configuration-based pipeline.
 
-### ✨ 核心特性
+### ✨ Key Features
 
-- 🚀 **快速启动**: 仅需配置文件即可启动完整的 Text-to-SQL 流水线
-- 🔧 **模块化设计**: 所有组件可独立实例化和调试
-- ⚡ **并行执行**: 支持多任务并发执行
-- 🎯 **灵活配置**: 通过 JSON 配置文件实现即插即用的模型集成
-- 📊 **内置评估**: 提供多种评估指标和可视化结果
-- 🔗 **多模型支持**: 支持 Qwen、DeepSeek、智谱等主流 LLM
+1. Configuration-driven Text-to-SQL tasks, integrating multiple baseline methods, large model invocations, and database connections.
+2. Component-level reproduction and sharing interfaces, supporting free combination and flexible switching of different method components for plug-and-play and quick startup.
+3. Scalable and robust modular design, with method implementations independent of specific datasets and database types, enabling rapid extension for new methods.
 
-## 🏗️ 核心架构
+## 🏗️ Core Architecture
 
-Squrve 采用模块化架构，主要包含以下核心组件：
+Squrve adopts a modular architecture with the following core components:
 
-- **Router**: 配置管理器，负责管理整个 Text-to-SQL 流程的参数配置
-- **DataLoader**: 数据管理器，负责数据准备和加载
-- **Engine**: 执行引擎，协调各个组件的执行流程
-- **Actor**: 执行器，包含 Reducer、Parser、Generator 等具体执行组件
-- **Task**: 任务管理器，支持复杂任务嵌套和并行执行
+- **Router**: Configuration manager, responsible for managing parameters for the entire Text-to-SQL process.
+- **DataLoader**: Data manager, handling data preparation and loading.
+- **Engine**: Execution engine, coordinating the execution flow of various components.
+- **Actor**: Executor, including specific components like Reducer, Parser, and Generator.
+- **Task**: Task manager, supporting complex task nesting and parallel execution.
 
-### 支持的 Baselines
+### Supported Baselines
 
-Squrve 支持多种 Text-to-SQL baselines，通过模块化组件实现快速集成和比较：
+Squrve supports multiple Text-to-SQL baselines, enabling quick integration and comparison through modular components:
 
-| Baseline 名称       | 方法介绍 |
-|---------------------|----------|
-| BaseGenerate       | 基础生成器，提供标准的 Text-to-SQL 查询生成功能。 |
-| CHESSGenerate      | CHESS 方法实现，专注于复杂查询的层次化生成和优化。 |
-| DAILSQLGenerate    | DAIL-SQL 方法，通过分治提示和链式思考实现高效 SQL 生成。 |
-| DINSQLGenerate     | DIN-SQL 方法，使用分解提示处理复杂 SQL 查询生成。 |
-| LinkAlignGenerate  | LinkAlign 集成生成，利用高级模式链接提升查询准确性。 |
-| MACSQLGenerate     | MAC-SQL 方法，采用多代理协作机制生成高质量 SQL。 |
-| OpenSearchSQLGenerate | 基于 OpenSearch 的 SQL 生成，利用搜索增强查询构建。 |
-| ReFoRCEGenerate    | ReFoRCE 方法，通过强化学习框架优化 SQL 生成过程。 |
-| RSLSQLGenerate     | RSL-SQL 方法，结合规则系统和学习模型生成可靠 SQL。 |
+| Baseline Name      | Description                                                                 | Code Link |
+|--------------------|-----------------------------------------------------------------------------|-----------|
+| BaseGenerate       | Basic generator providing standard Text-to-SQL query generation.            |           |
+| CHESSGenerate      | CHESS method implementation, focusing on hierarchical generation and optimization of complex queries. |           |
+| DAILSQLGenerate    | DAIL-SQL method, using divide-and-conquer prompting and chain-of-thought for efficient SQL generation. |           |
+| DINSQLGenerate     | DIN-SQL method, using decomposition prompting to handle complex SQL query generation. |           |
+| LinkAlignGenerate  | LinkAlign integrated generation, utilizing advanced schema linking to improve query accuracy. |           |
+| MACSQLGenerate     | MAC-SQL method, employing multi-agent collaboration for high-quality SQL generation. |           |
+| OpenSearchSQLGenerate | OpenSearch-based SQL generation, using search enhancement for query construction. |           |
+| ReFoRCEGenerate    | ReFoRCE method, optimizing SQL generation through a reinforcement learning framework. |           |
+| RSLSQLGenerate     | RSL-SQL method, combining rule systems and learning models for reliable SQL generation. |           |
 
+### Supported Benchmarks
 
-### 支持的 Benchmarks
+Squrve includes built-in support for several standard Text-to-SQL benchmarks for easy model evaluation and comparison:
 
-Squrve 内置支持多个标准 Text-to-SQL benchmarks，便于模型评估和比较：
+| Benchmark | Description                                      | Code Link |
+|-----------|--------------------------------------------------|-----------|
+| Spider    | Cross-domain Text-to-SQL benchmark, supporting dev split. |           |
+| BIRD      | Text-to-SQL benchmark with external knowledge.   |           |
+| Spider2   | Extended version of Spider with more complex scenarios. |           |
+| AmbiDB    | Ambiguous database query benchmark, testing ambiguity handling. |           |
 
-| Benchmark | 描述 |
-|-----------|------|
-| Spider   | 跨域 Text-to-SQL 基准，支持 dev 分割。 |
-| BIRD     | 带外部知识的 Text-to-SQL 基准。 |
-| Spider2  | Spider 的扩展版本，包含更多复杂场景。 |
-| AmbiDB   | 歧义数据库查询基准，测试歧义处理能力。 |
+These benchmarks can be easily loaded and evaluated via configuration files.
 
-这些 benchmarks 可通过配置文件轻松加载和评估。
+## 🚀 Quick Start
 
-## 🚀 快速开始
+### 1. Environment Setup
 
-### 1. 环境准备
-
-确保您的 Python 环境满足以下要求：
+Ensure your Python environment meets the following requirements:
 - Python 3.8+
-- 必要的依赖包（详见 requirements.txt）
+- Required dependencies (see requirements.txt)
 
 ```bash
-# 克隆项目
-git clone <repository-url>
-cd Squrve
+# Clone the repository
+git clone https://github.com/Satissss/Squrve.git
 
-# 安装依赖
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. 配置 API 密钥
+### 2. Configure API Keys
 
-编辑配置文件，添加您的 API 密钥：
+Edit the configuration file to add your API keys:
 
 ```json
 {
@@ -93,119 +88,118 @@ pip install -r requirements.txt
   }
 }
 ```
-### [Opt.] LinkAlign 配置
-若使用 LinkAlign 相关组件，需要按照 https://github.com/Satissss/LinkAlign/blob/master/README.md 进行配置。
 
-### 3. 运行示例
+### [Opt.] LinkAlign Configuration
+If using LinkAlign-related components, configure according to https://github.com/Satissss/LinkAlign/blob/master/README.md.
 
-#### 方式一：使用启动脚本
+### 3. Run Examples
+
+#### Method 1: Using Startup Script
 
 ```bash
-# 运行 Spider Dev 数据集示例
+# Run Spider Dev dataset example
 python startup_run/run_spider_dev.py
 ```
 
-#### 方式二：编程方式
+#### Method 2: Programmatic Approach
 
 ```python
 from core.base import Router
 from core.engine import Engine
 
-# 使用配置文件初始化
+# Initialize with configuration file
 router = Router(config_path="startup_run/spider_dev_config.json")
 engine = Engine(router)
 
-# 执行任务
+# Execute task
 engine.execute()
 
-# 评估结果
+# Evaluate results
 engine.evaluate()
 ```
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 Squrve/
-├── core/                    # 核心模块
-│   ├── base.py             # 基础类和配置管理
-│   ├── engine.py           # 执行引擎
-│   ├── data_manage.py      # 数据管理
-│   ├── actor/              # 执行器组件
-│   │   ├── reducer/        # 模式降维
-│   │   ├── parser/         # 模式链接
-│   │   └── generator/      # 查询生成
-│   └── task/               # 任务管理
-├── startup_run/            # 启动示例
-│   ├── run_spider_dev.py   # Spider Dev 运行脚本
-│   └── spider_dev_config.json  # 示例配置文件
-├── config/                 # 配置文件
-├── files/                  # 输出文件
-│   ├── datasets/           # 处理后的数据集
-│   ├── pred_sql/           # 生成的 SQL 查询
-│   └── schema_links/       # 模式链接结果
-└── benchmarks/             # 基准数据集
+├── core/                    # Core modules
+│   ├── base.py             # Base classes and configuration management
+│   ├── engine.py           # Execution engine
+│   ├── data_manage.py      # Data management
+│   ├── actor/              # Executor components
+│   │   ├── reducer/        # Schema reduction
+│   │   ├── parser/         # Schema linking
+│   │   └── generator/      # Query generation
+│   └── task/               # Task management
+├── startup_run/            # Startup examples
+│   ├── run_spider_dev.py   # Spider Dev run script
+│   └── spider_dev_config.json  # Example configuration file
+├── config/                 # Configuration files
+├── files/                  # Output files
+│   ├── datasets/           # Processed datasets
+│   ├── pred_sql/           # Generated SQL queries
+│   └── schema_links/       # Schema linking results
+└── benchmarks/             # Benchmark datasets
 ```
 
-## 🎯 快速使用
+## 🎯 Quick Usage
 
-根据场景需求，定义 Text2SQL 任务执行的配置文件，即可自动完成 SQL 生成任务并自动完成评估。具体的 startup 示例可参考 startup_run 目录。
+Define a Text2SQL task execution configuration file based on your scenario needs to automatically complete SQL generation tasks and evaluations. For specific startup examples, refer to the startup_run directory.
+
 ```python
 from core.base import Router
 from core.engine import Engine
 
-# 使用 Spider Dev 配置
+# Use Spider Dev configuration
 router = Router(config_path="spider_dev_config.json")
 engine = Engine(router)
 
-# 执行任务
+# Execute task
 engine.execute()
 
-# 评估结果
+# Evaluate results
 engine.evaluate()
 ```
 
+## 📊 Output Results
 
-## 📊 输出结果
+After running, you can view the results in the following directories:
 
-运行完成后，您可以在以下目录查看结果：
+- **`files/pred_sql/`**: Generated SQL query files
+- **`files/schema_links/`**: Schema linking results
+- **`files/datasets/`**: Processed datasets
+- **`files/logs/`**: Execution logs
 
-- **`files/pred_sql/`**: 生成的 SQL 查询文件
-- **`files/schema_links/`**: 模式链接结果
-- **`files/datasets/`**: 处理后的数据集
-- **`files/logs/`**: 执行日志
+## 📚 Detailed Documentation
 
-## 📚 详细文档
+- **[API Documentation](API%20documents.md)**: Complete API reference with detailed explanations of all configuration parameters and methods
+- **[Startup Examples](startup_run/README.md)**: Usage guide and configuration examples for the Spider Dev dataset
 
-- **[API 文档](API%20documents.md)**: 完整的 API 参考文档，包含所有配置参数和方法的详细说明
-- **[启动示例](startup_run/README.md)**: Spider Dev 数据集的使用指南和配置示例
+## 🔧 Configuration Guide
 
-## 🔧 配置说明
+### Main Configuration Parameters
 
-### 主要配置参数
+- **LLM Configuration**: Specify the language model and parameters to use
+- **Dataset Configuration**: Data source paths and preprocessing options
+- **Database Configuration**: Database schema and vector store settings
+- **Task Configuration**: Task types and execution flow definitions
+- **Evaluation Configuration**: Evaluation metrics and result saving settings
 
-- **LLM 配置**: 指定使用的语言模型和参数
-- **数据集配置**: 数据源路径和预处理选项
-- **数据库配置**: 数据库模式和向量存储设置
-- **任务配置**: 任务类型和执行流程定义
-- **评估配置**: 评估指标和结果保存设置
-
-详细配置说明请参考 [API 文档](API%20documents.md)。
-
+For detailed configuration explanations, refer to the [API Documentation](API%20documents.md).
 
 ## 📝 TODO List
 
-- [ ] 添加基准 baseline 方法
-- [ ] 集成基准 benchmark 数据集
-- [ ] 扩展数据库连接支持
-- [ ] 扩展 Actor 组件库
-- [ ] 扩展评估指标体系
-- [ ] 扩展微服务架构
-- [ ] 集成强化学习框架
+- [ ] Add benchmark baseline methods
+- [ ] Integrate benchmark datasets
+- [ ] Extend database connection support
+- [ ] Expand Actor component library
+- [ ] Expand evaluation metrics system
+- [ ] Extend to microservices architecture
+- [ ] Integrate reinforcement learning framework
 
+## 📄 License
 
-## 📄 许可证
-
-本项目采用 [MIT 许可证](LICENSE)。
+This project is licensed under the [MIT License](LICENSE).
 
 
 

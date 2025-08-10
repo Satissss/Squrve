@@ -61,6 +61,23 @@
           "has_label": true
         }
       ]
+    },
+    {
+      "id": "spider2",
+      "meta_info": "",
+      "root_path": "../benchmarks/spider2",
+      "db_type": "",
+      "has_sub": true,
+      "external": false,
+      "database": false,
+      "sub_data": [
+        {
+          "sub_id": "lite",
+          "use_local_database": true,
+          "use_local_external": true,
+          "has_label": true
+        }
+      ]
     }
   ],
   "task": {
