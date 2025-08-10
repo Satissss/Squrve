@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/data_manage.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/data_manage.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/datasets/spider_dev_generate.json" beforeDir="false" afterPath="$PROJECT_DIR$/files/datasets/spider_dev_generate.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -445,7 +443,7 @@
       <workItem from="1754811516119" duration="198000" />
       <workItem from="1754811917848" duration="69000" />
       <workItem from="1754812054352" duration="9101000" />
-      <workItem from="1754831801639" duration="3986000" />
+      <workItem from="1754831801639" duration="4921000" />
     </task>
     <servers />
   </component>
