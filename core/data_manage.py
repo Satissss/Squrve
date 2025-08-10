@@ -28,7 +28,6 @@ from pathlib import Path
 from typing import Union, Dict, List, Callable, Optional, Any
 import warnings
 import random
-from loguru import logger
 
 
 class Dataset:
@@ -158,6 +157,7 @@ class Dataset:
                 sample_size = int(len(data_source) * random_size)
             else:
                 sample_size = random_size
+            sample_size = min(len(data_source), sample_size)
             data_source = random.sample(data_source, sample_size)
 
         if filter_by:
@@ -569,11 +569,11 @@ class DataLoader:
                                    key: Optional[str] = None):
         """
         Get schema source by index.
-        
+
         Args:
             index_: Index or list of indices to retrieve. If None, returns all schema sources.
             key: Optional key to extract from the schema source metadata.
-            
+
         Returns:
             Dict containing the requested schema sources, or None if not found.
         """
@@ -888,12 +888,9 @@ class DataLoader:
         if schema is None:
             schema = []
 
-        logger.info("Starting schema source initialization")
-
         def init_single_item(source_: str, index_: Optional[Union[str, int]] = None):
             if ":" in Path(source_).stem:
                 index_ = source_.replace(":", "_") if not index_ else index_
-                logger.info(f"Processing multi-db source: {source_} with index: {index_}")
                 multi_db_ = self.query_multi_database(index_, self.multi_database)
                 vector_store_ = self.query_vector_store(index_, self.vector_store)
                 if self.schema_source_dir is None:
@@ -905,19 +902,14 @@ class DataLoader:
                 self.init_benchmark_schema(source_, multi_db_, save_schema_source=save_schema_source,
                                            skip_schema_init=self.skip_schema_init)
                 self.update_schema_save_source({index_: str(save_schema_source)}, multi_db_, vector_store_)
-                logger.info(f"Updated schema save source for {index_}: {save_schema_source}")
             else:
                 index_ = Path(source_).stem if not index_ else index_
-                logger.info(f"Processing source: {source_} with index: {index_}")
                 multi_db_ = self.query_multi_database(index_, self.multi_database)
                 vector_store_ = self.query_vector_store(index_, self.vector_store)
                 save_schema_source = source_ if self.skip_schema_init else Path(self.schema_source_dir) / str(index_)
                 if not self.skip_schema_init:
                     self.central_schema_process(source_, save_schema_source=save_schema_source, multi_db=multi_db_)
                 self.update_schema_save_source({index_: str(save_schema_source)}, multi_db_, vector_store_)
-                logger.info(f"Updated schema save source for {index_}: {save_schema_source}")
-
-        logger.info(f"Processing schema_source of type: {type(self.schema_source).__name__}")
 
         if isinstance(self.schema_source, str):
             source = self.schema_source
@@ -930,7 +922,6 @@ class DataLoader:
                 init_single_item(source, key_)
 
         if schema:
-            logger.info("Processing additional schema")
             multi_db = self.multi_database if isinstance(self.multi_database, bool) else False
             vec_store = self.vector_store if isinstance(self.vector_store, str) else "vector_store"
             if self.schema_source_dir is None or self.default_schema_dir_name is None:
@@ -944,7 +935,6 @@ class DataLoader:
                 self.central_schema_process(schema, save_schema_source=save_path, multi_db=multi_db)
             schema_index = self.default_schema_dir_name
             self.update_schema_save_source({schema_index: str(save_path)}, multi_db, vec_store)
-            logger.info(f"Updated additional schema for {schema_index}: {save_path}")
 
     def query_multi_database(
             self,
@@ -1527,7 +1517,7 @@ def filter_dataset(
     if "has_label" in filter_dict:
         val = filter_dict["has_label"].get("value", "query")
         val = "query" if val is True else val
-        dataset_ = [row for row in dataset_ if val in row]
+        dataset_ = [row for row in dataset_ if val in row and row[val]]
 
     return dataset_
 
