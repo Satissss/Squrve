@@ -76,6 +76,12 @@
           "use_local_database": true,
           "use_local_external": true,
           "has_label": true
+        },
+        {
+          "sub_id": "snow",
+          "use_local_database": true,
+          "use_local_external": true,
+          "has_label": true
         }
       ]
     }

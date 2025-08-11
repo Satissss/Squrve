@@ -18,11 +18,15 @@ files/schema_links
 files/schema_reduce
 files/schema_source
 files/datasets
-files
+files/credential
+files/sub_questions
+
 API.md
 test
 
 startup_run/spider_dev_config.json
+startup_run/demo.json
+
 startup_run/voter_1
 
 optimization_plan.txt

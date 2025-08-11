@@ -16,9 +16,10 @@
 
 ### ✨ Key Features
 
-1. Configuration-driven Text-to-SQL tasks, integrating multiple baseline methods, large model invocations, and database connections.
+1. Configuration-driven Text-to-SQL tasks, integrating multiple baseline methods, LLM invocations, and database connections.
 2. Component-level reproduction and sharing interfaces, supporting free combination and flexible switching of different method components for plug-and-play and quick startup.
 3. Scalable and robust modular design, with method implementations independent of specific datasets and database types, enabling rapid extension for new methods.
+4. Supports automated, modular, and specialized evaluation of generated query results metrics.
 
 ## 🏗️ Core Architecture
 
@@ -34,28 +35,26 @@ Squrve adopts a modular architecture with the following core components:
 
 Squrve supports multiple Text-to-SQL baselines, enabling quick integration and comparison through modular components:
 
-| Baseline Name      | Description                                                                 | Code Link |
-|--------------------|-----------------------------------------------------------------------------|-----------|
-| BaseGenerate       | Basic generator providing standard Text-to-SQL query generation.            |           |
-| CHESSGenerate      | CHESS method implementation, focusing on hierarchical generation and optimization of complex queries. |           |
-| DAILSQLGenerate    | DAIL-SQL method, using divide-and-conquer prompting and chain-of-thought for efficient SQL generation. |           |
-| DINSQLGenerate     | DIN-SQL method, using decomposition prompting to handle complex SQL query generation. |           |
-| LinkAlignGenerate  | LinkAlign integrated generation, utilizing advanced schema linking to improve query accuracy. |           |
-| MACSQLGenerate     | MAC-SQL method, employing multi-agent collaboration for high-quality SQL generation. |           |
-| OpenSearchSQLGenerate | OpenSearch-based SQL generation, using search enhancement for query construction. |           |
-| ReFoRCEGenerate    | ReFoRCE method, optimizing SQL generation through a reinforcement learning framework. |           |
-| RSLSQLGenerate     | RSL-SQL method, combining rule systems and learning models for reliable SQL generation. |           |
+| Baseline Name  | Description                                                                 | Code Link                                                              |
+|----------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------|
+| CHESS          | CHESS method implementation, focusing on hierarchical generation and optimization of complex queries. | https://github.com/ShayanTalaei/CHESS                                  |
+| DAIL-SQL       | DAIL-SQL method, using divide-and-conquer prompting and chain-of-thought for efficient SQL generation. | https://github.com/BeachWang/DAIL-SQL                                  |
+| DIN-SQL        | DIN-SQL method, using decomposition prompting to handle complex SQL query generation. | https://github.com/MohammadrezaPourreza/Few-shot-NL2SQL-with-prompting |
+| LinkAlign      | LinkAlign integrated generation, utilizing advanced schema linking to improve query accuracy. | https://github.com/Satissss/LinkAlign                                  |
+| MAC-SQL        | MAC-SQL method, employing multi-agent collaboration for high-quality SQL generation. | https://github.com/wbbeyourself/MAC-SQL                                |
+| OpenSearch-SQL | OpenSearch-based SQL generation, using search enhancement for query construction. | https://github.com/OpenSearch-AI/OpenSearch-SQL                        |
+| ReFoRCE        | ReFoRCE method, optimizing SQL generation through a reinforcement learning framework. | https://github.com/Snowflake-Labs/ReFoRCE                              |
+| RSL-SQL        | RSL-SQL method, combining rule systems and learning models for reliable SQL generation. | https://github.com/Laqcce-cao/RSL-SQL                                  |
 
 ### Supported Benchmarks
 
 Squrve includes built-in support for several standard Text-to-SQL benchmarks for easy model evaluation and comparison:
 
-| Benchmark | Description                                      | Code Link |
-|-----------|--------------------------------------------------|-----------|
-| Spider    | Cross-domain Text-to-SQL benchmark, supporting dev split. |           |
-| BIRD      | Text-to-SQL benchmark with external knowledge.   |           |
-| Spider2   | Extended version of Spider with more complex scenarios. |           |
-| AmbiDB    | Ambiguous database query benchmark, testing ambiguity handling. |           |
+| Benchmark             | Description                                      | Code Link |
+|-----------------------|--------------------------------------------------|-----------|
+| Spider (dev)          | Cross-domain Text-to-SQL benchmark, supporting dev split. | https://github.com/taoyds/spider |
+| BIRD (dev)            | Text-to-SQL benchmark with external knowledge.   | https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/bird |
+| Spider2 (in one week) | Extended version of Spider with more complex scenarios. | https://github.com/xlang-ai/Spider2 |
 
 These benchmarks can be easily loaded and evaluated via configuration files.
 
@@ -73,6 +72,9 @@ git clone https://github.com/Satissss/Squrve.git
 
 # Install dependencies
 pip install -r requirements.txt
+
+# Unzip benchmarks.zip to the root directory
+unzip benchmarks.zip -d .
 ```
 
 ### 2. Configure API Keys
@@ -189,7 +191,7 @@ For detailed configuration explanations, refer to the [API Documentation](API%20
 
 ## 📝 TODO List
 
-- [ ] Add benchmark baseline methods
+- [ ] Add baseline methods
 - [ ] Integrate benchmark datasets
 - [ ] Extend database connection support
 - [ ] Expand Actor component library

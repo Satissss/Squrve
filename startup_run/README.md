@@ -1,84 +1,54 @@
-# Spider Dev 数据集使用指南
+# Squrve 框架快速启动
 
-本指南介绍如何使用 Squrve 框架运行 Spider dev 数据集的 Text-to-SQL 任务。
-
-## 📋 目录结构
-
-```
-Squrve/
-├── config/
-│   ├── spider_dev_config.json    # Spider Dev 专用配置文件
-│   ├── demo_config.json          # 演示配置文件
-│   └── sys_config.json           # 系统配置文件
-├── run/
-│   ├── run_spider_dev.py         # Spider Dev 运行脚本
-├── benchmarks/
-│   └── spider/
-│       ├── dev/
-│       │   ├── dataset.json      # Spider Dev 数据集
-│       │   └── schema.json       # 数据库模式文件
-│       └── database/             # SQLite 数据库文件
-├── squrve_api.md                 # 详细 API 文档
-```
+本文件介绍如何基于 Squrve 框架，仅通过更换配置参数，即可实现不同数据集上对多种基线方法实现 Text-to-SQL 任务的表现并发测试。
 
 ## 🚀 快速开始
 
 ### 1. 环境准备
 
-确保已安装所有必要的依赖：
+确保已按照根目录下的 [`README`](https://github.com/Satissss/Squrve) 文件完成所有环境配置步骤。
 
-```bash
-pip install -r requirements.txt
-```
+### 2. 运行示例
 
-### 2. 配置 API 密钥
+任何 Text-to-SQL 任务均可以通过 run.py 下的简单数行代码完成，仅需要提供任务启动所需的正确配置文件，如下。
 
-编辑 `config/spider_dev_config.json` 文件，配置 API 密钥：
-
-```json
-{
-  "api_key": {
-    "qwen": "your_actual_qwen_api_key",
-    "deepseek": "your_actual_deepseek_api_key",
-    "zhipu": "your_actual_zhipu_api_key"
-  }
-}
-```
-
-### 3. 运行 Spider Dev 任务
-
-#### 方式一：使用交互式脚本
-
-```bash
-python startup_run/run_spider_dev.py
-```
-
-脚本会提供以下选项：
-
-- **简单 SQL 生成任务**: 直接生成 SQL 查询
-- **完整 Text-to-SQL 流水线**: 执行完整的 Reduce -> Parse -> Generate 流程
-- **自定义设置任务**: 使用自定义参数运行
-
-#### 方式二：编程方式
-
-```python
+```python 
 from core.base import Router
 from core.engine import Engine
 
-# 使用 Spider Dev 配置
-router = Router(config_path="spider_dev_config.json")
-engine = Engine(router)
+if __name__ == "__main__":
+    router = Router(config_path="startup_config.json")
 
-# 执行任务
-engine.execute()
+    engine = Engine(router)
 
-# 评估结果
-engine.evaluate()
+    # 执行任务
+    print("执行自定义任务中...")
+    engine.execute()
+
+    # 评估结果
+    print("评估结果中...")
+    engine.evaluate()
+
+    print("自定义任务完成!")
+
 ```
+
+startup_config.json 作为快速启动示例，提供了一个在 Spider-dev 基准数据集上运行 DIN-SQL 方法的简单示例。通过运行 run.py 即可快速启动 Squrve 框架。
+
+```bash
+python startup_run/run.py
+```
+
 
 ## 📁 运行成功
 
 ### 控制台输出
+
+代码启动后，控制台首先输出基本信息。
+![img.png](../assets/run_start.png)
+
+单个样本执行过程信息打印：
+![img.png](../assets/run_single.png)
 
 样例测试运行完成后，输出评估结果和任务相关统计信息，如下所示：
 ![img.png](../assets/img.png)
@@ -87,15 +57,12 @@ engine.evaluate()
 
 ### 文件夹输出
 
-- `files/pred_sql/`: 生成的 SQL 查询
-  ![img.png](../assets/pred_sql.png)
+根据配置，生成的每个样本的 SQL 语句将保存在 `files/pred_sql/` 目录下： 
+![img.png](../assets/pred_sql.png)!
 
-- `files/schema_links/`: 模式链接结果
-- ![img.png](../assets/schema_linking.png)
-- `files/datasets/`: 处理后的数据集
-  ![img.png](../assets/final_dataset.png)
+处理后的完整的数据集将保存在 `files/datasets/` 目录下：
 
-## 🎯 任务类型
+## 🎯 解析配置
 
 ### 1. 简单生成任务 (`generate`)
 
