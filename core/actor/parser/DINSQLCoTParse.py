@@ -103,7 +103,7 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
             if external_knowledge:
                 question += "\n" + external_knowledge
 
-        if isinstance(schema, (str, PathLike)):
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if schema is None:

@@ -153,7 +153,7 @@ Evidence: {HINT}
         evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
 
         # Load and process schema
-        if isinstance(schema, (str, Path)):
+        if isinstance(schema, (str, Path)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if schema is None:

@@ -873,7 +873,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
 
         # 加载和处理 schema
-        if isinstance(schema, (str, Path)):
+        if isinstance(schema, (str, Path)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if schema is None:

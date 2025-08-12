@@ -629,7 +629,7 @@ class OpenSearchSQLScaler(BaseScaler):
         db_id = row.get('db_id')
 
         # Load and process schema like ChessScale
-        if isinstance(schema, (str, Path)):
+        if isinstance(schema, (str, Path)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if schema is None:

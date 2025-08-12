@@ -59,7 +59,7 @@ class LinkAlignGenerator(BaseGenerator):
             self.db_path = self.dataset.db_path
         else:
             self.db_path = None
-            
+
         if credential is not None:
             self.credential = credential
         elif self.dataset is not None:
@@ -235,7 +235,7 @@ You need to follow below requirements:
 
         # Use LinkAlign to reduce the dimensionality of database schema
         logger.debug("开始处理数据库模式...")
-        if isinstance(schema, (str, PathLike)):
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         # Try to load schema if not provided
@@ -262,6 +262,7 @@ You need to follow below requirements:
             schema = pd.DataFrame(schema)
 
         if isinstance(schema, pd.DataFrame):
+            origin_schema = schema
             schema = parse_schema_from_df(schema)
         else:
             raise Exception("Failed to load a valid database schema for the sample!")
@@ -279,7 +280,7 @@ You need to follow below requirements:
             else:
                 logger.debug("使用 LinkAlignParser 生成模式链接")
                 parser = LinkAlignParser(self.dataset, self.llm) if not self.parser else self.parser
-                schema_links = parser.act(item, schema)
+                schema_links = parser.act(item, origin_schema)
 
         # Step 2: difficulty classification
         logger.debug("开始难度分类...")

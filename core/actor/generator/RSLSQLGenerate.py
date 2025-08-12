@@ -678,7 +678,7 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Load and process schema - 参考DINSQLGenerate的实现
         logger.debug("Processing database schema...")
-        if isinstance(schema, (str, PathLike)):
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if schema is None:

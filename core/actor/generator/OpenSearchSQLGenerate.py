@@ -1,6 +1,7 @@
 import pandas as pd
 import re
 import os
+from os import PathLike
 import chardet
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -441,8 +442,11 @@ class ColumnRetriever:
         self.tables_info_dir = tables_info_dir
 
     def get_col_retrieve(self, question, db, db_keys_col):
-        db_schema = json.load(open(self.tables_info_dir, 'r'))
-        db_schema = db_schema[db]
+        if isinstance(self.tables_info_dir, (str, PathLike)) and Path(self.tables_info_dir).exists():
+            schema = load_dataset(self.tables_info_dir)
+        else:
+            schema = {}
+        db_schema = schema.get(db, {})
         schema_emb = self.bert_model.encode(db_schema, show_progress_bar=False)
         question_emb = self.bert_model.encode(question, show_progress_bar=False)
         schema_sim = schema_emb @ question_emb.T

@@ -140,7 +140,7 @@ Label: "NESTED"'''
             if schema is None:
                 raise ValueError("Failed to load a valid database schema for the sample!")
 
-        if isinstance(schema, (str, PathLike)):
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
         if isinstance(schema, dict):

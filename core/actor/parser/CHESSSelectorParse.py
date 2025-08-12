@@ -194,7 +194,7 @@ Only output a json as your response."""
         db_size = data_row.get("db_size", 0)
         db_type = data_row.get("db_type", "sqlite")
 
-        if isinstance(schema, (str, PathLike)):
+        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
         if schema is None:
             schema = self.dataset.get_db_schema(item)

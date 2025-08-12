@@ -391,7 +391,7 @@ Your main tasks are:
             example = example or ''
 
             # Process schema to DataFrame
-            if isinstance(schema, (str, PathLike)):
+            if isinstance(schema, (str, PathLike)) and Path(schema).exists():
                 schema = load_dataset(schema)
             if schema is None:
                 instance_schema_path = row.get("instance_schemas")

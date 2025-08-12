@@ -130,7 +130,7 @@ class MACSQLCoTParser(BaseParser):
             db_id = row.get('db_id', 'database')
 
             # Normalize schema to DataFrame
-            if isinstance(schema, (str, Path)):
+            if isinstance(schema, (str, PathLike)) and Path(schema).exists():
                 schema = load_dataset(schema)
             if schema is None:
                 instance_schema_path = row.get("instance_schemas", None)
