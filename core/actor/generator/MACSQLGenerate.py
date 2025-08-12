@@ -11,7 +11,6 @@ import re
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, load_dataset, save_dataset
-from core.db_connect import execute_sql
 from core.utils import parse_schema_from_df
 from core.data_manage import single_central_process
 from llama_index.core.llms.llm import LLM
@@ -383,12 +382,7 @@ class Selector:
         for table_name, info in table_info.items():
             schema_str += f"# Table: {table_name}\n[\n"
             for col_name in info["column_names"]:
-                # Attempt to get value examples if cursor is available, otherwise note limitation
-                value_examples_str = self._get_value_examples_str(None, table_name, col_name)
-                if value_examples_str == "No value examples found.":
-                    schema_str += f"  ({col_name}, {col_name} description. Value examples: [...].),\n"
-                else:
-                    schema_str += f"  ({col_name}, {col_name} description. Value examples: [{value_examples_str}].),\n"
+                schema_str += f"  ({col_name}, {col_name} description. Value examples: [{self._get_value_examples_str(None, table_name, col_name)}].),\n"
             schema_str += "]\n"
         return schema_str
 
@@ -516,29 +510,35 @@ class Refiner:
 
     # Paste _execute_sql, _is_need_refine, _refine, talk from agents.py
     # Add @func_set_timeout if needed, but since it's not in Squrve, use try-except
-    def _execute_sql(self, sql: str, db_id: str, db_type: str = 'sqlite', db_path: str = None, credential: Any = None) -> dict:
+    def _execute_sql(self, sql: str, db_id: str) -> dict:
+        # Full code
         try:
-            if db_path is None:
-                db_path = os.path.join(self.data_path, f"{db_id}.sqlite")  # Fallback
-            exec_result = execute_sql(db_type, db_path if db_type == 'sqlite' else db_id, sql, credential)
-            
-            if isinstance(exec_result, tuple):
-                res, err = exec_result[:2]
-            else:
-                res = exec_result
-                err = None
-            
-            success = err is None
-            row_count = len(res) if success and isinstance(res, (list, pd.DataFrame)) else 0
-            
+            db_file = os.path.join(self.data_path, f"{db_id}.sqlite")
+            if not os.path.exists(db_file):
+                logger.warning(f"数据库文件不存在: {db_file}")
+                return {"success": False, "error": "Database file not found"}
+
+            conn = sqlite3.connect(db_file)
+            cursor = conn.cursor()
+
+            # 执行 SQL
+            cursor.execute(sql)
+            result = cursor.fetchall()
+
+            # 获取列名
+            column_names = [description[0] for description in cursor.description] if cursor.description else []
+
+            conn.close()
+
             return {
-                "success": success,
-                "result": res if success else None,
-                "error": err,
-                "row_count": row_count
+                "success": True,
+                "result": result,
+                "column_names": column_names,
+                "row_count": len(result)
             }
         except Exception as e:
-            return {"success": False, "result": None, "error": str(e), "row_count": 0}
+            logger.error(f"SQL 执行失败: {e}")
+            return {"success": False, "error": str(e)}
 
     def _is_need_refine(self, exec_result: dict):
         # Full code
@@ -570,18 +570,35 @@ class Refiner:
             message['send_to'] = SYSTEM_NAME
             return
 
-        # Use existing qa_pairs and final_sql from message (from Decomposer)
-        qa_pairs = message.get('qa_pairs', [])
-        final_sql = message.get('final_sql', '')
-        if not final_sql and qa_pairs:
-            final_sql = qa_pairs[-1][1] if qa_pairs else ""
+        # Decompose into sub-questions
+        sub_questions = []
+        try:
+            prompt = decompose_template_bird.format(query=query, desc_str=schema_info, fk_str=fk_info,
+                                                    evidence=evidence)  # Assuming bird for now
+            response = self.llm.complete(prompt)
+            reply = response.text.strip()
+            # Improved parsing: extract all sub questions and their SQLs
+            sub_parts = reply.split('Sub question ')
+            qa_pairs = []
+            for part in sub_parts[1:]:
+                if 'SQL' in part:
+                    sub_q = part.split('SQL')[0].strip()
+                    sub_sql = parse_sql_from_string(part)
+                    qa_pairs.append((sub_q, sub_sql))
+            if not qa_pairs:
+                message['send_to'] = SYSTEM_NAME
+                return
+        except Exception as e:
+            logger.error(f"Decomposition failed: {e}")
+            message['send_to'] = SYSTEM_NAME
+            return
+
+        # The last SQL is typically the final one in MAC-SQL decomposition
+        final_sql = qa_pairs[-1][1] if qa_pairs else ""
 
         # Execute and check if refinement needed
         db_id = message.get('db_id')
-        db_type = message.get('db_type', 'sqlite')  # Add db_type from message
-        db_path = message.get('db_path')  # Assume added to message
-        credential = message.get('credential')
-        exec_result = self._execute_sql(final_sql, db_id, db_type, db_path, credential)
+        exec_result = self._execute_sql(final_sql, db_id)
         if self._is_need_refine(exec_result) or not exec_result['success']:
             logger.info("Refining SQL due to execution issue.")
             error = exec_result.get('error', 'Empty result set') if not exec_result['success'] else 'Empty result set'
@@ -643,6 +660,7 @@ class MACSQLGenerator(BaseGenerator):
     """
 
     NAME = "MACSQLGenerator"
+    OUTPUT_NAME = "pred_sql"
 
     def __init__(
             self,
@@ -804,25 +822,34 @@ class MACSQLGenerator(BaseGenerator):
             return 'easy'
 
     def _execute_sql_with_feedback(self, sql: str, db_id: str, db_path: str) -> Dict:
+        """执行 SQL 并获取反馈"""
         try:
-            # Use db_connect
-            res = execute_sql('sqlite', db_path, sql, None)  # Assuming sqlite for now; make db_type dynamic
-            if isinstance(res, tuple):
-                result, err = res
-            else:
-                result = res
-                err = None
-            
-            success = err is None
+            db_file = os.path.join(db_path, f"{db_id}.sqlite")
+            if not os.path.exists(db_file):
+                logger.warning(f"数据库文件不存在: {db_file}")
+                return {"success": False, "error": "Database file not found"}
+
+            conn = sqlite3.connect(db_file)
+            cursor = conn.cursor()
+
+            # 执行 SQL
+            cursor.execute(sql)
+            result = cursor.fetchall()
+
+            # 获取列名
+            column_names = [description[0] for description in cursor.description] if cursor.description else []
+
+            conn.close()
+
             return {
-                "success": success,
-                "result": result if success else None,
-                "error": err,
-                "row_count": len(result) if success and hasattr(result, '__len__') else 0
+                "success": True,
+                "result": result,
+                "column_names": column_names,
+                "row_count": len(result)
             }
         except Exception as e:
             logger.error(f"SQL 执行失败: {e}")
-            return {"success": False, "result": None, "error": str(e), "row_count": 0}
+            return {"success": False, "error": str(e)}
 
     def _refine_sql_with_llm(self, question: str, schema: str, sql: str, error_info: Dict) -> str:
         """使用 LLM 优化 SQL"""
@@ -862,7 +889,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             **kwargs
     ):
         """实现 MAC-SQL 的端到端 SQL 生成逻辑"""
-        logger.info(f"Starting MACSQLGenerator processing for item {item}")
+        logger.info(f"MACSQLGenerator 开始处理样本 {item}")
 
         # 获取数据样本
         row = self.dataset[item]
@@ -870,10 +897,10 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
 
-        logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
+        logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
 
         # 加载和处理 schema
-        if isinstance(schema, (str, Path)) and Path(schema).exists():
+        if isinstance(schema, (str, Path)):
             schema = load_dataset(schema)
 
         if schema is None:
@@ -881,8 +908,6 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             schema = self.dataset.get_db_schema(item)
             if schema is None:
                 raise Exception("无法获取有效的数据库模式!")
-
-        logger.debug("Database schema loaded successfully")
 
         # 标准化 schema 格式
         if isinstance(schema, dict):
@@ -898,8 +923,6 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         # 转换为 MAC-SQL 格式
         tables_json = self._create_tables_json(schema)
         tables_json["db_id"] = db_id
-
-        logger.debug("Converted schema to MAC-SQL tables.json format")
 
         # 设置数据库路径
         if self.db_path:
@@ -917,9 +940,6 @@ Please provide the corrected SQL query. Only return the SQL statement without an
 
         # 初始化用户消息
         user_message = self._init_user_message(row, schema_str, db_id)
-        user_message['db_type'] = db_type
-        user_message['db_path'] = db_path
-        user_message['credential'] = self.credential
 
         # 执行 MAC-SQL 流程
         try:
@@ -931,10 +951,10 @@ Please provide the corrected SQL query. Only return the SQL statement without an
             if not pred_sql:
                 raise Exception("MAC-SQL 未生成有效的 SQL")
 
-            logger.info(f"MAC-SQL generation completed: {pred_sql[:100]}...")
+            logger.debug(f"MAC-SQL 生成完成: {pred_sql[:100]}...")
 
         except Exception as e:
-            logger.error(f"MAC-SQL execution failed: {e}")
+            logger.error(f"MAC-SQL 执行失败: {e}")
             # 回退到简单生成
             pred_sql = self._fallback_sql_generation(question, schema_str, row)
 
@@ -959,7 +979,7 @@ Please provide the corrected SQL query. Only return the SQL statement without an
         except:
             pass
 
-        logger.info(f"MACSQLGenerator processing for item {item} completed")
+        logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
         return pred_sql
 
     def _fallback_sql_generation(self, question: str, schema: str, row: Dict) -> str:

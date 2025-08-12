@@ -1,5 +1,5 @@
 from llama_index.core.llms.llm import LLM
-from typing import Union, List, Callable, Dict, Optional
+from typing import Union, List, Dict, Optional
 import pandas as pd
 from os import PathLike
 from pathlib import Path
@@ -15,14 +15,14 @@ from core.utils import (
 )
 
 
-class DIN_SQLGenerator(BaseGenerator):
+class DINSQLGenerator(BaseGenerator):
     """DIN-SQL method implementation for Text-to-SQL generation.
 
     This class provides a faithful reproduction of the DIN-SQL approach,
     integrated into the Squrve framework without dependencies on external baselines.
     """
 
-    NAME = "DIN_SQLGenerator"
+    NAME = "DINSQLGenerator"
 
     # Prompt constants for better organization and readability
     SCHEMA_LINKING_PROMPT = '''Table advisor, columns = [*,s_ID,i_ID]
@@ -142,9 +142,6 @@ Intermediate_representation: select department.dept_name , department.building f
             llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
-            use_external: bool = True,
-            use_few_shot: bool = True,
-            sql_post_process_function: Optional[Callable] = None,
             db_path: Optional[Union[str, PathLike]] = None,
             credential: Optional[Dict] = None,
             **kwargs
@@ -154,23 +151,10 @@ Intermediate_representation: select department.dept_name , department.building f
         self.llm: Optional[LLM] = llm
         self.is_save = is_save
         self.save_dir: Union[str, PathLike] = save_dir
-        self.use_external: bool = use_external
-        self.use_few_shot: bool = use_few_shot
-        self.sql_post_process_function: Optional[Callable] = sql_post_process_function
 
         # Safely initialize db_path and credential
         self.db_path = db_path or (self.dataset.db_path if self.dataset else None)
         self.credential = credential or (self.dataset.credential if self.dataset else None)
-
-    @classmethod
-    def load_external_knowledge(cls, external: Union[str, Path] = None) -> Optional[str]:
-        """Load external knowledge from a file if provided."""
-        if not external:
-            return None
-        external_data = load_dataset(external)
-        if external_data and len(external_data) > 50:
-            return "####[External Prior Knowledge]:\n" + str(external_data)
-        return None
 
     def schema_linking_prompt_maker(self, question: str, schema: str) -> str:
         instruction = "# Find the schema_links for generating SQL queries for each question based on the database schema and Foreign keys.\n"
@@ -227,7 +211,7 @@ Intermediate_representation: select department.dept_name , department.building f
             except Exception as e:
                 logger.warning(f"LLM generation attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(3)
+                    time.sleep(2 ** attempt)  # Exponential backoff
                 else:
                     logger.error("Max retries exceeded for LLM generation.")
                     raise
@@ -245,7 +229,7 @@ Intermediate_representation: select department.dept_name , department.building f
             except Exception as e:
                 logger.warning(f"LLM debug attempt {attempt + 1} failed: {e}")
                 if attempt < max_retries - 1:
-                    time.sleep(3)
+                    time.sleep(2 ** attempt)  # Exponential backoff
                 else:
                     logger.error("Max retries exceeded for LLM debug.")
                     raise
@@ -265,12 +249,6 @@ Intermediate_representation: select department.dept_name , department.building f
         db_id = row["db_id"]
         db_path = Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
         logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
-
-        if self.use_external:
-            external_knowledge = self.load_external_knowledge(row.get("external", None))
-            if external_knowledge:
-                question += "\n" + external_knowledge
-                logger.debug("Loaded external knowledge")
 
         # Load and process schema
         logger.debug("Processing database schema...")
@@ -312,9 +290,9 @@ Intermediate_representation: select department.dept_name , department.building f
             else:
                 logger.debug("Generating schema links using DIN-SQL")
                 schema_linking_prompt = self.schema_linking_prompt_maker(question, schema)
-                schema_links = self.llm_generation(schema_linking_prompt)
+                schema_links_raw = self.llm_generation(schema_linking_prompt)
                 try:
-                    schema_links = schema_links.split("Schema_links: ")[1]
+                    schema_links = schema_links_raw.split("Schema_links: ")[1].strip("[]")
                 except IndexError:
                     logger.warning("Schema linking parsing failed, using default")
                     schema_links = "[]"
@@ -375,8 +353,8 @@ Intermediate_representation: select department.dept_name , department.building f
             # Keep original SQL if debugging fails
 
         # SQL post-process
-        if self.sql_post_process_function:
-            sql = self.sql_post_process_function(sql, self.dataset)
+        # if self.sql_post_process_function:
+        #     sql = self.sql_post_process_function(sql, self.dataset)
 
         logger.debug(f"Final SQL: {sql[:100]}...")
 

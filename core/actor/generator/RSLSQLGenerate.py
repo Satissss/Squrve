@@ -1,5 +1,5 @@
 from os import PathLike
-from typing import Union, List, Optional
+from typing import Union, Optional, Dict, Any
 import json
 import pandas as pd
 from pathlib import Path
@@ -8,7 +8,7 @@ import re
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, load_dataset, single_central_process
-from core.utils import save_dataset, parse_schema_from_df
+from core.utils import save_dataset
 from core.db_connect import get_sql_exec_result
 
 # Prompts from Instruction.py
@@ -246,7 +246,7 @@ class RSLSQLGenerator(BaseGenerator):
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
-            llm = None,
+            llm=None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
             use_external: bool = True,
@@ -268,29 +268,22 @@ class RSLSQLGenerator(BaseGenerator):
         # Load column meanings
         self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
 
-    def parse_json_response(self, response):
-        """
-        Robust JSON parsing with multiple fallback strategies
-        """
-        if not response or not isinstance(response, str):
-            logger.warning(f"Invalid response type: {type(response)}")
-            return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
-            
-        # Clean the response
-        response = response.strip()
-        
-        # Try direct parsing first
+    def get_db_path(self, db_id):
+        return Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
+
+    def try_direct_parse(self, response: str) -> Optional[Dict[str, Any]]:
+        """Attempt direct JSON parsing."""
         try:
             return json.loads(response)
         except json.JSONDecodeError:
-            pass
-        
-        # Try to extract JSON from the response
+            return None
+
+    def try_extract_json(self, response: str) -> Optional[Dict[str, Any]]:
+        """Extract and parse JSON using regex patterns."""
         json_patterns = [
             r'\{.*\}',  # Basic JSON object
             r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}',  # Nested JSON
         ]
-        
         for pattern in json_patterns:
             matches = re.findall(pattern, response, re.DOTALL)
             for match in matches:
@@ -298,19 +291,17 @@ class RSLSQLGenerator(BaseGenerator):
                     return json.loads(match)
                 except json.JSONDecodeError:
                     continue
-        
-        # Try fixing common issues
-        fixed_response = response
-        
-        # Fix unescaped backslashes
-        fixed_response = fixed_response.replace("\\", "\\\\")
-        
+        return None
+
+    def try_fix_common_issues(self, response: str) -> Optional[Dict[str, Any]]:
+        """Fix common JSON issues and attempt parsing."""
+        fixed_response = response.replace("\\", "\\\\")
+
         # Fix unescaped quotes in SQL strings
-        # Look for SQL-like content and escape quotes properly
         sql_pattern = r'["\'](SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH).*?["\']'
+
         def escape_sql_quotes(match):
             sql_content = match.group(0)
-            # Escape internal quotes
             if sql_content.startswith('"') and sql_content.endswith('"'):
                 sql_content = sql_content[1:-1].replace('"', '\\"')
                 return f'"{sql_content}"'
@@ -318,58 +309,84 @@ class RSLSQLGenerator(BaseGenerator):
                 sql_content = sql_content[1:-1].replace("'", "\\'")
                 return f"'{sql_content}'"
             return match.group(0)
-        
+
         fixed_response = re.sub(sql_pattern, escape_sql_quotes, fixed_response, flags=re.IGNORECASE | re.DOTALL)
-        
-        # Try parsing the fixed response
+
+        # Additional fixes
+        fixed_response = re.sub(r',(\s*[}\]])', r'\1', fixed_response)
+        fixed_response = re.sub(r'(\w+):', r'"\1":', fixed_response)
+
         try:
             return json.loads(fixed_response)
         except json.JSONDecodeError:
-            pass
-        
-        # Try to fix common JSON issues
-        try:
-            # Remove any trailing commas
-            fixed_response = re.sub(r',(\s*[}\]])', r'\1', fixed_response)
-            # Fix missing quotes around keys
-            fixed_response = re.sub(r'(\w+):', r'"\1":', fixed_response)
-            return json.loads(fixed_response)
-        except json.JSONDecodeError:
-            pass
-        
-        # Last resort: try to construct a minimal valid JSON
-        try:
-            # Look for sql field specifically
-            sql_match = re.search(r'"sql"\s*:\s*["\']([^"\']*(?:\\.[^"\']*)*)["\']', response, re.DOTALL)
-            if sql_match:
-                sql_content = sql_match.group(1)
-                # Clean up the SQL content
-                sql_content = sql_content.replace('\n', ' ').replace('\r', ' ')
-                return {"sql": sql_content}
-        except:
-            pass
-        
-        # Try to extract any SQL-like content
-        try:
-            sql_match = re.search(r'(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH).*?(?:FROM|INTO|UPDATE|DELETE|CREATE|ALTER|DROP|$)', response, re.IGNORECASE | re.DOTALL)
-            if sql_match:
-                sql_content = sql_match.group(0).strip()
-                sql_content = sql_content.replace('\n', ' ').replace('\r', ' ')
-                return {"sql": sql_content}
-        except:
-            pass
-        
-        # If all else fails, return a default structure
+            return None
+
+    def try_extract_sql_field(self, response: str) -> Dict[str, Any]:
+        """Extract SQL from 'sql' field as fallback."""
+        sql_match = re.search(r'"sql"\s*:\s*["\']([^"\']*(?:\\.[^"\']*)*)["\']', response, re.DOTALL)
+        if sql_match:
+            sql_content = sql_match.group(1).replace('\n', ' ').replace('\r', ' ')
+            return {"sql": sql_content}
+        return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+    def try_extract_any_sql(self, response: str) -> Dict[str, Any]:
+        """Extract any SQL-like content as last resort."""
+        sql_match = re.search(
+            r'(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|WITH).*?(?:FROM|INTO|UPDATE|DELETE|CREATE|ALTER|DROP|$)',
+            response, re.IGNORECASE | re.DOTALL)
+        if sql_match:
+            sql_content = sql_match.group(0).strip().replace('\n', ' ').replace('\r', ' ')
+            return {"sql": sql_content}
+        return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+    def parse_json_response(self, response: str) -> Dict[str, Any]:
+        """Robust JSON parsing with multiple fallback strategies."""
+        if not response or not isinstance(response, str):
+            logger.warning(f"Invalid response type: {type(response)}")
+            return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
+
+        response = response.strip()
+
+        # Try direct parsing
+        result = self.try_direct_parse(response)
+        if result:
+            return result
+
+        # Try extracting JSON
+        result = self.try_extract_json(response)
+        if result:
+            return result
+
+        # Try fixing common issues
+        result = self.try_fix_common_issues(response)
+        if result:
+            return result
+
+        # Try extracting sql field
+        result = self.try_extract_sql_field(response)
+        if result.get("sql") != "SELECT 1":
+            return result
+
+        # Try extracting any SQL
+        result = self.try_extract_any_sql(response)
+        if result.get("sql") != "SELECT 1":
+            return result
+
         logger.warning(f"Failed to parse JSON response: {response[:200]}...")
         return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
 
-    def get_db_path(self, db_id):
-        return Path(self.db_path) / f"{db_id}/{db_id}.sqlite"
-
-    def execute_sql(self, sql, db_id):
+    def execute_sql(self, sql, db_id, db_type):
+        """Execute SQL query and return row count, column count, and partial results."""
         try:
             db_path = self.get_db_path(db_id)
-            df, err = get_sql_exec_result("sqlite", sql_query=sql, db_path=db_path)
+            sql_args = {
+                "db_type": db_type,
+                "sql_query": sql,
+                "db_path": db_path,
+                "db_id": db_id,
+                "credential_path": self.credential if self.credential else None
+            }
+            df, err = get_sql_exec_result(**sql_args)
             if err:
                 return 0, 0, f"Error: {err}"
             row_count = len(df) if df is not None else 0
@@ -406,50 +423,83 @@ class RSLSQLGenerator(BaseGenerator):
         """从schema DataFrame生成简单的DDL"""
         if schema_df is None or schema_df.empty:
             return "#\n# ", {}
-        
+
         if tables is None:
             tables = self.get_all_tables_from_schema(schema_df)
-        
+
         table_list = {}
         simple_ddl = "#\n# "
-        
+
         for table in tables:
             if columns:
                 col_list = [col.split(".")[1].strip("`") for col in columns if col.split(".")[0] == table]
             else:
                 col_list = self.get_table_columns_from_schema(schema_df, table)
-            
+
             simple_ddl += f"{table}(" + ",".join([f"`{col}`" for col in col_list]) + ")\n# "
             table_list[table] = [f"`{col}`" for col in col_list]
-        
+
         return simple_ddl.strip(), table_list
 
-    def get_ddl_data_from_schema(self, schema_df, tables, table_list):
+    def get_ddl_data_from_schema(self, schema_df, tables, table_list, db_id=None, db_type="sqlite"):
         """从schema DataFrame生成DDL数据信息"""
         if schema_df is None or schema_df.empty:
             return "# "
-        
+
         simplified_ddl_data = []
         for table in tables:
             if table not in table_list:
                 continue
-                
+
             col_str = ",".join(table_list[table])
-            # 从schema中获取示例数据
+
+            # First try to get sample data from schema if available
             table_schema = schema_df[schema_df['table_name'] == table]
-            test = ""
-            for _, row in table_schema.iterrows():
-                col_name = row['column_name']
-                sample_rows = row.get('sample_rows', [])
+            has_sample_data = False
+
+            if not table_schema.empty:
+                # Check if we have sample_rows in schema
+                sample_rows = table_schema.iloc[0].get('sample_rows', [])
                 if isinstance(sample_rows, list) and len(sample_rows) > 0:
-                    vals = [str(sample_rows[i]) if i < len(sample_rows) else "" for i in range(min(3, len(sample_rows)))]
-                else:
-                    vals = ["", "", ""]
-                test += f"{col_name}[{','.join(vals)}],"
-            
-            if test:
-                simplified_ddl_data.append(f"{table}({test[:-1]})")
-        
+                    has_sample_data = True
+                    test = ""
+                    for _, row in table_schema.iterrows():
+                        col_name = row['column_name']
+                        sample_vals = row.get('sample_rows', [])
+                        if isinstance(sample_vals, list) and len(sample_vals) > 0:
+                            vals = [str(sample_vals[i]) if i < len(sample_vals) else "" for i in
+                                    range(min(3, len(sample_vals)))]
+                        else:
+                            vals = ["", "", ""]
+                        test += f"{col_name}[{','.join(vals)}],"
+
+                    if test:
+                        simplified_ddl_data.append(f"{table}({test[:-1]})")
+                        continue
+
+            # If no sample data in schema and db_id provided, query database
+            if not has_sample_data and db_id is not None:
+                try:
+                    db_path = self.get_db_path(db_id)
+                    sql = f"SELECT {col_str} FROM `{table}` LIMIT 3"
+                    df, err = get_sql_exec_result(db_type, sql_query=sql, db_path=db_path, db_id=db_id,
+                                                  credential_path=self.credential)
+                    if err or df is None:
+                        continue
+
+                    col_names = df.columns.tolist()
+                    data_rows = df.values.tolist()
+                    test = ""
+                    for idx, col in enumerate(col_names):
+                        vals = [str(data_rows[r][idx]) if r < len(data_rows) else "" for r in range(3)]
+                        test += f"{col}[{','.join(vals)}],"
+
+                    if test:
+                        simplified_ddl_data.append(f"{table}({test[:-1]})")
+                except Exception as e:
+                    logger.warning(f"Failed to get sample data for table {table}: {e}")
+                    continue
+
         ddls_data = "# " + ";\n# ".join(simplified_ddl_data) + ";\n# "
         return ddls_data
 
@@ -457,10 +507,10 @@ class RSLSQLGenerator(BaseGenerator):
         """从schema DataFrame中提取外键信息"""
         if schema_df is None or schema_df.empty:
             return "#\n# "
-        
+
         if tables is None:
             tables = self.get_all_tables_from_schema(schema_df)
-        
+
         # 这里需要根据实际的schema结构来提取外键信息
         # 由于用户提供的schema格式中没有明确的外键信息，我们返回空的外键信息
         foreign_str = "#\n# "
@@ -470,98 +520,19 @@ class RSLSQLGenerator(BaseGenerator):
         """从schema DataFrame中获取列描述信息"""
         if schema_df is None or schema_df.empty:
             return ""
-        
+
         explanation = ""
         columns_lower = [col.replace("`", "").lower() for col in columns]
-        
+
         for _, row in schema_df.iterrows():
             table_name = row['table_name']
             col_name = row['column_name']
             col_desc = row.get('column_descriptions', '')
-            
+
             if table_name in tables and f"{table_name}.`{col_name}`".lower() in columns_lower:
                 if col_desc:
                     explanation += f"# {table_name}.{col_name}: {col_desc}\n"
-        
-        return explanation
 
-    # 保留原有的数据库访问方法作为备用
-    def get_all_tables(self, db_id):
-        sql = "SELECT name FROM sqlite_master WHERE type='table' AND name != 'sqlite_sequence';"
-        df, _ = get_sql_exec_result("sqlite", sql_query=sql, db_path=self.get_db_path(db_id))
-        return df["name"].tolist() if df is not None else []
-
-    def get_table_columns(self, db_id, table):
-        sql = f"PRAGMA table_info('{table}');"
-        df, _ = get_sql_exec_result("sqlite", sql_query=sql, db_path=self.get_db_path(db_id))
-        return df["name"].tolist() if df is not None else []
-
-    def get_all_schema(self, db_id):
-        tables = self.get_all_tables(db_id)
-        schema = []
-        for table in tables:
-            columns = self.get_table_columns(db_id, table)
-            for col in columns:
-                schema.append(f"{table}.{col}")
-        return schema
-
-    def get_simple_ddl(self, db_id, tables=None, columns=None):
-        if tables is None:
-            tables = self.get_all_tables(db_id)
-        table_list = {}
-        simple_ddl = "#\n# "
-        for table in tables:
-            if columns:
-                col_list = [col.split(".")[1].strip("`") for col in columns if col.split(".")[0] == table]
-            else:
-                col_list = self.get_table_columns(db_id, table)
-            simple_ddl += f"{table}(" + ",".join([f"`{col}`" for col in col_list]) + ")\n# "
-            table_list[table] = [f"`{col}`" for col in col_list]
-        return simple_ddl.strip(), table_list
-
-    def get_ddl_data(self, db_id, tables, table_list):
-        simplified_ddl_data = []
-        for table in tables:
-            col_str = ",".join(table_list[table])
-            sql = f"SELECT {col_str} FROM `{table}` LIMIT 3"
-            df, _ = get_sql_exec_result("sqlite", sql_query=sql, db_path=self.get_db_path(db_id))
-            if df is None:
-                continue
-            col_names = df.columns.tolist()
-            data_rows = df.values.tolist()
-            test = ""
-            for idx, col in enumerate(col_names):
-                vals = [str(data_rows[i][idx]) if i < len(data_rows) else "" for i in range(3)]
-                test += f"{col}[{','.join(vals)}],"
-            simplified_ddl_data.append(f"{table}({test[:-1]})")
-        ddls_data = "# " + ";\n# ".join(simplified_ddl_data) + ";\n# "
-        return ddls_data
-
-    def get_foreign_key(self, db_id, tables=None):
-        if tables is None:
-            tables = self.get_all_tables(db_id)
-        foreign_str = "#\n# "
-        for table in tables:
-            sql = f"PRAGMA foreign_key_list('{table}');"
-            df, _ = get_sql_exec_result("sqlite", sql_query=sql, db_path=self.get_db_path(db_id))
-            if df is None:
-                continue
-            for _, row in df.iterrows():
-                if row["table"] in tables:
-                    foreign_one = f"{table}({row['from']}) references {row['table']}({row['to']})"
-                    foreign_str += foreign_one + "\n# "
-        return foreign_str.strip()
-
-    def get_explanation(self, db_id, tables, columns):
-        explanation = ""
-        columns_lower = [col.replace("`", "").lower() for col in columns]
-        for key, desc in self.column_meaning.items():
-            parts = key.lower().split("|")
-            if len(parts) != 3:
-                continue
-            db_name, table_name, col_name = parts
-            if db_name == db_id and table_name in tables and f"{table_name}.`{col_name}`".lower() in columns_lower:
-                explanation += f"# {table_name}.{col_name}: {desc}\n"
         return explanation
 
     def table_column_selection(self, table_info, question, evidence):
@@ -572,7 +543,7 @@ class RSLSQLGenerator(BaseGenerator):
     def preliminary_sql_gen(self, table_info, table_column, example, question, evidence):
         table_info += f'### tables: {table_column["tables"]}\n'
         table_info += f'### columns: {table_column["columns"]}\n'
-        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {'sql': 'your sql'}."
+        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
         response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
@@ -630,22 +601,22 @@ class RSLSQLGenerator(BaseGenerator):
         table_info += f'### tables: {table_aug["tables"]}\n'
         table_info += f'### columns: {table_aug["columns"]}\n'
         table_info += f'### conditions: {cond_aug["conditions"]}'
-        prompt = example.strip() + '\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n' + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {'sql': 'your sql'}."
+        prompt = example.strip() + '\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n' + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
         response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
     def binary_selection(self, table_info, sql1, re1, sql2, re2):
         candidate_sql = f"### sql1: {sql1} \n### result1: {re1} \n### sql2: {sql2} \n### result2: {re2}"
-        prompt = table_info + "\n\n### Select the best SQL query to answer the question:\n" + candidate_sql + "\n\nReturn your answer in JSON format as {'sql': 'your selected or new sql'}."
+        prompt = table_info + "\n\n### Select the best SQL query to answer the question:\n" + candidate_sql + "\n\nReturn your answer in JSON format as {\"sql\": \"your selected or new sql\"}."
         response = self.llm.complete(BINARY_PROMPT.format(table_info=table_info, candidate_sql=candidate_sql)).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
-    def self_correction(self, table_info, pre_sql, db_id):
+    def self_correction(self, table_info, pre_sql, db_id, db_type):
         prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
         num = 0
         while num < 5:
             try:
-                row_count, column_count, result = self.execute_sql(pre_sql, db_id)
+                row_count, column_count, result = self.execute_sql(pre_sql, db_id, db_type)
             except Exception as e:
                 logger.error(f"SQL execution error: {e}")
                 break
@@ -666,11 +637,12 @@ class RSLSQLGenerator(BaseGenerator):
             schema_links=None,
             **kwargs
     ):
+        """Generate predicted SQL for the given dataset item using RSLSQL methodology."""
         logger.info(f"RSLSQLGenerator processing item {item}")
         row = self.dataset[item]
         question = row['question']
         db_id = row['db_id']
-        db_type = row.get('db_type', 'sqlite')  # Assume sqlite
+        db_type = row.get('db_type', 'sqlite')
         evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
         example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
         evidence = evidence or ''
@@ -709,10 +681,11 @@ class RSLSQLGenerator(BaseGenerator):
         # Step 1: Preliminary SQL - 使用schema DataFrame而不是直接访问数据库
         try:
             simple_ddl, _ = self.get_simple_ddl_from_schema(schema_df)
-            ddl_data = self.get_ddl_data_from_schema(schema_df, self.get_all_tables_from_schema(schema_df), 
-                                                    {t: self.get_table_columns_from_schema(schema_df, t) for t in self.get_all_tables_from_schema(schema_df)})
+            ddl_data = self.get_ddl_data_from_schema(schema_df, self.get_all_tables_from_schema(schema_df),
+                                                     {t: self.get_table_columns_from_schema(schema_df, t) for t in
+                                                      self.get_all_tables_from_schema(schema_df)}, db_id, db_type)
             foreign_key = self.get_foreign_key_from_schema(schema_df)
-            table_info = '### Sqlite SQL tables, with their properties:\n' + simple_ddl + '\n### Here are some data information about database references.\n' + ddl_data + '\n### Foreign key information of Sqlite SQL tables, used for table joins:\n' + foreign_key
+            table_info = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}'
             table_column = self.table_column_selection(table_info, question, evidence)
 
             pre_sql = self.preliminary_sql_gen(table_info, table_column, example, question, evidence)
@@ -736,11 +709,12 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Step 2: Information Augmentation
         try:
-            simple_ddl, table_list = self.get_simple_ddl_from_schema(schema_df, schema_links['tables'], schema_links['columns'])
-            ddl_data = self.get_ddl_data_from_schema(schema_df, schema_links['tables'], table_list)
+            simple_ddl, table_list = self.get_simple_ddl_from_schema(schema_df, schema_links['tables'],
+                                                                     schema_links['columns'])
+            ddl_data = self.get_ddl_data_from_schema(schema_df, schema_links['tables'], table_list, db_id, db_type)
             foreign_key = self.get_foreign_key_from_schema(schema_df, schema_links['tables'])
             explanation = self.get_explanation_from_schema(schema_df, schema_links['tables'], schema_links['columns'])
-            table_info_aug = '### Sqlite SQL tables, with their properties:\n' + simple_ddl + '\n### Here are some data information about database references.\n' + ddl_data + '\n### Foreign key information of Sqlite SQL tables, used for table joins:\n' + foreign_key + '\n### The meaning of every column:\n#\n' + explanation.strip() + '\n#\n'
+            table_info_aug = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}\n### The meaning of every column:\n#\n{explanation.strip()}\n#\n'
 
             table_aug = self.table_column_selection(table_info_aug, question, evidence)  # Similar to table_augmentation
             word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
@@ -756,8 +730,8 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Step 3: Binary Selection
         try:
-            r1, c1, re1 = self.execute_sql(pre_sql, db_id)
-            r2, c2, re2 = self.execute_sql(sql2, db_id)
+            r1, c1, re1 = self.execute_sql(pre_sql, db_id, db_type)
+            r2, c2, re2 = self.execute_sql(sql2, db_id, db_type)
             selected_sql = self.binary_selection(table_info_aug, pre_sql, re1, sql2, re2)
         except Exception as e:
             logger.error(f"Error in binary selection: {e}")
@@ -765,7 +739,12 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Step 4: Self Correction
         try:
-            pred_sql = self.self_correction(table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}', selected_sql, db_id)
+            pred_sql = self.self_correction(
+                table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}',
+                selected_sql,
+                db_id,
+                db_type
+            )
         except Exception as e:
             logger.error(f"Error in self correction: {e}")
             pred_sql = selected_sql
@@ -774,9 +753,9 @@ class RSLSQLGenerator(BaseGenerator):
             instance_id = row.get("instance_id", item)
             save_path = Path(self.save_dir)
             save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.name}_{instance_id}.sql"
+            save_path = save_path / f"{self.NAME}_{instance_id}.sql"
 
             save_dataset(pred_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
 
-        return pred_sql 
+        return pred_sql

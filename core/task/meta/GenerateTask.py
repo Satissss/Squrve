@@ -5,7 +5,7 @@ from llama_index.core.llms.llm import LLM
 
 from core.task.meta.MetaTask import MetaTask
 from core.actor.generator.LinkAlignGenerate import LinkAlignGenerator
-from core.actor.generator.DINSQLGenerate import DIN_SQLGenerator
+from core.actor.generator.DINSQLGenerate import DINSQLGenerator
 from core.actor.generator.DAILSQLGenerate import DAILSQLGenerate
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.actor.generator.CHESSGenerate import CHESSGenerator
@@ -67,8 +67,8 @@ class GenerateTask(MetaTask):
             actor = LinkAlignGenerator(**generate_args)
             return actor
         
-        elif actor_type in ("DIN_SQLGenerator", "DIN_SQL"):
-            actor = DIN_SQLGenerator(**generate_args)
+        elif actor_type in ("DINSQLGenerator", "DINSQL"):
+            actor = DINSQLGenerator(**generate_args)
             return actor
         
         elif actor_type in ("DAILSQLGenerator", "DAILSQL"):

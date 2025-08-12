@@ -954,21 +954,25 @@ class BasicICLPrompt(object):
                     components.append(prompt_extra)
                 components.append(prompt_question)
                 return "\n\n".join(components)
+
             self.format_question = format_question
         # Explicitly define format_target if not available
         if not hasattr(self, 'format_target'):
             def format_target(ex):
                 return self.format_question(ex) + "\nSELECT "
+
             self.format_target = format_target
         # Explicitly define get_example_prefix if not available
         if not hasattr(self, 'get_example_prefix'):
             def get_example_prefix():
                 return "/* Some SQL examples are provided based on similar problems: */\n"
+
             self.get_example_prefix = get_example_prefix
         # Explicitly define format_example if not available
         if not hasattr(self, 'format_example'):
             def format_example(ex):
                 return "/* Answer the following: {} */\n{}".format(ex['question'], ex['query'])
+
             self.format_example = format_example
         # Proceed with prompt construction
         suffix = self.format_target(target)[len(self.format_question(target)):]
@@ -984,6 +988,7 @@ class BasicICLPrompt(object):
                         indexes = [i for i in indexes if self.db_ids[i] != t['db_id']]
                     selected = random.sample(indexes, min(n, len(indexes)))
                     return [self.train_json[i] for i in selected]
+
                 self.get_examples = get_examples
             examples = self.get_examples(target, self.NUM_EXAMPLE, cross_domain)
             if hasattr(self, 'record_example_quality'):
@@ -1007,7 +1012,7 @@ class BasicExampleSelector(object):
         self.data = data
         self.train_json = self.data.get('train_json', [])
         self.db_ids = [d.get('db_id') for d in self.train_json]
-        self.train_questions = [d['question'] for d in self.train_json]
+        self.train_questions = [d.get('question') for d in self.train_json]
 
     def get_examples(self, question, num_example, cross_domain=False):
         pass
@@ -1038,14 +1043,12 @@ class RandomExampleSelector(BasicExampleSelector):
 class CosineSimilarExampleSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity based on question text instead of embeddings
-        similarities = []
-        for i, train_question in enumerate(self.train_questions):
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1063,17 +1066,12 @@ class CosineSimilarExampleSelector(BasicExampleSelector):
 class EuclideanDistanceSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use simple word-based distance instead of embeddings
-        distances = []
-        target_words = set(target['question'].lower().split())
-        for train_question in self.train_questions:
-            train_words = set(train_question.lower().split())
-            # Calculate simple set-based distance
-            distance = len(target_words.symmetric_difference(train_words))
-            distances.append(distance)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import euclidean_distances
+        distances = np.squeeze(euclidean_distances(target_embedding, self.train_embeddings)).tolist()
         pairs = [(d, i) for d, i in zip(distances, range(len(distances)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0])
         top_pairs = []
@@ -1091,16 +1089,12 @@ class EuclideanDistanceSelector(BasicExampleSelector):
 class EuclideanDistanceThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use simple word-based distance with threshold
-        distances = []
-        target_words = set(target['question'].lower().split())
-        for train_question in self.train_questions:
-            train_words = set(train_question.lower().split())
-            distance = len(target_words.symmetric_difference(train_words))
-            distances.append(distance)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import euclidean_distances
+        distances = np.squeeze(euclidean_distances(target_embedding, self.train_embeddings)).tolist()
         pairs = [(d, i) for d, i in zip(distances, range(len(distances)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0])
         top_pairs = []
@@ -1109,9 +1103,7 @@ class EuclideanDistanceThresholdSelector(BasicExampleSelector):
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Apply threshold (e.g., distance < 10)
-            if d < 10:  # Simple threshold
-                top_pairs.append((index, d))
+            top_pairs.append((index, d))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, d) in top_pairs]
@@ -1120,14 +1112,12 @@ class EuclideanDistanceThresholdSelector(BasicExampleSelector):
 class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text with threshold
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1136,9 +1126,7 @@ class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector)
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Apply similarity threshold
-            if s > 0.1:  # Simple threshold
-                top_pairs.append((index, s))
+            top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1147,14 +1135,12 @@ class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector)
 class EuclideanDistanceQuestionMaskSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1172,14 +1158,12 @@ class EuclideanDistanceQuestionMaskSelector(BasicExampleSelector):
 class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text with threshold
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1188,9 +1172,7 @@ class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelect
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Apply similarity threshold
-            if s > 0.1:  # Simple threshold
-                top_pairs.append((index, s))
+            top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1199,14 +1181,12 @@ class EuclideanDistancePreSkeletonSimilarityThresholdSelector(BasicExampleSelect
 class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text with enhanced selection
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1215,9 +1195,7 @@ class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Enhanced selection with higher threshold
-            if s > 0.15:  # Higher threshold for better quality
-                top_pairs.append((index, s))
+            top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1226,14 +1204,12 @@ class EuclideanDistancePreSkeletonSimilarityPlusSelector(BasicExampleSelector):
 class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text with mask-based threshold
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1242,9 +1218,7 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSe
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Mask-based threshold
-            if s > 0.1:  # Threshold for masked similarity
-                top_pairs.append((index, s))
+            top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1253,14 +1227,12 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdSelector(BasicExampleSe
 class EuclideanDistanceMaskPreSkeletonSimilarityThresholdShiftSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
+        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
 
     def get_examples(self, target, num_example, cross_domain=False):
-        # Use Jaccard similarity on question text with shifted threshold
-        similarities = []
-        for train_question in self.train_questions:
-            sim = jaccard_similarity(target['question'], train_question)
-            similarities.append(sim)
-        
+        target_embedding = np.random.rand(1, 768)  # Dummy
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
         pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
         top_pairs = []
@@ -1269,9 +1241,7 @@ class EuclideanDistanceMaskPreSkeletonSimilarityThresholdShiftSelector(BasicExam
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            # Shifted threshold for better selection
-            if s > 0.05:  # Lower threshold for more examples
-                top_pairs.append((index, s))
+            top_pairs.append((index, s))
             if len(top_pairs) >= num_example:
                 break
         return [self.train_json[index] for (index, s) in top_pairs]
@@ -1388,7 +1358,7 @@ class DAILSQLGenerate(BaseGenerator):
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
-            llm = None,
+            llm=None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
             use_external: bool = True,
@@ -1419,25 +1389,22 @@ class DAILSQLGenerate(BaseGenerator):
             self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
                 data=self.dataset, tokenizer="approx")
 
-        # Import necessary libraries for database operations
-        from core.db_connect import get_sql_exec_result
-
     def act(self, item, schema=None, schema_links=None, **kwargs):
         try:
             if isinstance(item, int):
                 row = self.dataset[item]
             else:
                 row = item
-                
+
             question = row.get('question', '')
             db_id = row.get('db_id', 'default_db')
             db_type = row.get('db_type', 'sqlite')
-            
+
             logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
 
             # Load and process schema
             logger.debug("Processing database schema...")
-            if isinstance(schema, (str, PathLike)) and Path(schema).exists():
+            if isinstance(schema, (str, PathLike)):
                 schema = load_dataset(schema)
 
             if schema is None:
@@ -1484,7 +1451,7 @@ class DAILSQLGenerate(BaseGenerator):
                 question_toks = target['question'].split()
                 # 使用简化的 schema linking 实现
                 q_col_match, q_tab_match = self._simplified_schema_linking(question_toks, schema_dict)
-                
+
                 # 简化的 cell value linking - 只处理数字和日期
                 cv_link = {"num_date_match": {}, "cell_match": {}}
                 for q_id, word in enumerate(question_toks):
@@ -1493,14 +1460,15 @@ class DAILSQLGenerate(BaseGenerator):
                         float(word)
                         # 找到匹配的数字类型列
                         for col_id, (table_id, col_name) in enumerate(schema_dict['column_names_original']):
-                            col_type = schema_dict['column_types'][col_id] if col_id < len(schema_dict['column_types']) else 'text'
+                            col_type = schema_dict['column_types'][col_id] if col_id < len(
+                                schema_dict['column_types']) else 'text'
                             if 'number' in col_type.lower() or 'int' in col_type.lower() or 'float' in col_type.lower():
                                 cv_link['num_date_match'][f"{q_id},{col_id}"] = 'NUMBER'
                     except ValueError:
                         pass
-                
+
                 schema_links = {
-                    'sc_link': {'q_col_match': q_col_match, 'q_tab_match': q_tab_match}, 
+                    'sc_link': {'q_col_match': q_col_match, 'q_tab_match': q_tab_match},
                     'cv_link': cv_link
                 }
 
@@ -1539,11 +1507,11 @@ class DAILSQLGenerate(BaseGenerator):
             'column_types': [],
             'connection': None  # 暂时设为 None，实际使用时可能需要数据库连接
         }
-        
+
         # 获取所有唯一的表名
         table_names = schema_df['table_name'].unique().tolist()
         schema_dict['table_names_original'] = table_names
-        
+
         # 构建 column_names_original 格式: [(table_id, column_name), ...]
         # 其中 table_id 是表名在 table_names_original 中的索引
         for _, row in schema_df.iterrows():
@@ -1552,21 +1520,21 @@ class DAILSQLGenerate(BaseGenerator):
             table_id = table_names.index(table_name)
             schema_dict['column_names_original'].append((table_id, column_name))
             schema_dict['column_types'].append(row.get('column_types', 'text'))
-        
+
         return schema_dict
 
     def _get_tables_from_schema(self, schema_dict: Dict) -> List:
         """从 schema 字典中提取表信息，用于构建 tables 对象"""
         tables = []
         table_names = schema_dict.get('table_names_original', [])
-        
+
         for table_name in table_names:
             # 获取该表的所有列
             table_columns = []
             for table_id, col_name in schema_dict.get('column_names_original', []):
                 if table_id < len(table_names) and table_names[table_id] == table_name:
                     table_columns.append(col_name)
-            
+
             # 创建 SqliteTable 对象
             table_obj = SqliteTable(
                 name=table_name,
@@ -1574,36 +1542,36 @@ class DAILSQLGenerate(BaseGenerator):
                 data=None
             )
             tables.append(table_obj)
-        
+
         return tables
 
     def _simplified_schema_linking(self, question_toks, schema_dict):
         """简化的 schema linking 实现，避免复杂的数据库连接"""
         q_col_match = {}
         q_tab_match = {}
-        
+
         # 获取列名和表名
         columns = [c[1] for c in schema_dict['column_names_original']]
         tables = schema_dict['table_names_original']
-        
+
         # 简单的字符串匹配
         for q_id, word in enumerate(question_toks):
             word_lower = word.lower()
-            
+
             # 检查列名匹配
             for col_id, col_name in enumerate(columns):
                 if word_lower in col_name.lower() or col_name.lower() in word_lower:
                     q_col_match[f"{q_id},{col_id}"] = COL_PARTIAL_MATCH_FLAG
                     if word_lower == col_name.lower():
                         q_col_match[f"{q_id},{col_id}"] = COL_EXACT_MATCH_FLAG
-            
+
             # 检查表名匹配
             for tab_id, tab_name in enumerate(tables):
                 if word_lower in tab_name.lower() or tab_name.lower() in word_lower:
                     q_tab_match[f"{q_id},{tab_id}"] = TAB_PARTIAL_MATCH_FLAG
                     if word_lower == tab_name.lower():
                         q_tab_match[f"{q_id},{tab_id}"] = TAB_EXACT_MATCH_FLAG
-        
+
         return q_col_match, q_tab_match
 
 
