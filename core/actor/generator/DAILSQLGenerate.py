@@ -3,7 +3,6 @@ import re
 import string
 import numpy as np
 import random
-# import sqlite3  # Replaced with get_sql_exec_result for database abstraction
 import nltk
 from nltk.corpus import stopwords
 from os import PathLike
@@ -236,7 +235,7 @@ def mask_question_with_schema_linking(data_jsons, mask_tag='<mask>', value_tag='
     return mask_questions
 
 
-def get_sql_for_database(path_db, db_type='sqlite', credential=None):
+def get_sql_for_database(path_db, db_type='sqlite', credential=None, db_id=None):
     """
     Get CREATE TABLE SQL statements for database using get_sql_exec_result.
     Supports multiple database types through unified interface.
@@ -260,7 +259,8 @@ def get_sql_for_database(path_db, db_type='sqlite', credential=None):
             db_type=db_type,
             sql_query=table_names_query,
             db_path=str(path_db) if path_db else None,
-            credential_path=credential
+            credential_path=credential,
+            db_id=db_id
         )
 
         if error or result is None:
@@ -283,7 +283,9 @@ def get_sql_for_database(path_db, db_type='sqlite', credential=None):
                 result, error = get_sql_exec_result(
                     db_type=db_type,
                     sql_query=create_sql_query,
-                    db_path=str(path_db) if path_db else None
+                    db_path=str(path_db) if path_db else None,
+                    credential_path=credential,
+                    db_id=db_id
                 )
                 if not error and result is not None:
                     if hasattr(result, 'values') and len(result.values) > 0:
@@ -359,37 +361,35 @@ TAB_EXACT_MATCH_FLAG = "TEM"
 
 
 def compute_schema_linking(question, column, table):
+    def _to_tokens(value):
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            return [t for t in re.split(r"[\s_]+", value.strip()) if t]
+        return [str(value)]
+
     def partial_match(x_list, y_list):
-        x_str = " ".join(x_list)
-        y_str = " ".join(y_list)
-        if x_str in STOPWORDS or x_str in PUNKS:
+        x_str = " ".join(x_list).strip().lower()
+        y_str = " ".join(_to_tokens(y_list)).strip().lower()
+        if not x_str or x_str in STOPWORDS or x_str in PUNKS:
             return False
-        if re.match(rf"\b{re.escape(x_str)}\b", y_str):
-            assert x_str in y_str
-            return True
-        else:
-            return False
+        return re.search(rf"\b{re.escape(x_str)}\b", y_str) is not None
 
     def exact_match(x_list, y_list):
-        x_str = " ".join(x_list)
-        y_str = " ".join(y_list)
-        if x_str == y_str:
-            return True
-        else:
-            return False
+        x_str = " ".join(x_list).strip().lower()
+        y_str = " ".join(_to_tokens(y_list)).strip().lower()
+        return x_str == y_str
 
     q_col_match = dict()
     q_tab_match = dict()
 
     col_id2list = dict()
     for col_id, col_item in enumerate(column):
-        if col_id == 0:
-            continue
-        col_id2list[col_id] = col_item
+        col_id2list[col_id] = _to_tokens(col_item)
 
     tab_id2list = dict()
     for tab_id, tab_item in enumerate(table):
-        tab_id2list[tab_id] = tab_item
+        tab_id2list[tab_id] = _to_tokens(tab_item)
 
     # 5-gram
     n = 5
@@ -424,7 +424,7 @@ def compute_schema_linking(question, column, table):
     return {"q_col_match": q_col_match, "q_tab_match": q_tab_match}
 
 
-def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential=None):
+def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, credential=None):
     """
     Compute cell value linking using the unified database connection approach.
     Supports multiple database types through get_sql_exec_result factory method.
@@ -438,7 +438,7 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential
         except:
             return False
 
-    def db_word_match(word, column, table, db_type, db_path, credential, exact=False):
+    def db_word_match(word, column, table, db_type, db_path, db_id, credential, exact=False):
         """
         Use get_sql_exec_result for database queries across different database types.
         Supports SQLite, BigQuery, Snowflake, etc.
@@ -509,7 +509,8 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential
                 "db_type": db_type,
                 "sql_query": sql_query,
                 "db_path": str(db_path) if db_path else None,
-                "credential_path": credential
+                "credential_path": credential,
+                "db_id": db_id
             }
             result, error = get_sql_exec_result(**exec_args)
 
@@ -544,8 +545,6 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential
     logger.debug(f"Starting cell value linking for {len(column_names)} columns in {db_type} database")
 
     for col_id, (table_id, col_name) in enumerate(column_names):
-        if col_id == 0:  # Skip the first '*' column
-            continue
 
         if table_id >= len(table_names):
             continue
@@ -573,7 +572,7 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential
                     num_date_match[f"{q_id},{col_id}"] = "TIME"
             else:
                 # Check cell value match using database-agnostic query
-                if db_word_match(word, col_name, table_name, db_type, db_path, credential, exact=False):
+                if db_word_match(word, col_name, table_name, db_type, db_path, db_id, credential, exact=False):
                     match_q_ids.append(q_id)
 
         # Process consecutive matches for exact matching
@@ -586,7 +585,7 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential
             words = [token for token in tokens[q_f: q_t]]
 
             # Try exact match first
-            if db_word_match(' '.join(words), col_name, table_name, db_type, db_path, credential, exact=True):
+            if db_word_match(' '.join(words), col_name, table_name, db_type, db_path, db_id, credential, exact=True):
                 for q_id in range(q_f, q_t):
                     cell_match[f"{q_id},{col_id}"] = CELL_EXACT_MATCH_FLAG
             else:
@@ -662,19 +661,19 @@ class SqliteTable(dict):
     __setattr__ = dict.__setitem__
 
 
-def get_tables(path_db, db_type='sqlite', credential=None):
+def get_tables(path_db, db_type='sqlite', credential=None, db_id=None):
     """
     Get table information using get_sql_exec_result for database abstraction.
     Supports multiple database types.
     """
     try:
         # Get table names using the unified approach
-        table_names = get_table_names_unified(path_db, db_type, credential)
+        table_names = get_table_names_unified(path_db, db_type, credential, db_id=db_id)
 
         res = list()
         for table_name in table_names:
             # Get schema information
-            schema = get_table_schema_unified(table_name, path_db, db_type, credential)
+            schema = get_table_schema_unified(table_name, path_db, db_type, credential, db_id=db_id)
 
             # Create table object
             res.append(
@@ -692,7 +691,7 @@ def get_tables(path_db, db_type='sqlite', credential=None):
         return []
 
 
-def get_table_names_unified(path_db, db_type='sqlite', credential=None):
+def get_table_names_unified(path_db, db_type='sqlite', credential=None, db_id=None):
     """
     Get table names using get_sql_exec_result for database abstraction.
     """
@@ -711,7 +710,8 @@ def get_table_names_unified(path_db, db_type='sqlite', credential=None):
             db_type=db_type,
             sql_query=query,
             db_path=str(path_db) if path_db else None,
-            credential_path=credential
+            credential_path=credential,
+            db_id=db_id
         )
 
         if error or result is None:
@@ -733,7 +733,7 @@ def get_table_names_unified(path_db, db_type='sqlite', credential=None):
         return []
 
 
-def get_table_schema_unified(table_name, path_db, db_type='sqlite', credential=None):
+def get_table_schema_unified(table_name, path_db, db_type='sqlite', credential=None, db_id=None):
     """
     Get table schema (column names) using get_sql_exec_result for database abstraction.
     """
@@ -752,7 +752,8 @@ def get_table_schema_unified(table_name, path_db, db_type='sqlite', credential=N
             db_type=db_type,
             sql_query=query,
             db_path=str(path_db) if path_db else None,
-            credential_path=credential
+            credential_path=credential,
+            db_id=db_id
         )
 
         if error or result is None:
@@ -808,10 +809,11 @@ class SQLPrompt(BasicPrompt):
         db_type = example.get('db_type', 'sqlite')
         path_db = example.get('path_db')
         credential = example.get('credential_path')
+        db_id = example.get('db_id')
 
         if path_db:
             try:
-                sqls = get_sql_for_database(path_db, db_type, credential)
+                sqls = get_sql_for_database(path_db, db_type, credential, db_id=db_id)
                 if sqls:
                     prompt_info = self.template_info.format("\n\n".join(sqls))
                 else:
@@ -881,7 +883,7 @@ class BaselinePrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -895,7 +897,7 @@ class InstructionPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -909,7 +911,7 @@ class TextWithForeignKeyPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -923,7 +925,7 @@ class NumberSignWithForeignKeyPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -937,7 +939,7 @@ class BaselineWithoutForeignKeyPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -951,7 +953,7 @@ class InstructionWithForeignKeyPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -965,7 +967,7 @@ class SQLWithRulePrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -979,7 +981,7 @@ class TextWithRulePrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -993,7 +995,7 @@ class NumberSignWithoutRulePrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1007,7 +1009,7 @@ class InstructionWithRulePrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1024,7 +1026,7 @@ class SQLCOTPrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1041,7 +1043,7 @@ class TextCOTPrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1058,7 +1060,7 @@ class NumberSignCOTPrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1075,7 +1077,7 @@ class InstructionCOTPrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1092,7 +1094,7 @@ class CBRPrompt(BasicPrompt):
         return self.format_question(example) + "\nA: SELECT "
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'])
+        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
         prompt_info = self.template_info.format("\n\n".join(sqls))
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
@@ -1762,7 +1764,7 @@ class DAILSQLGenerate(BaseGenerator):
                 # Schema column/table linking using original DAIL-SQL approach
                 sc_link = compute_schema_linking(
                     question_toks,
-                    [col[1] for col in schema_dict['column_names_original'][1:]],  # Skip '*' column
+                    [col[1] for col in schema_dict['column_names_original']],
                     schema_dict['table_names_original']
                 )
 
@@ -1772,6 +1774,7 @@ class DAILSQLGenerate(BaseGenerator):
                     schema_dict,
                     db_type,
                     db_path,
+                    db_id,
                     self.credential
                 )
 

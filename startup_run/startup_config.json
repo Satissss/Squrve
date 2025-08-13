@@ -33,177 +33,28 @@
   "task": {
     "task_meta": [
       {
-        "task_id": "reduce",
-        "task_type": "ReduceTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "reduce_type": "LinkAlignReducer"
-          }
-        }
-      },
-      {
-        "task_id": "parse",
-        "task_type": "ParseTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "parse_type": "OpenSearchCoTParser"
-          }
-        }
-      },
-      {
-        "task_id": "decompose",
-        "task_type": "DecomposeTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "decompose_type": "DINSQLDecomposer"
-          }
-        }
-      },
-      {
-        "task_id": "scale",
-        "task_type": "ScaleTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "scale_type": "ChessScaler"
-          }
-        },
-        "open_parallel": true,
-        "max_workers": 1
-      },
-      {
-        "task_id": "optimize",
-        "task_type": "OptimizeTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "optimize_type": "DINSQLOptimizer"
-          }
-        },
-        "open_parallel": true,
-        "max_workers": 1
-      },
-      {
-        "task_id": "select",
-        "task_type": "SelectTask",
-        "data_source": "spider:dev:db_size-10",
-        "schema_source": "spider:dev",
-        "dataset_save_path": "../files/datasets/spider_dev_generate.json",
-        "is_save_dataset": true,
-        "meta": {
-          "task": {
-            "select_type": "CHESSSelector"
-          }
-        },
-        "open_parallel": true,
-        "max_workers": 1
-      },
-      {
         "task_id": "generate",
         "task_type": "GenerateTask",
         "data_source": "spider:dev:db_size-10",
         "schema_source": "spider:dev",
         "dataset_save_path": "../files/datasets/spider_dev_generate.json",
         "is_save_dataset": true,
+        "eval_type": [
+          "execute_accuracy"
+        ],
         "meta": {
           "task": {
-            "generate_type": "DIN_SQLGenerator"
+            "generate_type": "CHESSGenerator"
           }
         },
         "open_parallel": true,
-        "max_workers": 1
+        "max_workers": 10
       }
-
-    ],
-    "cpx_task_meta": [
-      {
-        "task_id": "spider_dev_pipeline",
-        "task_info": "Complete Text-to-SQL pipeline for Spider dev dataset: Reduce -> Parse -> Generate",
-        "task_lis": [
-          "reduce",
-          "parse",
-          "generate"
-        ],
-        "eval_type": [
-          "execute_accuracy"
-        ],
-        "is_save_dataset": true,
-        "dataset_save_path": "../files/datasets/spider_dev_pipeline.json",
-        "meta": {
-          "actor": {
-            "reduce": {
-              "save_dir": "../files/instance_schemas/bird_dev"
-            },
-            "parse": {
-              "save_dir": "../files/schema_links/spider_dev"
-            },
-            "generate": {
-              "save_dir": "../files/pred_sql/spider_dev"
-            }
-          }
-        }
-      },
-      {
-        "task_id": "task_test",
-        "task_info": "Complete Text-to-SQL pipeline for Spider dev dataset: Reduce -> Parse -> Generate",
-        "task_lis": [
-          "reduce",
-          ["parse", "decompose"],
-          "scale",
-          "optimize",
-          "select"
-        ],
-        "eval_type": [
-          "execute_accuracy"
-        ],
-        "is_save_dataset": true,
-        "dataset_save_path": "../files/datasets/spider_dev_pipeline.json",
-        "meta": {
-          "actor": {
-            "reduce": {
-              "save_dir": "../files/instance_schemas/spider_dev"
-            },
-            "parse": {
-              "save_dir": "../files/schema_links/spider_dev"
-            },
-            "decompose": {
-              "save_dir": "../files/sub_questions/spider_dev"
-            },
-            "scale": {
-              "save_dir": "../files/pred_sql/spider_dev"
-            },
-            "optimize": {
-              "save_dir": "../files/pred_sql/spider_dev"
-            },
-            "select": {
-              "save_dir": "../files/pred_sql/spider_dev"
-            }
-          }
-        }
-      }
-    ],
-    "is_save_dataset": true,
-    "open_parallel": true,
-    "max_workers": 1
+    ]
   },
   "engine": {
     "exec_process": [
-      "spider_dev_pipeline"
+      "generate"
     ]
   }
 }

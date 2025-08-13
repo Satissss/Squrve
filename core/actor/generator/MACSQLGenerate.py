@@ -466,6 +466,7 @@ class Refiner:
             exec_args = {
                 "sql_query": sql,
                 "db_path": db_path,
+                "db_id": db_id,
                 "credential_path": credential
             }
 

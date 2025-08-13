@@ -50,11 +50,11 @@ Squrve supports multiple Text-to-SQL baselines, enabling quick integration and c
 
 Squrve includes built-in support for several standard Text-to-SQL benchmarks for easy model evaluation and comparison:
 
-| Benchmark             | Description                                      | Code Link |
-|-----------------------|--------------------------------------------------|-----------|
-| Spider (dev)          | Cross-domain Text-to-SQL benchmark, supporting dev split. | https://github.com/taoyds/spider |
-| BIRD (dev)            | Text-to-SQL benchmark with external knowledge.   | https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/bird |
-| Spider2 (in one week) | Extended version of Spider with more complex scenarios. | https://github.com/xlang-ai/Spider2 |
+| Benchmark           | Description                                      | Code Link |
+|---------------------|--------------------------------------------------|-----------|
+| Spider (dev\test)   | Cross-domain Text-to-SQL benchmark, supporting dev split. | https://github.com/taoyds/spider |
+| BIRD (dev)          | Text-to-SQL benchmark with external knowledge.   | https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/bird |
+| Spider2 (snow\lite) | Extended version of Spider with more complex scenarios. | https://github.com/xlang-ai/Spider2 |
 
 These benchmarks can be easily loaded and evaluated via configuration files.
 

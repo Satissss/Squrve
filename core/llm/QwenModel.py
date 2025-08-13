@@ -93,21 +93,29 @@ class QwenModel(CustomLLM):
         return CompletionResponse(text=completion_response)
 
     @llm_completion_callback()
-    def stream_complete(
-            self, prompt: str, **kwargs: Any
-    ) -> CompletionResponseGen:
-        response = ""
-        # 注意：这里使用了 dummy_response，但在类中没有定义
-        # 你可能需要实现实际的流式响应逻辑
-        dummy_response = ["这", "是", "一", "个", "测", "试", "响", "应"]
-        for token in dummy_response:
-            response += token
-            yield CompletionResponse(text=response, delta=token)
+    def stream_complete(self, prompt: str, **kwargs: Any) -> CompletionResponseGen:
+        accumulated_text = ""
+        stream = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            stream=True,
+            timeout=self.time_out,
+        )
+
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            token = ""
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                token = ""
+            else:
+                token = delta.content or ""
+            if token:
+                accumulated_text += token
+                yield CompletionResponse(text=accumulated_text, delta=token)
 
 
-if __name__ == "__main__":
-    llm = QwenModel(
-        api_key="sk-3f43effded4d49fc934829ee24e79f1d",
-    )
-    res = llm.complete("我的爸爸妈妈结婚为什么不叫我").text
-    print(res)

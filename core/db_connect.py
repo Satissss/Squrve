@@ -1,7 +1,7 @@
 from os import PathLike
 import os
 from pathlib import Path
-from typing import Union
+from typing import Union, Dict
 import pandas as pd
 from google.cloud import bigquery
 import snowflake.connector
@@ -48,13 +48,18 @@ def get_sqlite_result(
 def get_snowflake_sql_result(
         sql_query: str,
         db_id: str,
-        credential_path: Union[str, Path],
+        credential_path: Union[str, Path, Dict],
         save_path: Union[str, PathLike, None] = None,
         timeout_seconds: int = 120,
         **kwargs
 ):
     """ Execute SQL query on Snowflake and return results as DataFrame or save to CSV. """
     try:
+        if isinstance(credential_path, str):
+            credential_path = Path(credential_path)
+        elif isinstance(credential_path, dict):
+            credential_path = credential_path.get("snowflake", None)
+
         credentials = load_dataset(credential_path)
     except Exception as e:
         return None, f"Failed to load credentials: {e}"
@@ -83,13 +88,17 @@ def get_snowflake_sql_result(
 
 def get_bigquery_sql_result(
         sql_query: str,
-        credential_path: Union[str, Path],
+        credential_path: Union[str, Path, Dict],
         save_path: Union[str, Path, None] = None,
         **kwargs
 ):
     """ Execute a SQL query in BigQuery, return result or save as CSV. """
     try:
-        credential_path = Path(credential_path)
+        if isinstance(credential_path, str):
+            credential_path = Path(credential_path)
+        elif isinstance(credential_path, dict):
+            credential_path = credential_path.get("big_query", None)
+
         if not credential_path.exists():
             return None, f"Credential file not found at: {credential_path}", 0.0
 

@@ -26,6 +26,7 @@ test
 
 startup_run/spider_dev_config.json
 startup_run/demo.json
+startup_run/overall.json
 
 startup_run/voter_1
 

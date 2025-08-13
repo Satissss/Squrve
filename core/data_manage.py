@@ -633,6 +633,9 @@ class DataLoader:
             elif use == "qwen":
                 from core.llm.QwenModel import QwenModel
                 llm_ = QwenModel(**init_args)
+            elif use == "zhipu":
+                from core.llm.ZhipuModel import ZhipuModel
+                llm_ = ZhipuModel(**init_args)
 
         except Exception as e:
             warnings.warn(f"Failed to create LLM: {e}.", category=UserWarning)

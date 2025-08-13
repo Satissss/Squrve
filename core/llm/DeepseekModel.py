@@ -80,10 +80,27 @@ class DeepseekModel(CustomLLM):
         return CompletionResponse(text=completion_response)
 
     @llm_completion_callback()
-    def stream_complete(
-            self, prompt: str, **kwargs: Any
-    ) -> CompletionResponseGen:
-        response = ""
-        for token in self.dummy_response:
-            response += token
-            yield CompletionResponse(text=response, delta=token)
+    def stream_complete(self, prompt: str, **kwargs: Any) -> CompletionResponseGen:
+        accumulated_text = ""
+        stream = self.client.chat.completions.create(
+            model=self.model_name,
+            messages=[
+                {"role": "user", "content": prompt},
+            ],
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            top_p=self.top_p,
+            stream=True,
+            timeout=self.time_out,
+        )
+
+        for chunk in stream:
+            delta = chunk.choices[0].delta
+            token = ""
+            if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                token = ""
+            else:
+                token = delta.content or ""
+            if token:
+                accumulated_text += token
+                yield CompletionResponse(text=accumulated_text, delta=token)

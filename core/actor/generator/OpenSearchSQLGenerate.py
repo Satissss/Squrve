@@ -236,8 +236,38 @@ class DB_AGENT:
                                 credential: Optional[str] = None, db_id: Optional[str] = None):
         """Get complete table information using get_sql_exec_result"""
         try:
-            # Execute PRAGMA (SQLite-specific, assume db_type='sqlite')
-            pragma_query = f"PRAGMA table_info(`{table_name}`)"
+            # Build column info query per database type
+            # Parse qualified names
+            parts = table_name.split('.')
+            table_only = parts[-1]
+            schema_only = parts[-2] if len(parts) >= 2 else None
+
+            if db_type == "sqlite":
+                pragma_query = f"PRAGMA table_info(`{table_name}`)"
+            elif db_type == "snowflake":
+                # Shape output to match SQLite PRAGMA columns order: (cid,name,type,notnull,dflt_value,pk)
+                schema_filter = f" AND UPPER(TABLE_SCHEMA) = '{schema_only.upper()}'" if schema_only else ""
+                pragma_query = (
+                    "SELECT 0 AS cid, COLUMN_NAME AS name, DATA_TYPE AS type, "
+                    "CASE WHEN IS_NULLABLE='YES' THEN 0 ELSE 1 END AS notnull, "
+                    "COLUMN_DEFAULT AS dflt_value, 0 AS pk "
+                    "FROM INFORMATION_SCHEMA.COLUMNS "
+                    f"WHERE UPPER(TABLE_NAME) = '{table_only.upper()}'" + schema_filter + " "
+                    "ORDER BY ORDINAL_POSITION"
+                )
+            elif db_type == "big_query":
+                # Use db_id as fully qualified dataset (e.g., project.dataset)
+                pragma_query = (
+                    "SELECT 0 AS cid, column_name AS name, data_type AS type, "
+                    "CASE WHEN is_nullable = 'YES' THEN 0 ELSE 1 END AS notnull, "
+                    "NULL AS dflt_value, 0 AS pk "
+                    f"FROM `{db_id}.INFORMATION_SCHEMA.COLUMNS` "
+                    f"WHERE table_name = '{table_only}' "
+                    "ORDER BY ordinal_position"
+                )
+            else:
+                # Fallback to SQLite-style for unknown types
+                pragma_query = f"PRAGMA table_info(`{table_name}`)"
 
             # Prepare arguments for get_sql_exec_result
             exec_args = {"sql_query": pragma_query, "db_path": db_path, "db_id": db_id, "credential_path": credential}
@@ -249,7 +279,15 @@ class DB_AGENT:
             columns_info = [tuple(row) for row in columns_info_df.values]  # Convert DF to list of tuples
 
             # Read table data
-            data_query = f"SELECT * FROM `{table_name}`"
+            if db_type == "sqlite":
+                data_query = f"SELECT * FROM `{table_name}`"
+            elif db_type == "snowflake":
+                qual = f"{schema_only}.{table_only}" if schema_only else table_only
+                data_query = f"SELECT * FROM {qual}"
+            elif db_type == "big_query":
+                data_query = f"SELECT * FROM `{db_id}.{table_only}`"
+            else:
+                data_query = f"SELECT * FROM `{table_name}`"
             exec_args["sql_query"] = data_query
 
             df, err = get_sql_exec_result(db_type, **exec_args)
@@ -279,7 +317,15 @@ class DB_AGENT:
                     dic[col] = "", ""
 
             # For the LIMIT 1 query
-            limit_query = f"SELECT * FROM `{table_name}` LIMIT 1"
+            if db_type == "sqlite":
+                limit_query = f"SELECT * FROM `{table_name}` LIMIT 1"
+            elif db_type == "snowflake":
+                qual = f"{schema_only}.{table_only}" if schema_only else table_only
+                limit_query = f"SELECT * FROM {qual} LIMIT 1"
+            elif db_type == "big_query":
+                limit_query = f"SELECT * FROM `{db_id}.{table_only}` LIMIT 1"
+            else:
+                limit_query = f"SELECT * FROM `{table_name}` LIMIT 1"
             exec_args["sql_query"] = limit_query
 
             limit_df, err = get_sql_exec_result(db_type, **exec_args)
@@ -308,7 +354,9 @@ class DB_AGENT:
                 except:
                     pass
 
-            schema_str = f"## Table {table_name}:\n"
+            # Display table name without schema to keep downstream expectations (table.column)
+            display_table = table_only
+            schema_str = f"## Table {display_table}:\n"
             columns = {}
             for column, val in zip(columns_info, row):
                 schema_str_single = ""
@@ -343,7 +391,7 @@ class DB_AGENT:
                 else:
                     schema_str_single += f"Values format like: {val}"
                 schema_str += f"{column_name}: {schema_str_single}\n"
-                columns[f"{table_name}.{column_name}"] = (schema_str_single, col_des, val_des, column_type,
+                columns[f"{display_table}.{column_name}"] = (schema_str_single, col_des, val_des, column_type,
                                                           include_null,
                                                           unique, str(val))
             return schema_str, columns
@@ -359,7 +407,12 @@ class DB_AGENT:
             if db_type == "sqlite":
                 tables_query = "SELECT name FROM sqlite_master WHERE type='table';"
             elif db_type == "snowflake":
-                tables_query = "SHOW TABLES"
+                # If db_id encodes database.schema, filter SHOW TABLES accordingly
+                if db_id and '.' in db_id:
+                    db_name, schema_name = db_id.split('.', 1)
+                    tables_query = f"SHOW TABLES IN {db_name}.{schema_name}"
+                else:
+                    tables_query = "SHOW TABLES"
             elif db_type == "big_query":
                 tables_query = f"SELECT table_name FROM `{db_id}.INFORMATION_SCHEMA.TABLES`"
             else:
@@ -372,7 +425,43 @@ class DB_AGENT:
             if err:
                 raise ValueError(f"Error fetching tables: {err}")
 
-            tables = [(row[0],) for row in tables_df.values]  # Adjust to DF
+            # Normalize table list across engines
+            if db_type == "sqlite":
+                tables = [(row[0],) for row in tables_df.values]
+            elif db_type == "snowflake":
+                # SHOW TABLES returns columns like: created_on, name, ... Ensure we pick the name column
+                # Try a few common positions/names to be robust
+                lower_cols = [c.lower() for c in tables_df.columns]
+                if 'name' in lower_cols:
+                    name_idx = lower_cols.index('name')
+                    # Prefer schema-qualified name if schema column exists
+                    if 'schema_name' in lower_cols:
+                        schema_idx = lower_cols.index('schema_name')
+                        tables = [(f"{row[schema_idx]}.{row[name_idx]}",) for row in tables_df.values]
+                    else:
+                        tables = [(row[name_idx],) for row in tables_df.values]
+                elif 'table_name' in lower_cols:
+                    name_idx = lower_cols.index('table_name')
+                    if 'schema_name' in lower_cols:
+                        schema_idx = lower_cols.index('schema_name')
+                        tables = [(f"{row[schema_idx]}.{row[name_idx]}",) for row in tables_df.values]
+                    else:
+                        tables = [(row[name_idx],) for row in tables_df.values]
+                else:
+                    # Fallback to first string-like column
+                    tables = []
+                    for row in tables_df.values:
+                        picked = None
+                        for i, v in enumerate(row):
+                            if isinstance(v, str) and v:
+                                picked = v
+                                break
+                        if picked is not None:
+                            tables.append((picked,))
+            elif db_type == "big_query":
+                tables = [(row[0],) for row in tables_df.values]
+            else:
+                tables = [(row[0],) for row in tables_df.values]
 
             db_info = []
             db_col = dict()
