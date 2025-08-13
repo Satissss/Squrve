@@ -438,7 +438,7 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
         except:
             return False
 
-    def db_word_match(word, column, table, db_type, db_path, db_id, credential, exact=False):
+    def db_word_match(word, column, table, db_type, db_path, db_id, credential, exact=False, invalid_tables_cache=None, qualify_table_fn=None):
         """
         Use get_sql_exec_result for database queries across different database types.
         Supports SQLite, BigQuery, Snowflake, etc.
@@ -459,13 +459,18 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
                 ]
                 sql_query = f"SELECT `{column}` FROM `{table}` WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
             elif db_type == "snowflake":
+                # Use UPPER identifiers and qualify table name to avoid case-sensitive quoted object issues
+                col_ident = str(column).upper()
+                tbl_ident = str(table).upper()
+                if qualify_table_fn:
+                    tbl_ident = qualify_table_fn(tbl_ident)
                 like_conditions = [
-                    f'"{column}" ILIKE \'{escaped_word}\'',
-                    f'"{column}" ILIKE \' {escaped_word}\'',
-                    f'"{column}" ILIKE \'{escaped_word} \'',
-                    f'"{column}" ILIKE \' {escaped_word} \''
+                    f"{col_ident} ILIKE '{escaped_word}'",
+                    f"{col_ident} ILIKE ' {escaped_word}'",
+                    f"{col_ident} ILIKE '{escaped_word} '",
+                    f"{col_ident} ILIKE ' {escaped_word} '"
                 ]
-                sql_query = f'SELECT "{column}" FROM "{table}" WHERE ({" OR ".join(like_conditions)}) LIMIT 5'
+                sql_query = f"SELECT {col_ident} FROM {tbl_ident} WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
             else:
                 # SQLite and others
                 like_conditions = [
@@ -486,13 +491,17 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
                 ]
                 sql_query = f"SELECT `{column}` FROM `{table}` WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
             elif db_type == "snowflake":
+                col_ident = str(column).upper()
+                tbl_ident = str(table).upper()
+                if qualify_table_fn:
+                    tbl_ident = qualify_table_fn(tbl_ident)
                 like_conditions = [
-                    f'"{column}" ILIKE \'{escaped_word} %\'',
-                    f'"{column}" ILIKE \'% {escaped_word}\'',
-                    f'"{column}" ILIKE \'% {escaped_word} %\'',
-                    f'"{column}" ILIKE \'{escaped_word}\''
+                    f"{col_ident} ILIKE '{escaped_word} %'",
+                    f"{col_ident} ILIKE '% {escaped_word}'",
+                    f"{col_ident} ILIKE '% {escaped_word} %'",
+                    f"{col_ident} ILIKE '{escaped_word}'"
                 ]
-                sql_query = f'SELECT "{column}" FROM "{table}" WHERE ({" OR ".join(like_conditions)}) LIMIT 5'
+                sql_query = f"SELECT {col_ident} FROM {tbl_ident} WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
             else:
                 # SQLite and others
                 like_conditions = [
@@ -515,6 +524,15 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
             result, error = get_sql_exec_result(**exec_args)
 
             if error:
+                # Cache invalid tables to avoid repeated probing on Snowflake
+                if invalid_tables_cache is not None and db_type == "snowflake":
+                    lowered = str(error).lower()
+                    if ("does not exist" in lowered) or ("not authorized" in lowered) or ("sql compilation error" in lowered):
+                        try:
+                            tbl_for_cache = qualify_table_fn(str(table).upper()) if qualify_table_fn else str(table).upper()
+                            invalid_tables_cache.add(tbl_for_cache)
+                        except Exception:
+                            pass
                 logger.debug(f"Database query failed: {error}")
                 return False
 
@@ -544,6 +562,66 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
 
     logger.debug(f"Starting cell value linking for {len(column_names)} columns in {db_type} database")
 
+    # Snowflake-specific preparation: schema qualification and failure cache
+    table_schema_map = {}
+    invalid_tables_cache = set()
+    default_sf_schema = None
+
+    def _load_credentials_dict(cred):
+        try:
+            if isinstance(cred, dict):
+                return cred.get("snowflake", cred)
+            if isinstance(cred, (str, Path)):
+                return load_dataset(cred)
+        except Exception:
+            return None
+        return None
+
+    total_probes_remaining = None
+    if db_type == "snowflake":
+        # Global safety budget to avoid excessive remote calls
+        total_probes_remaining = 500
+        cred_dict = _load_credentials_dict(credential)
+        if isinstance(cred_dict, dict):
+            default_sf_schema = cred_dict.get("schema") or cred_dict.get("SCHEMA")
+
+        # Map table -> schema via INFORMATION_SCHEMA to avoid unqualified references
+        try:
+            candidate_tables = [str(t).upper() for t in schema_dict.get('table_names_original', [])]
+            if candidate_tables:
+                in_list = ", ".join([f"'{t}'" for t in candidate_tables])
+                info_sql = f"SELECT TABLE_NAME, TABLE_SCHEMA FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ({in_list})"
+                result, error = get_sql_exec_result(
+                    db_type=db_type,
+                    sql_query=info_sql,
+                    credential_path=credential,
+                    db_id=db_id,
+                    db_path=str(db_path) if db_path else None
+                )
+                if not error and result is not None:
+                    rows = []
+                    if hasattr(result, 'values'):
+                        rows = result.values
+                    elif isinstance(result, list):
+                        rows = result
+                    for r in rows:
+                        try:
+                            tname = str(r[0]).upper()
+                            tschema = str(r[1]).upper()
+                            table_schema_map[tname] = tschema
+                        except Exception:
+                            continue
+        except Exception:
+            pass
+
+    def qualify_table_fn_snowflake(table_upper: str) -> str:
+        if '.' in table_upper:
+            return table_upper
+        schema_part = table_schema_map.get(table_upper) or (str(default_sf_schema).upper() if default_sf_schema else None)
+        if schema_part:
+            return f"{schema_part}.{table_upper}"
+        return table_upper
+
     for col_id, (table_id, col_name) in enumerate(column_names):
 
         if table_id >= len(table_names):
@@ -553,6 +631,7 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
         col_type = column_types[col_id] if col_id < len(column_types) else 'text'
 
         match_q_ids = []
+        remaining_probes = 50 if db_type == "snowflake" else 10000
         for q_id, word in enumerate(tokens):
             if len(word.strip()) == 0:
                 continue
@@ -571,9 +650,30 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
                 elif any(t in col_type_lower for t in time_types):
                     num_date_match[f"{q_id},{col_id}"] = "TIME"
             else:
-                # Check cell value match using database-agnostic query
-                if db_word_match(word, col_name, table_name, db_type, db_path, db_id, credential, exact=False):
+                if db_type == "snowflake":
+                    qualified_tbl = qualify_table_fn_snowflake(str(table_name).upper())
+                    if qualified_tbl in invalid_tables_cache:
+                        continue
+                    if remaining_probes <= 0 or (total_probes_remaining is not None and total_probes_remaining <= 0):
+                        continue
+                # Check cell value match using the unified query
+                if db_word_match(
+                    word,
+                    col_name,
+                    table_name,
+                    db_type,
+                    db_path,
+                    db_id,
+                    credential,
+                    exact=False,
+                    invalid_tables_cache=invalid_tables_cache,
+                    qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
+                ):
                     match_q_ids.append(q_id)
+                if db_type == "snowflake":
+                    remaining_probes -= 1
+                    if total_probes_remaining is not None:
+                        total_probes_remaining -= 1
 
         # Process consecutive matches for exact matching
         f = 0
@@ -585,7 +685,18 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
             words = [token for token in tokens[q_f: q_t]]
 
             # Try exact match first
-            if db_word_match(' '.join(words), col_name, table_name, db_type, db_path, db_id, credential, exact=True):
+            if db_word_match(
+                ' '.join(words),
+                col_name,
+                table_name,
+                db_type,
+                db_path,
+                db_id,
+                credential,
+                exact=True,
+                invalid_tables_cache=invalid_tables_cache,
+                qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
+            ):
                 for q_id in range(q_f, q_t):
                     cell_match[f"{q_id},{col_id}"] = CELL_EXACT_MATCH_FLAG
             else:

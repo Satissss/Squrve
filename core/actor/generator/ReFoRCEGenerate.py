@@ -1,13 +1,10 @@
-import os
 import pandas as pd
 from pathlib import Path
 from typing import Union, List, Optional, Dict, Tuple
 from loguru import logger
 import re
-import json
-import shutil
-import threading
-from collections import defaultdict, Counter
+
+from collections import defaultdict
 from os import PathLike
 from llama_index.core.llms.llm import LLM
 
@@ -153,11 +150,25 @@ class ReFoRCEGenerator(BaseGenerator):
     def execute_sql_safe(self, sql: str, db_type: str, db_path: str, credential: str = None) -> Tuple[bool, str]:
         """Execute SQL safely using Squrve's db_connect module"""
         try:
+            # Map parameters per backend requirements
             args = {
                 "sql_query": sql,
-                "db_path": db_path,
-                "credential_path": credential,
             }
+
+            if db_type == "sqlite":
+                args["db_path"] = db_path
+            elif db_type == "snowflake":
+                # For Snowflake, the function expects `db_id` instead of `db_path`
+                args["db_id"] = db_path
+                args["credential_path"] = credential
+            elif db_type == "big_query":
+                # BigQuery only needs credentials
+                args["credential_path"] = credential
+            else:
+                # Fallback to original mapping
+                args["db_path"] = db_path
+                if credential is not None:
+                    args["credential_path"] = credential
 
             exec_result = get_sql_exec_result(db_type, **args)
 
