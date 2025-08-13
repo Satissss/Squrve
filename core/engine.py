@@ -321,18 +321,6 @@ class Engine:
         elif task_type in ("ReduceTask", "reduce"):
             task = self.generate_reduce_task(**init_args)
 
-        elif task_type in ("ScaleTask", "scale"):
-            task = self.generate_scale_task(**init_args)
-
-        elif task_type in ("DecomposeTask", "decompose"):
-            task = self.generate_decompose_task(**init_args)
-
-        elif task_type in ("OptimizeTask", "optimize"):
-            task = self.generate_optimize_task(**init_args)
-
-        elif task_type in ("SelectTask", "select"):
-            task = self.generate_select_task(**init_args)
-
         return task
 
     def generate_generate_task(self, **kwargs):
@@ -366,51 +354,6 @@ class Engine:
             kwargs["output_format"] = self.router.reduce_output_format
 
         task = ReduceTask(**kwargs)
-        return task
-
-    def generate_scale_task(self, **kwargs):
-        from core.task.meta.ScaleTask import ScaleTask
-        # initialize parameters by router.
-        if kwargs.get("save_dir", None) is None:
-            kwargs["save_dir"] = self.router.scale_save_dir if hasattr(self.router, 'scale_save_dir') else "../files/pred_sql"
-
-        if kwargs.get("output_format", None) is None:
-            kwargs["output_format"] = self.router.scale_output_format if hasattr(self.router, 'scale_output_format') else "list"
-
-        task = ScaleTask(**kwargs)
-        return task
-
-    def generate_decompose_task(self, **kwargs):
-        from core.task.meta.DecomposeTask import DecomposeTask
-        # initialize parameters by router.
-        if kwargs.get("save_dir", None) is None:
-            kwargs["save_dir"] = self.router.decompose_save_dir if hasattr(self.router, 'decompose_save_dir') else "../files/sub_questions"
-
-        if kwargs.get("output_format", None) is None:
-            kwargs["output_format"] = self.router.decompose_output_format if hasattr(self.router, 'decompose_output_format') else "list"
-
-        task = DecomposeTask(**kwargs)
-        return task
-
-    def generate_optimize_task(self, **kwargs):
-        from core.task.meta.OptimizeTask import OptimizeTask
-        # initialize parameters by router.
-        if kwargs.get("save_dir", None) is None:
-            kwargs["save_dir"] = self.router.optimize_save_dir if hasattr(self.router, 'optimize_save_dir') else "../files/optimized_sql"
-
-        task = OptimizeTask(**kwargs)
-        return task
-
-    def generate_select_task(self, **kwargs):
-        from core.task.meta.SelectTask import SelectTask
-        # initialize parameters by router.
-        if kwargs.get("save_dir", None) is None:
-            kwargs["save_dir"] = self.router.select_save_dir if hasattr(self.router, 'select_save_dir') else "../files/selected_sql"
-
-        if kwargs.get("output_format", None) is None:
-            kwargs["output_format"] = self.router.select_output_format if hasattr(self.router, 'select_output_format') else "str"
-
-        task = SelectTask(**kwargs)
         return task
 
     def init_complex_task(
@@ -753,5 +696,3 @@ class Engine:
         print(f"Engine 评估完毕!!!!")
 
         return all_res
-
-
