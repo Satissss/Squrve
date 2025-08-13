@@ -6,7 +6,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT count(*) FROM area_code_state",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_687.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_687.sql"
     },
     {
         "instance_id": "dev_688",
@@ -15,7 +15,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT contestant_number ,  contestant_name FROM contestants ORDER BY contestant_name DESC",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_688.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_688.sql"
     },
     {
         "instance_id": "dev_689",
@@ -24,7 +24,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT vote_id ,  phone_number ,  state FROM votes",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_689.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_689.sql"
     },
     {
         "instance_id": "dev_690",
@@ -33,7 +33,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT max(area_code) ,  min(area_code) FROM area_code_state",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_690.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_690.sql"
     },
     {
         "instance_id": "dev_691",
@@ -42,7 +42,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT max(created) FROM votes WHERE state  =  'CA'",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_691.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_691.sql"
     },
     {
         "instance_id": "dev_692",
@@ -51,7 +51,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT contestant_name FROM contestants WHERE contestant_name != 'Jessie Alloway'",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_692.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_692.sql"
     },
     {
         "instance_id": "dev_693",
@@ -60,7 +60,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT DISTINCT state ,  created FROM votes",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_693.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_693.sql"
     },
     {
         "instance_id": "dev_694",
@@ -69,7 +69,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT T1.contestant_number , T1.contestant_name FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number GROUP BY T1.contestant_number HAVING count(*)  >=  2",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_694.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_694.sql"
     },
     {
         "instance_id": "dev_695",
@@ -78,7 +78,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT T1.contestant_number , T1.contestant_name FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number GROUP BY T1.contestant_number ORDER BY count(*) ASC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_695.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_695.sql"
     },
     {
         "instance_id": "dev_696",
@@ -87,7 +87,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT count(*) FROM votes WHERE state  =  'NY' OR state  =  'CA'",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_696.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_696.sql"
     },
     {
         "instance_id": "dev_697",
@@ -96,7 +96,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT count(*) FROM contestants WHERE contestant_number NOT IN ( SELECT contestant_number FROM votes )",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_697.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_697.sql"
     },
     {
         "instance_id": "dev_698",
@@ -105,7 +105,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT T1.area_code FROM area_code_state AS T1 JOIN votes AS T2 ON T1.state  =  T2.state GROUP BY T1.area_code ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_698.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_698.sql"
     },
     {
         "instance_id": "dev_699",
@@ -114,7 +114,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT T2.created ,  T2.state ,  T2.phone_number FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number WHERE T1.contestant_name  =  'Tabatha Gehling'",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_699.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_699.sql"
     },
     {
         "instance_id": "dev_700",
@@ -123,7 +123,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "SELECT T3.area_code FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number JOIN area_code_state AS T3 ON T2.state  =  T3.state WHERE T1.contestant_name  =  'Tabatha Gehling' INTERSECT SELECT T3.area_code FROM contestants AS T1 JOIN votes AS T2 ON T1.contestant_number  =  T2.contestant_number JOIN area_code_state AS T3 ON T2.state  =  T3.state WHERE T1.contestant_name  =  'Kelly Clauss'",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_700.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_700.sql"
     },
     {
         "instance_id": "dev_701",
@@ -132,7 +132,7 @@
         "db_type": "sqlite",
         "db_size": 9,
         "query": "select contestant_name from contestants where contestant_name like \"%al%\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_701.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_701.sql"
     },
     {
         "instance_id": "dev_862",
@@ -141,7 +141,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_862.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_862.sql"
     },
     {
         "instance_id": "dev_863",
@@ -150,7 +150,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_863.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_863.sql"
     },
     {
         "instance_id": "dev_864",
@@ -159,7 +159,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name ,  grade FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_864.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_864.sql"
     },
     {
         "instance_id": "dev_865",
@@ -168,7 +168,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name ,  grade FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_865.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_865.sql"
     },
     {
         "instance_id": "dev_866",
@@ -177,7 +177,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_866.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_866.sql"
     },
     {
         "instance_id": "dev_867",
@@ -186,7 +186,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_867.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_867.sql"
     },
     {
         "instance_id": "dev_868",
@@ -195,7 +195,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler WHERE name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_868.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_868.sql"
     },
     {
         "instance_id": "dev_869",
@@ -204,7 +204,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler WHERE name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_869.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_869.sql"
     },
     {
         "instance_id": "dev_870",
@@ -213,7 +213,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name FROM Highschooler WHERE grade  =  10",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_870.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_870.sql"
     },
     {
         "instance_id": "dev_871",
@@ -222,7 +222,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name FROM Highschooler WHERE grade  =  10",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_871.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_871.sql"
     },
     {
         "instance_id": "dev_872",
@@ -231,7 +231,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT ID FROM Highschooler WHERE name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_872.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_872.sql"
     },
     {
         "instance_id": "dev_873",
@@ -240,7 +240,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT ID FROM Highschooler WHERE name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_873.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_873.sql"
     },
     {
         "instance_id": "dev_874",
@@ -249,7 +249,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Highschooler WHERE grade  =  9 OR grade  =  10",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_874.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_874.sql"
     },
     {
         "instance_id": "dev_875",
@@ -258,7 +258,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Highschooler WHERE grade  =  9 OR grade  =  10",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_875.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_875.sql"
     },
     {
         "instance_id": "dev_876",
@@ -267,7 +267,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade ,  count(*) FROM Highschooler GROUP BY grade",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_876.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_876.sql"
     },
     {
         "instance_id": "dev_877",
@@ -276,7 +276,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade ,  count(*) FROM Highschooler GROUP BY grade",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_877.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_877.sql"
     },
     {
         "instance_id": "dev_878",
@@ -285,7 +285,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler GROUP BY grade ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_878.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_878.sql"
     },
     {
         "instance_id": "dev_879",
@@ -294,7 +294,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler GROUP BY grade ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_879.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_879.sql"
     },
     {
         "instance_id": "dev_880",
@@ -303,7 +303,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler GROUP BY grade HAVING count(*)  >=  4",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_880.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_880.sql"
     },
     {
         "instance_id": "dev_881",
@@ -312,7 +312,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT grade FROM Highschooler GROUP BY grade HAVING count(*)  >=  4",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_881.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_881.sql"
     },
     {
         "instance_id": "dev_882",
@@ -321,7 +321,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id ,  count(*) FROM Friend GROUP BY student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_882.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_882.sql"
     },
     {
         "instance_id": "dev_883",
@@ -330,7 +330,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id ,  count(*) FROM Friend GROUP BY student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_883.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_883.sql"
     },
     {
         "instance_id": "dev_884",
@@ -339,7 +339,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name ,  count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_884.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_884.sql"
     },
     {
         "instance_id": "dev_885",
@@ -348,7 +348,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name ,  count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_885.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_885.sql"
     },
     {
         "instance_id": "dev_886",
@@ -357,7 +357,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_886.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_886.sql"
     },
     {
         "instance_id": "dev_887",
@@ -366,7 +366,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_887.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_887.sql"
     },
     {
         "instance_id": "dev_888",
@@ -375,7 +375,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  3",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_888.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_888.sql"
     },
     {
         "instance_id": "dev_889",
@@ -384,7 +384,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  3",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_889.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_889.sql"
     },
     {
         "instance_id": "dev_890",
@@ -393,7 +393,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T3.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id JOIN Highschooler AS T3 ON T1.friend_id  =  T3.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_890.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_890.sql"
     },
     {
         "instance_id": "dev_891",
@@ -402,7 +402,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T3.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id JOIN Highschooler AS T3 ON T1.friend_id  =  T3.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_891.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_891.sql"
     },
     {
         "instance_id": "dev_892",
@@ -411,7 +411,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_892.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_892.sql"
     },
     {
         "instance_id": "dev_893",
@@ -420,7 +420,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_893.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_893.sql"
     },
     {
         "instance_id": "dev_894",
@@ -429,7 +429,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT id FROM Highschooler EXCEPT SELECT student_id FROM Friend",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_894.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_894.sql"
     },
     {
         "instance_id": "dev_895",
@@ -438,7 +438,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT id FROM Highschooler EXCEPT SELECT student_id FROM Friend",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_895.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_895.sql"
     },
     {
         "instance_id": "dev_896",
@@ -447,7 +447,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name FROM Highschooler EXCEPT SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_896.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_896.sql"
     },
     {
         "instance_id": "dev_897",
@@ -456,7 +456,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT name FROM Highschooler EXCEPT SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_897.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_897.sql"
     },
     {
         "instance_id": "dev_898",
@@ -465,7 +465,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id FROM Friend INTERSECT SELECT liked_id FROM Likes",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_898.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_898.sql"
     },
     {
         "instance_id": "dev_899",
@@ -474,7 +474,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id FROM Friend INTERSECT SELECT liked_id FROM Likes",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_899.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_899.sql"
     },
     {
         "instance_id": "dev_900",
@@ -483,7 +483,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id INTERSECT SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.liked_id  =  T2.id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_900.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_900.sql"
     },
     {
         "instance_id": "dev_901",
@@ -492,7 +492,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id INTERSECT SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.liked_id  =  T2.id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_901.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_901.sql"
     },
     {
         "instance_id": "dev_902",
@@ -501,7 +501,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id ,  count(*) FROM Likes GROUP BY student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_902.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_902.sql"
     },
     {
         "instance_id": "dev_903",
@@ -510,7 +510,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT student_id ,  count(*) FROM Likes GROUP BY student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_903.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_903.sql"
     },
     {
         "instance_id": "dev_904",
@@ -519,7 +519,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name ,  count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_904.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_904.sql"
     },
     {
         "instance_id": "dev_905",
@@ -528,7 +528,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name ,  count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_905.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_905.sql"
     },
     {
         "instance_id": "dev_906",
@@ -537,7 +537,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_906.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_906.sql"
     },
     {
         "instance_id": "dev_907",
@@ -546,7 +546,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id ORDER BY count(*) DESC LIMIT 1",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_907.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_907.sql"
     },
     {
         "instance_id": "dev_908",
@@ -555,7 +555,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  2",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_908.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_908.sql"
     },
     {
         "instance_id": "dev_909",
@@ -564,7 +564,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id GROUP BY T1.student_id HAVING count(*)  >=  2",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_909.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_909.sql"
     },
     {
         "instance_id": "dev_910",
@@ -573,7 +573,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.grade  >  5 GROUP BY T1.student_id HAVING count(*)  >=  2",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_910.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_910.sql"
     },
     {
         "instance_id": "dev_911",
@@ -582,7 +582,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT T2.name FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.grade  >  5 GROUP BY T1.student_id HAVING count(*)  >=  2",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_911.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_911.sql"
     },
     {
         "instance_id": "dev_912",
@@ -591,7 +591,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_912.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_912.sql"
     },
     {
         "instance_id": "dev_913",
@@ -600,7 +600,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT count(*) FROM Likes AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id WHERE T2.name  =  \"Kyle\"",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_913.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_913.sql"
     },
     {
         "instance_id": "dev_914",
@@ -609,7 +609,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT avg(grade) FROM Highschooler WHERE id IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_914.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_914.sql"
     },
     {
         "instance_id": "dev_915",
@@ -618,7 +618,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT avg(grade) FROM Highschooler WHERE id IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_915.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_915.sql"
     },
     {
         "instance_id": "dev_916",
@@ -627,7 +627,7 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT min(grade) FROM Highschooler WHERE id NOT IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_916.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_916.sql"
     },
     {
         "instance_id": "dev_917",
@@ -636,6 +636,6 @@
         "db_type": "sqlite",
         "db_size": 7,
         "query": "SELECT min(grade) FROM Highschooler WHERE id NOT IN (SELECT T1.student_id FROM Friend AS T1 JOIN Highschooler AS T2 ON T1.student_id  =  T2.id)",
-        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\RSLSQLGenerator_dev_917.sql"
+        "pred_sql": "..\\files\\pred_sql\\spider_dev_db_size-10\\OpenSearchSQLGenerator_dev_917.sql"
     }
 ]

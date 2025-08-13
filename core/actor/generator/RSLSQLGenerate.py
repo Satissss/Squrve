@@ -262,14 +262,53 @@ class RSLSQLGenerator(BaseGenerator):
         self.use_external = use_external
         self.use_few_shot = use_few_shot
 
-        self.db_path = db_path or (dataset.db_path if dataset else None)
-        self.credential = credential or (dataset.credential if dataset else None)
+        # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
+        if db_path is not None:
+            self.db_path = db_path
+        elif dataset is not None:
+            self.db_path = dataset.db_path
+        else:
+            self.db_path = None
+
+        if credential is not None:
+            self.credential = credential
+        elif dataset is not None:
+            self.credential = dataset.credential
+        else:
+            self.credential = None
 
         # Load column meanings
         self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
 
-    def get_db_path(self, db_id):
-        return Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
+    @property
+    def name(self):
+        return self.NAME
+
+    def _get_db_path(self, row, db_id, db_type):
+        """
+        Get database path/identifier based on db_type.
+        Database-agnostic approach that works with get_sql_exec_result.
+        """
+        if db_type == "sqlite":
+            # For SQLite, we need the actual file path
+            if self.db_path:
+                db_path = Path(self.db_path)
+                if db_path.is_file():
+                    return str(db_path)
+                else:
+                    return str(db_path / f"{db_id}.sqlite")
+            else:
+                return row.get('path_db', f"{db_id}.sqlite")
+        elif db_type == "big_query":
+            # For BigQuery, db_path is not used, only credential_path matters
+            return row.get('project_id', db_id)
+        elif db_type == "snowflake":
+            # For Snowflake, db_path is actually the database name
+            return row.get('database_name', db_id)
+        else:
+            # For other database types, return the db_id as identifier
+            logger.debug(f"Using db_id as path for unsupported database type: {db_type}")
+            return db_id
 
     def try_direct_parse(self, response: str) -> Optional[Dict[str, Any]]:
         """Attempt direct JSON parsing."""
@@ -375,10 +414,10 @@ class RSLSQLGenerator(BaseGenerator):
         logger.warning(f"Failed to parse JSON response: {response[:200]}...")
         return {"sql": "SELECT 1", "tables": [], "columns": [], "sql_keywords": [], "conditions": []}
 
-    def execute_sql(self, sql, db_id, db_type):
+    def execute_sql(self, sql, db_id, db_type, row=None):
         """Execute SQL query and return row count, column count, and partial results."""
         try:
-            db_path = self.get_db_path(db_id)
+            db_path = self._get_db_path(row or {}, db_id, db_type)
             sql_args = {
                 "db_type": db_type,
                 "sql_query": sql,
@@ -480,10 +519,15 @@ class RSLSQLGenerator(BaseGenerator):
             # If no sample data in schema and db_id provided, query database
             if not has_sample_data and db_id is not None:
                 try:
-                    db_path = self.get_db_path(db_id)
                     sql = f"SELECT {col_str} FROM `{table}` LIMIT 3"
-                    df, err = get_sql_exec_result(db_type, sql_query=sql, db_path=db_path, db_id=db_id,
-                                                  credential_path=self.credential)
+                    sql_args = {
+                        "db_type": db_type,
+                        "sql_query": sql,
+                        "db_path": self._get_db_path({}, db_id, db_type),
+                        "db_id": db_id,
+                        "credential_path": self.credential
+                    }
+                    df, err = get_sql_exec_result(**sql_args)
                     if err or df is None:
                         continue
 
@@ -548,23 +592,41 @@ class RSLSQLGenerator(BaseGenerator):
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
     def extract_from_text(self, text, db_schema):
+        """Extract schema links from text (evidence or SQL) using column name matching."""
         pred = []
+        if not text or not db_schema:
+            return {"tables": [], "columns": []}
+        
         text_lower = text.lower()
         for item in db_schema:
             try:
                 if '.' not in item:
                     continue
-                table, column = item.lower().split('.', 1)  # Split only on first occurrence
+                parts = item.split('.')
+                if len(parts) < 2:
+                    continue
+                table, column = parts[0].lower(), '.'.join(parts[1:]).lower()
                 if table == 'sqlite_sequence':
                     continue
-                if column in text_lower:
+                # More flexible column matching
+                column_clean = column.strip('`').strip()
+                if column_clean in text_lower:
                     pred.append(item)
-            except (ValueError, AttributeError):
-                # Skip items that don't have the expected format
+            except (ValueError, AttributeError) as e:
+                logger.debug(f"Skipping malformed schema item {item}: {e}")
                 continue
+        
         pred = list(set(pred))
         tables = list(set([p.split('.')[0] for p in pred if '.' in p]))
-        columns = [p.replace('.', '.`') + '`' for p in pred if '.' in p]
+        columns = []
+        for p in pred:
+            if '.' in p:
+                table_part, col_part = p.split('.', 1)
+                if not col_part.startswith('`'):
+                    col_part = '`' + col_part
+                if not col_part.endswith('`'):
+                    col_part = col_part + '`'
+                columns.append(f"{table_part}.{col_part}")
         return {"tables": tables, "columns": columns}
 
     def merge_schema_links(self, sl_sql, sl_llm, sl_hint):
@@ -573,17 +635,34 @@ class RSLSQLGenerator(BaseGenerator):
         return {"tables": [t.lower() for t in tables], "columns": [c.lower() for c in columns]}
 
     def filter_schema_links(self, schema_links, db_schema):
+        """Filter schema links to ensure they exist in the actual database schema."""
+        if not schema_links or not db_schema:
+            return {"tables": [], "columns": []}
+        
         pred = []
-        db_schema_lower = [s.lower() for s in db_schema]
-        for col in schema_links['columns']:
-            col_lower = col.replace('`', '').lower()
+        db_schema_lower = [s.lower() for s in db_schema if s]
+        
+        for col in schema_links.get('columns', []):
+            if not col:
+                continue
+            col_clean = col.replace('`', '').lower().strip()
             for sch in db_schema:
-                if sch.lower() == col_lower:
+                if sch and sch.lower() == col_clean:
                     pred.append(sch)
                     break
+        
         pred = list(set(pred))
-        tables = list(set([p.split('.')[0] for p in pred if '.' in p]))
-        columns = [p.replace('.', '.`') + '`' for p in pred if '.' in p]
+        tables = list(set([p.split('.')[0] for p in pred if '.' in p and p.split('.')[0]]))
+        columns = []
+        for p in pred:
+            if '.' in p:
+                table_part, col_part = p.split('.', 1)
+                if not col_part.startswith('`'):
+                    col_part = '`' + col_part
+                if not col_part.endswith('`'):
+                    col_part = col_part + '`'
+                columns.append(f"{table_part}.{col_part}")
+        
         return {"tables": tables, "columns": columns}
 
     def key_word_augmentation(self, table_info, question, evidence):
@@ -611,12 +690,12 @@ class RSLSQLGenerator(BaseGenerator):
         response = self.llm.complete(BINARY_PROMPT.format(table_info=table_info, candidate_sql=candidate_sql)).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
-    def self_correction(self, table_info, pre_sql, db_id, db_type):
+    def self_correction(self, table_info, pre_sql, db_id, db_type, row=None):
         prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
         num = 0
         while num < 5:
             try:
-                row_count, column_count, result = self.execute_sql(pre_sql, db_id, db_type)
+                row_count, column_count, result = self.execute_sql(pre_sql, db_id, db_type, row)
             except Exception as e:
                 logger.error(f"SQL execution error: {e}")
                 break
@@ -730,8 +809,8 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Step 3: Binary Selection
         try:
-            r1, c1, re1 = self.execute_sql(pre_sql, db_id, db_type)
-            r2, c2, re2 = self.execute_sql(sql2, db_id, db_type)
+            r1, c1, re1 = self.execute_sql(pre_sql, db_id, db_type, row)
+            r2, c2, re2 = self.execute_sql(sql2, db_id, db_type, row)
             selected_sql = self.binary_selection(table_info_aug, pre_sql, re1, sql2, re2)
         except Exception as e:
             logger.error(f"Error in binary selection: {e}")
@@ -743,7 +822,8 @@ class RSLSQLGenerator(BaseGenerator):
                 table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}',
                 selected_sql,
                 db_id,
-                db_type
+                db_type,
+                row
             )
         except Exception as e:
             logger.error(f"Error in self correction: {e}")

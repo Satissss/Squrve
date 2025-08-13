@@ -3,13 +3,14 @@ import re
 import string
 import numpy as np
 import random
-import sqlite3
+# import sqlite3  # Replaced with get_sql_exec_result for database abstraction
 import nltk
 from nltk.corpus import stopwords
 from os import PathLike
 from typing import Union, Dict, List, Optional
 from pathlib import Path
 import pandas as pd
+import abc
 
 from loguru import logger
 from sql_metadata import Parser
@@ -21,8 +22,7 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
-
-import abc
+from core.db_connect import get_sql_exec_result
 
 nltk.download('stopwords', quiet=True)
 
@@ -236,18 +236,70 @@ def mask_question_with_schema_linking(data_jsons, mask_tag='<mask>', value_tag='
     return mask_questions
 
 
-def get_sql_for_database(path_db):
-    # Full
-    con = sqlite3.connect(str(path_db))
-    cur = con.cursor()
-    table_names = [row[0] for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-    sqls = []
-    for name in table_names:
-        sql = cur.execute(f"SELECT sql FROM sqlite_master WHERE tbl_name='{name}'").fetchone()
-        if sql:
-            sqls.append(sql[0])
-    con.close()
-    return sqls
+def get_sql_for_database(path_db, db_type='sqlite', credential=None):
+    """
+    Get CREATE TABLE SQL statements for database using get_sql_exec_result.
+    Supports multiple database types through unified interface.
+    """
+    try:
+        # Get table names first
+        if db_type == 'sqlite':
+            table_names_query = "SELECT name FROM sqlite_master WHERE type='table'"
+        elif db_type == 'big_query':
+            # BigQuery uses INFORMATION_SCHEMA
+            table_names_query = "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_type='BASE TABLE'"
+        elif db_type == 'snowflake':
+            # Snowflake uses INFORMATION_SCHEMA
+            table_names_query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+        else:
+            # Default to standard SQL
+            table_names_query = "SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'"
+        
+        # Execute query to get table names
+        result, error = get_sql_exec_result(
+            db_type=db_type,
+            sql_query=table_names_query,
+            db_path=str(path_db) if path_db else None,
+            credential_path=credential
+        )
+        
+        if error or result is None:
+            logger.warning(f"Failed to get table names: {error}")
+            return []
+        
+        # Extract table names from result
+        if hasattr(result, 'values'):
+            table_names = [row[0] for row in result.values]
+        elif isinstance(result, list):
+            table_names = [row[0] if isinstance(row, (list, tuple)) else str(row) for row in result]
+        else:
+            table_names = []
+        
+        sqls = []
+        for table_name in table_names:
+            if db_type == 'sqlite':
+                # For SQLite, get the CREATE statement
+                create_sql_query = f"SELECT sql FROM sqlite_master WHERE tbl_name='{table_name}'"
+                result, error = get_sql_exec_result(
+                    db_type=db_type,
+                    sql_query=create_sql_query,
+                    db_path=str(path_db) if path_db else None
+                )
+                if not error and result is not None:
+                    if hasattr(result, 'values') and len(result.values) > 0:
+                        sql_statement = result.values[0][0]
+                        if sql_statement:
+                            sqls.append(sql_statement)
+            else:
+                # For other databases, construct CREATE statement from INFORMATION_SCHEMA
+                # This is a simplified version - in practice you might want more detailed schema info
+                sqls.append(f"-- Table: {table_name} (Schema details not available for {db_type})")
+        
+        return sqls
+        
+    except Exception as e:
+        logger.error(f"Failed to get SQL for database: {e}")
+        return []
 
 
 # Enums
@@ -372,7 +424,12 @@ def compute_schema_linking(question, column, table):
     return {"q_col_match": q_col_match, "q_tab_match": q_tab_match}
 
 
-def compute_cell_value_linking(tokens, schema):
+def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, credential=None):
+    """
+    Compute cell value linking using the unified database connection approach.
+    Supports multiple database types through get_sql_exec_result factory method.
+    Follows the original DAIL-SQL approach but uses database-agnostic queries.
+    """
     def isnumber(word):
         try:
             float(word)
@@ -380,43 +437,136 @@ def compute_cell_value_linking(tokens, schema):
         except:
             return False
 
-    def db_word_partial_match(word, column, table, db_conn):
-        cursor = db_conn.cursor()
-
-        p_str = f"select {column} from {table} where {column} like '{word} %' or {column} like '% {word}' or " \
-                f"{column} like '% {word} %' or {column} like '{word}'"
-        try:
-            cursor.execute(p_str)
-            p_res = cursor.fetchall()
-            if len(p_res) == 0:
-                return False
+    def db_word_match(word, column, table, db_type, db_path, credential, exact=False):
+        """
+        Use get_sql_exec_result for database queries across different database types.
+        Supports SQLite, BigQuery, Snowflake, etc.
+        Implements both exact and partial matching like the original DAIL-SQL.
+        """
+        # Escape single quotes in word to prevent SQL injection
+        escaped_word = word.replace("'", "''")
+        
+        # Construct appropriate SQL for different database types
+        if exact:
+            # Exact match: word matches entire cell content (with optional spaces)
+            if db_type == "big_query":
+                like_conditions = [
+                    f"`{column}` = '{escaped_word}'",
+                    f"`{column}` = ' {escaped_word}'",
+                    f"`{column}` = '{escaped_word} '",
+                    f"`{column}` = ' {escaped_word} '"
+                ]
+                sql_query = f"SELECT `{column}` FROM `{table}` WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
+            elif db_type == "snowflake":
+                like_conditions = [
+                    f'"{column}" ILIKE \'{escaped_word}\'',
+                    f'"{column}" ILIKE \' {escaped_word}\'',
+                    f'"{column}" ILIKE \'{escaped_word} \'',
+                    f'"{column}" ILIKE \' {escaped_word} \''
+                ]
+                sql_query = f'SELECT "{column}" FROM "{table}" WHERE ({" OR ".join(like_conditions)}) LIMIT 5'
             else:
-                return p_res
-        except Exception as e:
-            return False
-
-    def db_word_exact_match(word, column, table, db_conn):
-        cursor = db_conn.cursor()
-
-        p_str = f"select {column} from {table} where {column} like '{word}' or {column} like ' {word}' or " \
-                f"{column} like '{word} ' or {column} like ' {word} '"
-        try:
-            cursor.execute(p_str)
-            p_res = cursor.fetchall()
-            if len(p_res) == 0:
-                return False
+                # SQLite and others
+                like_conditions = [
+                    f"{column} LIKE '{escaped_word}'",
+                    f"{column} LIKE ' {escaped_word}'",
+                    f"{column} LIKE '{escaped_word} '",
+                    f"{column} LIKE ' {escaped_word} '"
+                ]
+                sql_query = f"SELECT {column} FROM {table} WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
+        else:
+            # Partial match: word appears anywhere in cell content
+            if db_type == "big_query":
+                like_conditions = [
+                    f"`{column}` LIKE '{escaped_word} %'",
+                    f"`{column}` LIKE '% {escaped_word}'",
+                    f"`{column}` LIKE '% {escaped_word} %'",
+                    f"`{column}` LIKE '{escaped_word}'"
+                ]
+                sql_query = f"SELECT `{column}` FROM `{table}` WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
+            elif db_type == "snowflake":
+                like_conditions = [
+                    f'"{column}" ILIKE \'{escaped_word} %\'',
+                    f'"{column}" ILIKE \'% {escaped_word}\'',
+                    f'"{column}" ILIKE \'% {escaped_word} %\'',
+                    f'"{column}" ILIKE \'{escaped_word}\''
+                ]
+                sql_query = f'SELECT "{column}" FROM "{table}" WHERE ({" OR ".join(like_conditions)}) LIMIT 5'
             else:
-                return p_res
+                # SQLite and others
+                like_conditions = [
+                    f"{column} LIKE '{escaped_word} %'",
+                    f"{column} LIKE '% {escaped_word}'",
+                    f"{column} LIKE '% {escaped_word} %'",
+                    f"{column} LIKE '{escaped_word}'"
+                ]
+                sql_query = f"SELECT {column} FROM {table} WHERE ({' OR '.join(like_conditions)}) LIMIT 5"
+        
+        try:
+            # Use unified database connection approach - consistent with LinkAlignGenerator
+            if db_type == "sqlite":
+                result, error = get_sql_exec_result(
+                    db_type=db_type,
+                    sql_query=sql_query,
+                    db_path=str(db_path) if db_path else None
+                )
+            elif db_type == "big_query":
+                result, error = get_sql_exec_result(
+                    db_type=db_type,
+                    sql_query=sql_query,
+                    credential_path=credential
+                )
+            elif db_type == "snowflake":
+                result, error = get_sql_exec_result(
+                    db_type=db_type,
+                    sql_query=sql_query,
+                    db_id=db_path,  # For Snowflake, db_path is actually db_id
+                    credential_path=credential
+                )
+            else:
+                logger.warning(f"Unsupported database type: {db_type}")
+                return False
+            
+            if error:
+                logger.debug(f"Database query failed: {error}")
+                return False
+            
+            # Check if result has data - handle different result types
+            if result is None:
+                return False
+            elif isinstance(result, pd.DataFrame):
+                return not result.empty
+            elif isinstance(result, str):
+                return "No data found" not in result and "exception" not in result.lower()
+            elif isinstance(result, (list, tuple)):
+                return len(result) > 0
+            else:
+                return bool(result)
+                
         except Exception as e:
+            logger.debug(f"Database query failed for {db_type}: {e}")
             return False
 
     num_date_match = {}
     cell_match = {}
 
-    for col_id, column in enumerate(schema.columns):
-        if col_id == 0:
-            assert column.orig_name == "*"
+    # Process columns from schema_dict
+    column_names = schema_dict.get('column_names_original', [])
+    column_types = schema_dict.get('column_types', [])
+    table_names = schema_dict.get('table_names_original', [])
+
+    logger.debug(f"Starting cell value linking for {len(column_names)} columns in {db_type} database")
+
+    for col_id, (table_id, col_name) in enumerate(column_names):
+        if col_id == 0:  # Skip the first '*' column
             continue
+            
+        if table_id >= len(table_names):
+            continue
+            
+        table_name = table_names[table_id]
+        col_type = column_types[col_id] if col_id < len(column_types) else 'text'
+        
         match_q_ids = []
         for q_id, word in enumerate(tokens):
             if len(word.strip()) == 0:
@@ -425,14 +575,22 @@ def compute_cell_value_linking(tokens, schema):
                 continue
 
             num_flag = isnumber(word)
-            if num_flag:  # TODO refine the date and time match
-                if column.type in ["number", "time"]:
-                    num_date_match[f"{q_id},{col_id}"] = column.type.upper()
+            if num_flag:
+                # Check if column is numeric or time type - database agnostic
+                numeric_types = ["number", "int", "integer", "float", "decimal", "numeric", "double"]
+                time_types = ["time", "date", "datetime", "timestamp"]
+                
+                col_type_lower = col_type.lower()
+                if any(t in col_type_lower for t in numeric_types):
+                    num_date_match[f"{q_id},{col_id}"] = "NUMBER"
+                elif any(t in col_type_lower for t in time_types):
+                    num_date_match[f"{q_id},{col_id}"] = "TIME"
             else:
-                ret = db_word_partial_match(word, column.orig_name, column.table.orig_name, schema.connection)
-                if ret:
-                    # print(word, ret)
+                # Check cell value match using database-agnostic query
+                if db_word_match(word, col_name, table_name, db_type, db_path, credential, exact=False):
                     match_q_ids.append(q_id)
+
+        # Process consecutive matches for exact matching
         f = 0
         while f < len(match_q_ids):
             t = f + 1
@@ -440,8 +598,9 @@ def compute_cell_value_linking(tokens, schema):
                 t += 1
             q_f, q_t = match_q_ids[f], match_q_ids[t - 1] + 1
             words = [token for token in tokens[q_f: q_t]]
-            ret = db_word_exact_match(' '.join(words), column.orig_name, column.table.orig_name, schema.connection)
-            if ret:
+            
+            # Try exact match first
+            if db_word_match(' '.join(words), col_name, table_name, db_type, db_path, credential, exact=True):
                 for q_id in range(q_f, q_t):
                     cell_match[f"{q_id},{col_id}"] = CELL_EXACT_MATCH_FLAG
             else:
@@ -449,6 +608,7 @@ def compute_cell_value_linking(tokens, schema):
                     cell_match[f"{q_id},{col_id}"] = CELL_PARTIAL_MATCH_FLAG
             f = t
 
+    logger.debug(f"Cell value linking completed: {len(num_date_match)} numeric matches, {len(cell_match)} cell matches")
     cv_link = {"num_date_match": num_date_match, "cell_match": cell_match}
     return cv_link
 
@@ -516,44 +676,126 @@ class SqliteTable(dict):
     __setattr__ = dict.__setitem__
 
 
-def get_tables(path_db):
-    if not Path(path_db).exists():
-        raise RuntimeError(f"{path_db} not exists")
-
-    # init sqlite connection
-    connection = sqlite3.connect(str(path_db))
-    cur = connection.cursor()
-
-    # extract table information
-    # table_info = parse_db(path_db, cur)  # Assuming parse_db is not needed or inline if necessary
-    table_names = get_table_names(cur=cur)
-
-    res = list()
-    for table_name in table_names:
-        # schema
-        schema = [_[1] for _ in cur.execute(f'PRAGMA table_info("{table_name}")')]
-
-        # data
-        data = None
-
-        # append table
-        res.append(
-            SqliteTable(
-                name=table_name,
-                schema=schema,
-                data=data,
-                # table_info=table_info.get(table_name, dict())
+def get_tables(path_db, db_type='sqlite', credential=None):
+    """
+    Get table information using get_sql_exec_result for database abstraction.
+    Supports multiple database types.
+    """
+    try:
+        # Get table names using the unified approach
+        table_names = get_table_names_unified(path_db, db_type, credential)
+        
+        res = list()
+        for table_name in table_names:
+            # Get schema information
+            schema = get_table_schema_unified(table_name, path_db, db_type, credential)
+            
+            # Create table object
+            res.append(
+                SqliteTable(
+                    name=table_name,
+                    schema=schema,
+                    data=None  # Data is not loaded by default
+                )
             )
+        
+        return res
+        
+    except Exception as e:
+        logger.error(f"Failed to get tables: {e}")
+        return []
+
+
+def get_table_names_unified(path_db, db_type='sqlite', credential=None):
+    """
+    Get table names using get_sql_exec_result for database abstraction.
+    """
+    try:
+        # Construct appropriate query for different database types
+        if db_type == 'sqlite':
+            query = "SELECT name FROM sqlite_master WHERE type='table'"
+        elif db_type == 'big_query':
+            query = "SELECT table_name FROM INFORMATION_SCHEMA.TABLES WHERE table_type='BASE TABLE'"
+        elif db_type == 'snowflake':
+            query = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE='BASE TABLE'"
+        else:
+            query = "SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'"
+        
+        result, error = get_sql_exec_result(
+            db_type=db_type,
+            sql_query=query,
+            db_path=str(path_db) if path_db else None,
+            credential_path=credential
         )
+        
+        if error or result is None:
+            logger.warning(f"Failed to get table names: {error}")
+            return []
+        
+        # Extract table names from result
+        if hasattr(result, 'values'):
+            table_names = [row[0] for row in result.values]
+        elif isinstance(result, list):
+            table_names = [row[0] if isinstance(row, (list, tuple)) else str(row) for row in result]
+        else:
+            table_names = []
+            
+        return table_names
+        
+    except Exception as e:
+        logger.error(f"Failed to get table names: {e}")
+        return []
 
-    cur.close()
-    return res
 
-
-def get_table_names(cur):
-    table_names = cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
-    table_names = [_[0] for _ in table_names]
-    return table_names
+def get_table_schema_unified(table_name, path_db, db_type='sqlite', credential=None):
+    """
+    Get table schema (column names) using get_sql_exec_result for database abstraction.
+    """
+    try:
+        # Construct appropriate query for different database types
+        if db_type == 'sqlite':
+            query = f'PRAGMA table_info("{table_name}")'
+        elif db_type == 'big_query':
+            query = f"SELECT column_name FROM INFORMATION_SCHEMA.COLUMNS WHERE table_name='{table_name}'"
+        elif db_type == 'snowflake':
+            query = f"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='{table_name.upper()}'"
+        else:
+            query = f"SELECT column_name FROM information_schema.columns WHERE table_name='{table_name}'"
+        
+        result, error = get_sql_exec_result(
+            db_type=db_type,
+            sql_query=query,
+            db_path=str(path_db) if path_db else None,
+            credential_path=credential
+        )
+        
+        if error or result is None:
+            logger.warning(f"Failed to get schema for table {table_name}: {error}")
+            return []
+        
+        # Extract column names from result
+        if db_type == 'sqlite':
+            # For SQLite PRAGMA, column names are in the second column (index 1)
+            if hasattr(result, 'values'):
+                schema = [row[1] for row in result.values]
+            elif isinstance(result, list):
+                schema = [row[1] if len(row) > 1 else str(row) for row in result]
+            else:
+                schema = []
+        else:
+            # For other databases, column names are in the first column
+            if hasattr(result, 'values'):
+                schema = [row[0] for row in result.values]
+            elif isinstance(result, list):
+                schema = [row[0] if isinstance(row, (list, tuple)) else str(row) for row in result]
+            else:
+                schema = []
+                
+        return schema
+        
+    except Exception as e:
+        logger.error(f"Failed to get schema for table {table_name}: {e}")
+        return []
 
 
 # Prompt Classes
@@ -576,8 +818,34 @@ class SQLPrompt(BasicPrompt):
     template_question = "/* Answer the following: {} */"
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example["path_db"])
-        prompt_info = self.template_info.format("\n\n".join(sqls))
+        # Handle different database types for schema extraction
+        db_type = example.get('db_type', 'sqlite')
+        path_db = example.get('path_db')
+        credential = example.get('credential_path')
+        
+        if path_db:
+            try:
+                sqls = get_sql_for_database(path_db, db_type, credential)
+                if sqls:
+                    prompt_info = self.template_info.format("\n\n".join(sqls))
+                else:
+                    raise ValueError("No SQL schemas retrieved")
+            except Exception as e:
+                logger.warning(f"Failed to get SQL schema from database: {e}")
+                # Fallback to table-based schema representation
+                tables_info = []
+                for table in example.get("tables", []):
+                    table_sql = f"CREATE TABLE {table.name} ({', '.join(table.schema)});"
+                    tables_info.append(table_sql)
+                prompt_info = self.template_info.format("\n\n".join(tables_info))
+        else:
+            # For cases when path_db is not available
+            tables_info = []
+            for table in example.get("tables", []):
+                table_sql = f"CREATE TABLE {table.name} ({', '.join(table.schema)});"
+                tables_info.append(table_sql)
+            prompt_info = self.template_info.format("\n\n".join(tables_info))
+        
         prompt_extra_info = self.get_extra_info(example["db_id"])
         prompt_question = self.template_question.format(example["question"])
         if prompt_extra_info is None or prompt_extra_info == "":
@@ -942,68 +1210,84 @@ class BasicICLPrompt(object):
             return []
 
     def format(self, target, max_seq_len, max_ans_len, scope_factor, cross_domain):
-        # Explicitly define format_question if not available
-        if not hasattr(self, 'format_question'):
-            def format_question(ex):
-                sqls = get_sql_for_database(ex['path_db'])
-                prompt_info = "/* Given the following database schema: */\n{}".format("\n\n".join(sqls))
-                prompt_extra = self.get_extra_info(ex['db_id']) if hasattr(self, 'get_extra_info') else ""
-                prompt_question = "/* Answer the following: {} */".format(ex['question'])
-                components = [prompt_info]
-                if prompt_extra:
-                    components.append(prompt_extra)
-                components.append(prompt_question)
-                return "\n\n".join(components)
-
-            self.format_question = format_question
-        # Explicitly define format_target if not available
-        if not hasattr(self, 'format_target'):
-            def format_target(ex):
-                return self.format_question(ex) + "\nSELECT "
-
-            self.format_target = format_target
-        # Explicitly define get_example_prefix if not available
-        if not hasattr(self, 'get_example_prefix'):
-            def get_example_prefix():
-                return "/* Some SQL examples are provided based on similar problems: */\n"
-
-            self.get_example_prefix = get_example_prefix
-        # Explicitly define format_example if not available
-        if not hasattr(self, 'format_example'):
-            def format_example(ex):
-                return "/* Answer the following: {} */\n{}".format(ex['question'], ex['query'])
-
-            self.format_example = format_example
+        # Ensure required methods are available
+        self._ensure_required_methods()
+        
         # Proceed with prompt construction
         suffix = self.format_target(target)[len(self.format_question(target)):]
         prompt_str = ""
         token_cnt = 0
-        if self.NUM_EXAMPLE > 0:
-            if not hasattr(self, 'get_examples'):
-                def get_examples(t, n, cd):
-                    # Fallback to random selection
-                    import random
-                    indexes = list(range(len(self.train_json)))
-                    if cd:
-                        indexes = [i for i in indexes if self.db_ids[i] != t['db_id']]
-                    selected = random.sample(indexes, min(n, len(indexes)))
-                    return [self.train_json[i] for i in selected]
-
-                self.get_examples = get_examples
-            examples = self.get_examples(target, self.NUM_EXAMPLE, cross_domain)
-            if hasattr(self, 'record_example_quality'):
-                self.record_example_quality(examples, target)
-            if hasattr(self, 'record_pattern_similarity'):
-                self.record_pattern_similarity(examples, target)
-            formatted_examples = [self.format_example(ex) for ex in examples]
-            examples_prompt = self.get_example_prefix() + self.SEP_EXAMPLE.join(formatted_examples) + self.SEP_EXAMPLE
-            prompt_str += examples_prompt
-            token_cnt += self.count_tokens(examples_prompt)
+        
+        # Add few-shot examples if k_shot > 0
+        if getattr(self, 'NUM_EXAMPLE', 0) > 0:
+            examples = self._get_examples_safe(target, self.NUM_EXAMPLE, cross_domain)
+            if examples:
+                if hasattr(self, 'record_example_quality'):
+                    self.record_example_quality(examples, target)
+                if hasattr(self, 'record_pattern_similarity'):
+                    self.record_pattern_similarity(examples, target)
+                
+                formatted_examples = [self.format_example(ex) for ex in examples]
+                examples_prompt = self.get_example_prefix() + self.SEP_EXAMPLE.join(formatted_examples) + self.SEP_EXAMPLE
+                prompt_str += examples_prompt
+                token_cnt += self.count_tokens(examples_prompt)
+        
+        # Add the main question
         question_prompt = self.format_question(target)
         prompt_str += question_prompt + suffix
         token_cnt += self.count_tokens(question_prompt) + self.count_tokens(suffix)
-        # TODO: Implement truncation if prompt exceeds max_seq_len
+        
+        # Truncate if necessary
+        if token_cnt > max_seq_len:
+            logger.warning(f"Prompt too long ({token_cnt} tokens), truncating...")
+            # Simple truncation strategy - keep question and reduce examples
+            if getattr(self, 'NUM_EXAMPLE', 0) > 0:
+                self.NUM_EXAMPLE = max(0, self.NUM_EXAMPLE - 1)
+                return self.format(target, max_seq_len, max_ans_len, scope_factor, cross_domain)
+        
         return {"prompt": prompt_str, "prompt_tokens": token_cnt}
+
+    def _ensure_required_methods(self):
+        """Ensure all required methods are available"""
+        if not hasattr(self, 'format_question'):
+            self.format_question = self._default_format_question
+        if not hasattr(self, 'format_target'):
+            self.format_target = self._default_format_target
+        if not hasattr(self, 'get_example_prefix'):
+            self.get_example_prefix = self._default_get_example_prefix
+        if not hasattr(self, 'format_example'):
+            self.format_example = self._default_format_example
+
+    def _default_format_question(self, ex):
+        """Default question formatting"""
+        if 'tables' in ex:
+            schemas = "\n".join([f"{_.name}: {', '.join(_.schema)}" for _ in ex["tables"]])
+            return f"Given the following database schema:\n{schemas}\n\nAnswer the following: {ex['question']}"
+        else:
+            return f"Answer the following: {ex['question']}"
+
+    def _default_format_target(self, ex):
+        """Default target formatting"""
+        return self.format_question(ex) + "\nSELECT "
+
+    def _default_get_example_prefix(self):
+        """Default example prefix"""
+        return "/* Some SQL examples are provided based on similar problems: */\n"
+
+    def _default_format_example(self, ex):
+        """Default example formatting"""
+        return f"/* Answer the following: {ex['question']} */\n{ex.get('query', 'SELECT')}"
+
+    def _get_examples_safe(self, target, num_example, cross_domain):
+        """Safely get examples with fallback"""
+        if hasattr(self, 'get_examples'):
+            try:
+                return self.get_examples(target, num_example, cross_domain)
+            except:
+                pass
+        
+        # Fallback: return empty list for 0-shot
+        return []
 
 
 # Example Selector Classes
@@ -1354,6 +1638,10 @@ def get_example_selector(selector_type):
 class DAILSQLGenerate(BaseGenerator):
     NAME = "DAILSQL"
     OUTPUT_NAME = "pred_sql"
+    
+    @property
+    def name(self):
+        return self.NAME
 
     def __init__(
             self,
@@ -1368,7 +1656,7 @@ class DAILSQLGenerate(BaseGenerator):
             example_type=EXAMPLE_TYPE.QA,
             selector_type=SELECTOR_TYPE.RANDOM,
             db_path: Optional[Union[str, PathLike]] = None,
-            credential: Optional[dict] = None,
+            credential: Optional[Dict] = None,
             **kwargs
     ):
         self.dataset = dataset
@@ -1382,44 +1670,76 @@ class DAILSQLGenerate(BaseGenerator):
         self.example_type = example_type
         self.selector_type = selector_type
 
-        self.db_path = db_path or (dataset.db_path if dataset else None)
-        self.credential = credential or (dataset.credential if dataset else None)
+        # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
+        if db_path is not None:
+            self.db_path = db_path
+        elif self.dataset is not None:
+            self.db_path = self.dataset.db_path
+        else:
+            self.db_path = None
 
-        if self.dataset:
-            self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
-                data=self.dataset, tokenizer="approx")
+        if credential is not None:
+            self.credential = credential
+        elif self.dataset is not None:
+            self.credential = self.dataset.credential
+        else:
+            self.credential = None
+
+        # Initialize prompt system
+        self.prompt = None
+        if self.dataset and self.use_few_shot:
+            try:
+                self.prompt = prompt_factory(self.prompt_repr, self.k_shot, self.example_type, self.selector_type)(
+                    data=self._build_dataset_adapter(), tokenizer="approx")
+                logger.debug(f"Initialized DAIL-SQL prompt system: {self.prompt_repr}, {self.k_shot}-shot")
+            except Exception as e:
+                logger.warning(f"Failed to initialize DAIL-SQL prompt system: {e}, using fallback")
+                self.prompt = None
 
     def act(self, item, schema=None, schema_links=None, **kwargs):
+        """Main DAIL-SQL generation method following the Generator interface"""
+        logger.info(f"DAILSQLGenerator 开始处理样本 {item}")
+        
+        # Validate inputs
+        is_valid, error_msg = self._validate_inputs(item, schema)
+        if not is_valid:
+            logger.error(f"输入验证失败: {error_msg}")
+            raise ValueError(error_msg)
+        
         try:
-            if isinstance(item, int):
-                row = self.dataset[item]
-            else:
-                row = item
+            # Get data row
+            row = self.dataset[item]
+            question = row['question']
+            db_type = row['db_type']
+            db_id = row["db_id"]
+            db_path = self._get_db_path(row, db_id, db_type)
+            logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
 
-            question = row.get('question', '')
-            db_id = row.get('db_id', 'default_db')
-            db_type = row.get('db_type', 'sqlite')
-
-            logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
+            # Load external knowledge if available
+            if self.use_external:
+                external_knowledge = self._load_external_knowledge(row.get("external", None))
+                if external_knowledge:
+                    question += "\n" + external_knowledge
+                    logger.debug("已加载外部知识")
 
             # Load and process schema
-            logger.debug("Processing database schema...")
-            if isinstance(schema, (str, PathLike)):
+            logger.debug("开始处理数据库模式...")
+            if isinstance(schema, (str, PathLike)) and Path(schema).exists():
                 schema = load_dataset(schema)
 
             if schema is None:
                 instance_schema_path = row.get("instance_schemas")
                 if instance_schema_path:
                     schema = load_dataset(instance_schema_path)
-                    logger.debug(f"Loaded schema from: {instance_schema_path}")
+                    logger.debug(f"从实例模式路径加载模式: {instance_schema_path}")
                 else:
-                    logger.debug("Fetching schema from dataset")
+                    logger.debug("从数据集获取数据库模式")
                     schema = self.dataset.get_db_schema(item)
 
                 if schema is None:
                     raise ValueError("Failed to load a valid database schema for the sample!")
 
-            # Normalize schema type - 参考 DINSQLGenerate 的处理方式
+            # Normalize schema type
             if isinstance(schema, dict):
                 schema = single_central_process(schema)
             elif isinstance(schema, list):
@@ -1427,77 +1747,109 @@ class DAILSQLGenerate(BaseGenerator):
 
             if isinstance(schema, pd.DataFrame):
                 schema_str = parse_schema_from_df(schema)
-                # 为了兼容原有的 DAIL-SQL 逻辑，需要构建兼容的 schema 字典
                 schema_dict = self._build_compatible_schema_dict(schema)
             else:
                 raise ValueError("Invalid schema format")
 
-            logger.debug("Database schema processed")
+            logger.debug("数据库模式处理完成")
 
-            # 构建 target 对象，使用处理后的 schema
-            path_db = row.get('path_db', '')
+            # Build target object for DAIL-SQL format
             target = {
                 'question': question,
                 'db_id': db_id,
-                'path_db': path_db,
+                'db_type': db_type,  # Include database type for database-agnostic processing
+                'path_db': db_path,
                 'tables': self._get_tables_from_schema(schema_dict),
                 'query': row.get('query', 'SELECT'),
                 'column_names_original': schema_dict.get('column_names_original', []),
                 'table_names_original': schema_dict.get('table_names_original', []),
+                'query_skeleton': self._get_query_skeleton(row.get('query', 'SELECT'), schema_dict),
+                'credential_path': self.credential  # Include credential path for non-SQLite databases
             }
 
-            # Compute schema_links if not provided
+            # Compute schema linking if not provided
             if schema_links is None:
-                question_toks = target['question'].split()
-                # 使用简化的 schema linking 实现
-                q_col_match, q_tab_match = self._simplified_schema_linking(question_toks, schema_dict)
+                logger.debug("开始计算模式链接...")
+                question_toks = question.split()
+                
+                # Schema column/table linking using original DAIL-SQL approach
+                sc_link = compute_schema_linking(
+                    question_toks,
+                    [col[1] for col in schema_dict['column_names_original'][1:]], # Skip '*' column
+                    schema_dict['table_names_original']
+                )
+                
+                # Cell value linking with database queries using get_sql_exec_result
+                cv_link = compute_cell_value_linking(
+                    question_toks,
+                    schema_dict,
+                    db_type,
+                    db_path,
+                    self.credential
+                )
+                
+                # Apply match shifting as in original DAIL-SQL
+                q_col_match, q_tab_match, cell_match = match_shift(
+                    sc_link['q_col_match'],
+                    sc_link['q_tab_match'],
+                    cv_link['cell_match']
+                )
+                
+                target['sc_link'] = {'q_col_match': q_col_match, 'q_tab_match': q_tab_match}
+                target['cv_link'] = {'num_date_match': cv_link['num_date_match'], 'cell_match': cell_match}
+                target['question_for_copying'] = question_toks
+                logger.debug("模式链接计算完成")
+            else:
+                # Use provided schema links
+                if isinstance(schema_links, (str, PathLike)):
+                    schema_links = load_dataset(schema_links)
+                target.update(schema_links)
 
-                # 简化的 cell value linking - 只处理数字和日期
-                cv_link = {"num_date_match": {}, "cell_match": {}}
-                for q_id, word in enumerate(question_toks):
-                    # 检查是否为数字
-                    try:
-                        float(word)
-                        # 找到匹配的数字类型列
-                        for col_id, (table_id, col_name) in enumerate(schema_dict['column_names_original']):
-                            col_type = schema_dict['column_types'][col_id] if col_id < len(
-                                schema_dict['column_types']) else 'text'
-                            if 'number' in col_type.lower() or 'int' in col_type.lower() or 'float' in col_type.lower():
-                                cv_link['num_date_match'][f"{q_id},{col_id}"] = 'NUMBER'
-                    except ValueError:
-                        pass
+            # Format prompt using DAIL-SQL prompt system
+            logger.debug("开始格式化提示...")
+            if hasattr(self, 'prompt') and self.prompt:
+                try:
+                    prompt_data = self.prompt.format(
+                        target=target,
+                        max_seq_len=2048,
+                        max_ans_len=200,
+                        scope_factor=100,
+                        cross_domain=True
+                    )
+                    prompt = prompt_data['prompt']
+                    logger.debug(f"使用 DAIL-SQL 提示系统，token 数: {prompt_data.get('prompt_tokens', 0)}")
+                except Exception as e:
+                    logger.warning(f"DAIL-SQL 提示系统失败，使用回退提示: {e}")
+                    prompt = self._build_fallback_prompt(target, schema_str)
+            else:
+                # Fallback to basic prompt if prompt system not initialized
+                prompt = self._build_fallback_prompt(target, schema_str)
 
-                schema_links = {
-                    'sc_link': {'q_col_match': q_col_match, 'q_tab_match': q_tab_match},
-                    'cv_link': cv_link
-                }
+            # Generate SQL using LLM
+            logger.debug("开始生成 SQL...")
+            try:
+                res = self.llm.complete(prompt)
+                res_text = res.text if hasattr(res, 'text') else str(res)
+            except Exception as e:
+                logger.error(f"LLM 生成失败: {e}")
+                return "SELECT 1"  # Return a valid SQL as fallback
 
-            prompt_data = self.prompt.format(target, max_seq_len=2048, max_ans_len=200, scope_factor=100,
-                                             cross_domain=True)
+            # Post-process SQL with database type information
+            sql = self._post_process_sql(res_text, db_type)
 
-            prompt = prompt_data['prompt']
-
-            res = self.llm.complete(prompt)  # Assume returns object with text
-            res_text = res.text if hasattr(res, 'text') else str(res)
-
-            sql = " ".join(res_text.replace("\n", " ").split())
-            sql = process_duplication(sql)  # Define if not
-            if not sql.upper().startswith('SELECT'):
-                sql = 'SELECT ' + sql
-
+            # Save result if required
             if self.is_save:
-                instance_id = row.get("instance_id", item)
-                save_path = Path(self.save_dir)
-                save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-                save_path = save_path / f"{self.name}_{instance_id}.sql"
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                save_dataset(sql, new_data_source=save_path)
-                self.dataset.setitem(item, "pred_sql", str(save_path))
+                self._save_result(sql, row, item)
 
+            logger.debug(f"生成的 SQL: {sql[:100]}...")
+            logger.info(f"DAILSQLGenerator 样本 {item} 处理完成")
             return sql
+
         except Exception as e:
-            logger.error(f"DAILSQL act error: {e}")
-            return "SELECT"
+            logger.error(f"DAILSQLGenerator act 错误: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return "SELECT 1"  # Return a valid SQL as fallback
 
     def _build_compatible_schema_dict(self, schema_df: pd.DataFrame) -> Dict:
         """将 DataFrame 格式的 schema 转换为 DAIL-SQL 兼容的字典格式"""
@@ -1573,6 +1925,177 @@ class DAILSQLGenerate(BaseGenerator):
                         q_tab_match[f"{q_id},{tab_id}"] = TAB_EXACT_MATCH_FLAG
 
         return q_col_match, q_tab_match
+
+    def _get_db_path(self, row, db_id, db_type):
+        """
+        Get database path/identifier based on db_type.
+        Consistent with LinkAlignGenerator approach.
+        """
+        if db_type == "sqlite":
+            return Path(self.db_path) / (db_id + ".sqlite") if self.db_path else None
+        elif db_type in ["big_query", "snowflake"]:
+            # For cloud databases, db_path might be db_id or connection string
+            return db_id
+        else:
+            return self.db_path
+
+    def _get_query_skeleton(self, query, schema_dict):
+        """Get SQL query skeleton"""
+        if not query or not query.strip().upper().startswith('SELECT'):
+            return query
+        try:
+            return sql2skeleton(query, schema_dict)
+        except:
+            return query
+
+    def _build_fallback_prompt(self, target, schema_str):
+        """
+        Build a basic fallback prompt when DAIL-SQL prompt system is not available.
+        Database-agnostic prompt construction.
+        """
+        db_type = target.get('db_type', 'sqlite')
+        
+        # Add database-specific instructions if needed
+        db_instruction = ""
+        if db_type == "big_query":
+            db_instruction = "/* Note: Use BigQuery SQL syntax with backticks for table/column names */\n"
+        elif db_type == "snowflake":
+            db_instruction = "/* Note: Use Snowflake SQL syntax */\n"
+        elif db_type == "sqlite":
+            db_instruction = "/* Note: Use SQLite SQL syntax */\n"
+        
+        prompt = f"""{db_instruction}Given the following database schema:
+{schema_str}
+
+Answer the following: {target['question']}
+SELECT """
+        return prompt
+
+    def _post_process_sql(self, sql_text, db_type='sqlite'):
+        """
+        Post-process generated SQL for different database types.
+        Database-agnostic SQL cleaning and validation.
+        """
+        # Clean up the SQL text
+        sql = " ".join(sql_text.replace("\n", " ").split())
+        sql = process_duplication(sql)
+        
+        # Ensure SQL starts with SELECT
+        if not sql.upper().startswith('SELECT'):
+            if sql.startswith(' '):
+                sql = 'SELECT' + sql
+            else:
+                sql = 'SELECT ' + sql
+        
+        # Database-specific SQL adjustments
+        if db_type == "big_query":
+            # BigQuery specific adjustments
+            sql = self._adjust_sql_for_bigquery(sql)
+        elif db_type == "snowflake":
+            # Snowflake specific adjustments
+            sql = self._adjust_sql_for_snowflake(sql)
+        elif db_type == "sqlite":
+            # SQLite specific adjustments
+            sql = self._adjust_sql_for_sqlite(sql)
+                
+        return sql
+
+    def _adjust_sql_for_bigquery(self, sql):
+        """Adjust SQL for BigQuery syntax"""
+        # BigQuery uses backticks for identifiers
+        # This is a basic adjustment - more sophisticated parsing might be needed
+        return sql
+
+    def _adjust_sql_for_snowflake(self, sql):
+        """Adjust SQL for Snowflake syntax"""
+        # Snowflake uses double quotes for case-sensitive identifiers
+        # This is a basic adjustment - more sophisticated parsing might be needed
+        return sql
+
+    def _adjust_sql_for_sqlite(self, sql):
+        """Adjust SQL for SQLite syntax"""
+        # SQLite uses standard SQL syntax
+        return sql
+
+    def _load_external_knowledge(self, external_path):
+        """Load external knowledge if available"""
+        if not external_path:
+            return None
+        try:
+            external = load_dataset(external_path)
+            if external and len(external) > 50:
+                external = "####[External Prior Knowledge]:\n" + external
+                return external
+        except Exception as e:
+            logger.warning(f"加载外部知识失败: {e}")
+        return None
+        
+    def _save_result(self, sql, row, item):
+        """Save the generated SQL result"""
+        instance_id = row.get("instance_id", item)
+        save_path = Path(self.save_dir)
+        if self.dataset and self.dataset.dataset_index:
+            save_path = save_path / str(self.dataset.dataset_index)
+        save_path = save_path / f"{self.NAME}_{instance_id}.sql"
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_dataset(sql, new_data_source=save_path)
+        if self.dataset:
+            self.dataset.setitem(item, "pred_sql", str(save_path))
+        logger.debug(f"SQL 已保存到: {save_path}")
+
+    def _build_dataset_adapter(self):
+        """Build a dataset adapter for DAIL-SQL prompt system"""
+        class DatasetAdapter:
+            def __init__(self, dataset):
+                self.dataset = dataset
+                self.train_json = []
+                self.db_ids = []
+                self.train_questions = []
+                
+                # Build training data if available
+                if hasattr(dataset, 'data') and dataset.data:
+                    for i, item in enumerate(dataset.data):
+                        if isinstance(item, dict):
+                            # Convert Squrve format to DAIL-SQL format
+                            adapted_item = {
+                                'question': item.get('question', ''),
+                                'query': item.get('query', 'SELECT'),
+                                'db_id': item.get('db_id', 'default'),
+                                'path_db': item.get('path_db', ''),
+                                'tables': []  # Will be populated as needed
+                            }
+                            self.train_json.append(adapted_item)
+                            self.db_ids.append(adapted_item['db_id'])
+                            self.train_questions.append(adapted_item['question'])
+            
+            def get_train_json(self):
+                return self.train_json
+                
+            def get_test_json(self):
+                return []  # Not used for generation
+                
+        return DatasetAdapter(self.dataset)
+    
+    def _validate_inputs(self, item, schema=None):
+        """Validate input parameters"""
+        if self.dataset is None:
+            return False, "Dataset not initialized"
+        
+        if self.llm is None:
+            return False, "LLM not initialized"
+        
+        try:
+            row = self.dataset[item]
+            if 'question' not in row:
+                return False, "Data sample missing 'question' field"
+            if 'db_id' not in row:
+                return False, "Data sample missing 'db_id' field"
+            if 'db_type' not in row:
+                return False, "Data sample missing 'db_type' field"
+        except Exception as e:
+            return False, f"Cannot access data sample: {e}"
+        
+        return True, ""
 
 
 # Define process_duplication from existing
