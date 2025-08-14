@@ -94,18 +94,21 @@ def get_bigquery_sql_result(
 ):
     """ Execute a SQL query in BigQuery, return result or save as CSV. """
     try:
-        if isinstance(credential_path, str):
-            credential_path = Path(credential_path)
-        elif isinstance(credential_path, dict):
+        # Normalize credential path when provided in different formats
+        if isinstance(credential_path, dict):
             credential_path = credential_path.get("big_query", None)
+        if credential_path is None:
+            return None, "BigQuery credential path is not provided"
+        if isinstance(credential_path, (str, PathLike)):
+            credential_path = Path(credential_path)
 
         if not credential_path.exists():
-            return None, f"Credential file not found at: {credential_path}", 0.0
+            return None, f"Credential file not found at: {credential_path}"
 
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(credential_path)
         client = bigquery.Client()
     except Exception as e:
-        return None, f"Failed to initialize BigQuery client: {e}", 0.0
+        return None, f"Failed to initialize BigQuery client: {e}"
 
     try:
         query_job = client.query(sql_query, timeout=120)
@@ -115,21 +118,21 @@ def get_bigquery_sql_result(
         print(f"GB processed: {gb_processed:.5f} GB")
 
         if df.empty:
-            return None, "No data found for the specified query", gb_processed
+            return None, "No data found for the specified query"
 
         if save_path:
             save_path = Path(save_path)
             save_path.mkdir(parents=True, exist_ok=True)
             df.to_csv(save_path, index=False)
-            return df, None, gb_processed
+            return df, None
         else:
             if df.shape == (1, 1):
-                return df.iat[0, 0], None, gb_processed
+                return df.iat[0, 0], None
             else:
-                return df, None, gb_processed
+                return df, None
 
     except Exception as e:
-        return None, str(e), 0.0
+        return None, str(e)
 
 
 def get_sql_exec_result(db_type: str, **kwargs):
