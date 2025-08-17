@@ -636,6 +636,15 @@ class DataLoader:
             elif use == "zhipu":
                 from core.llm.ZhipuModel import ZhipuModel
                 llm_ = ZhipuModel(**init_args)
+            elif use == "openai":
+                from core.llm.OpenaiModel import OpenaiModel
+                llm_ = OpenaiModel(**init_args)
+            elif use == "claude":
+                from core.llm.ClaudeModel import ClaudeModel
+                llm_ = ClaudeModel(**init_args)
+            elif use == "gemini":
+                from core.llm.GeminiModel import GeminiModel
+                llm_ = GeminiModel(**init_args)
 
         except Exception as e:
             warnings.warn(f"Failed to create LLM: {e}.", category=UserWarning)
@@ -675,6 +684,18 @@ class DataLoader:
             elif use == "qwen":
                 from core.llm.QwenModel import QwenModel
                 llm_ = QwenModel(**init_args)
+            elif use == "zhipu":
+                from core.llm.ZhipuModel import ZhipuModel
+                llm_ = ZhipuModel(**init_args)
+            elif use == "openai":
+                from core.llm.OpenaiModel import OpenaiModel
+                llm_ = OpenaiModel(**init_args)
+            elif use == "claude":
+                from core.llm.ClaudeModel import ClaudeModel
+                llm_ = ClaudeModel(**init_args)
+            elif use == "gemini":
+                from core.llm.GeminiModel import GeminiModel
+                llm_ = GeminiModel(**init_args)
 
         except Exception as e:
             warnings.warn(f"Failed to create LLM: {e}.", category=UserWarning)

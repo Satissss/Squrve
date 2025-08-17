@@ -277,8 +277,8 @@ class RSLSQLGenerator(BaseGenerator):
         else:
             self.credential = None
 
-        # Load column meanings
-        self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
+        # # Load column meanings
+        # self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
 
     @property
     def name(self):
