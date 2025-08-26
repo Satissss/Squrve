@@ -645,6 +645,9 @@ class DataLoader:
             elif use == "gemini":
                 from core.llm.GeminiModel import GeminiModel
                 llm_ = GeminiModel(**init_args)
+            elif use == "xiaojing":
+                from core.llm.XiaoJingModel import XiaoJingModel
+                llm_ = XiaoJingModel(**init_args)
 
         except Exception as e:
             warnings.warn(f"Failed to create LLM: {e}.", category=UserWarning)
