@@ -2,6 +2,8 @@
 
 <div align="center">
 
+<img src="./assets/icon.png" alt="Squrve Logo" width="120"/>
+
 ![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Framework](https://img.shields.io/badge/Framework-Text--to--SQL-orange.svg)
