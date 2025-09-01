@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from llama_index.core.llms.llm import LLM
 from typing import Union, List, Dict
 import pandas as pd
@@ -109,52 +108,28 @@ class LinkAlignParser(BaseParser):
         turn_n, link_num = (self.load_turn_n(db_size) if self.automatic
                             else (self.parse_turn_n, self.parse_link_num))
 
-        def build_parse_args(llm_):
-            return {
-                "mode": self.parse_mode,
-                "query": question,
-                "context": schema_context,
-                "turn_n": turn_n,
-                "linker_num": link_num,
-                "llm": llm_,
-            }
-
-        # 生成 schema link 列表
-        def generate_schema_links(llm_):
-            links = []
-            args = build_parse_args(llm_)
-            for _ in range(self.generate_num):
-                result = SchemaLinkingTool.generate_selector(**args)
-                links.extend(parse_schema_link_from_str(result))
-            return links
-
-        def process_serial(llm_lis_):
-            links = []
-            for llm_model in llm_lis_:
-                links.extend(generate_schema_links(llm_model))
-            return links
-
-        def process_parallel(llm_lis_):
-            links = []
-            max_workers = self.max_workers if self.max_workers else len(llm_lis_)
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = {executor.submit(generate_schema_links, llm_model): llm_model for llm_model in llm_lis_}
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        links.extend(result)
-                    except Exception as e:
-                        llm_model = futures[future]
-                        print(f"Error occurred when processing LLM {llm_model}: {e}")
-            return links
-
-        # 多 LLM 扩展或单模型处理
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        schema_links = []
-        if self.use_llm_scaling and isinstance(self.llm, list):
-            schema_links.extend(process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis))
+        if isinstance(self.llm, list) and self.llm:
+            llm = self.llm[0]
         else:
-            schema_links.extend(generate_schema_links(llm_lis[0]))
+            llm = self.llm
+
+        if llm is None:
+            # 如果没有有效的 LLM，返回空结果
+            return []
+
+        # 仅使用第一个 LLM 生成 schema links
+        schema_links = []
+        select_args = {
+            "mode": self.parse_mode,
+            "query": question,
+            "context": schema_context,
+            "turn_n": turn_n,
+            "linker_num": link_num,
+            "llm": llm,
+        }
+        for _ in range(self.generate_num):
+            result = SchemaLinkingTool.generate_selector(**select_args)
+            schema_links.extend(parse_schema_link_from_str(result))
 
         schema_links = list(dict.fromkeys(schema_links))
 

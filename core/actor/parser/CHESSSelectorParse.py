@@ -191,7 +191,6 @@ Only output a json as your response."""
         data_row = self.dataset[item]
         question = data_row["question"]
         evidence = data_row.get("evidence", "")
-        db_size = data_row.get("db_size", 0)
         db_type = data_row.get("db_type", "sqlite")
 
         if isinstance(schema, (str, PathLike)) and Path(schema).exists():

@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from llama_index.core.llms.llm import LLM
 from typing import Union, List, Dict
 import pandas as pd
@@ -12,6 +11,7 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
+
 
 class DINSQLCoTParser(BaseParser):
     """
@@ -92,6 +92,7 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
     def generate_schema_links(self, llm_: LLM, question: str, schema_context: str) -> List[str]:
         prompt = self.schema_linking_prompt_maker(question, schema_context)
         response = llm_.complete(prompt).text
+
         return self.parse_schema_links(response)
 
     def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
@@ -121,35 +122,21 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
 
         schema_context = parse_schema_from_df(schema)
 
-        def process_serial(llm_lis_):
-            links = []
-            for llm_model in llm_lis_:
-                for _ in range(self.generate_num):
-                    links.extend(self.generate_schema_links(llm_model, question, schema_context))
-            return links
-
-        def process_parallel(llm_lis_):
-            links = []
-            max_workers = self.max_workers if self.max_workers else len(llm_lis_) * self.generate_num
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                futures = []
-                for llm_model in llm_lis_:
-                    for _ in range(self.generate_num):
-                        futures.append(executor.submit(self.generate_schema_links, llm_model, question, schema_context))
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        links.extend(result)
-                    except Exception as e:
-                        print(f"Error occurred: {e}")
-            return links
-
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        schema_links = []
-        if self.use_llm_scaling and isinstance(self.llm, list):
-            schema_links.extend(process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis))
+        # 在 act 方法内部初始化 llm，考虑 self.llm 是否为列表
+        if isinstance(self.llm, list) and self.llm:
+            llm = self.llm[0]
         else:
-            schema_links.extend(process_serial([llm_lis[0]]))
+            llm = self.llm
+
+        if llm is None:
+            # 如果没有有效的 LLM，返回空结果
+            return []
+
+        # 仅使用第一个 LLM 生成 schema links
+        schema_links = []
+        for _ in range(self.generate_num):
+            links = self.generate_schema_links(llm, question, schema_context)
+            schema_links.extend(links)
 
         schema_links = list(dict.fromkeys(schema_links))
 
@@ -164,4 +151,4 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
             save_dataset(output, new_data_source=save_path)
             self.dataset.setitem(item, "schema_links", str(save_path))
 
-        return output 
+        return output

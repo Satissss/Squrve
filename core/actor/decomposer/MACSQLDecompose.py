@@ -1,5 +1,4 @@
 # core/actor/decomposer/MACSQLDecompose.py
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from llama_index.core.llms.llm import LLM
 from typing import Union, List, Dict, Tuple
 import pandas as pd
@@ -286,48 +285,24 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
         desc_str = parse_schema_from_df(schema)  # Assuming this function generates the schema string in the required format
         fk_str = ""  # TODO: Implement foreign key extraction if needed, or assume it's part of desc_str
 
-        def process_serial(llm_lis_):
-            decompositions = []
-            for llm_model in llm_lis_:
-                for _ in range(self.generate_num):
-                    decompositions.append(self.generate_decomposition(llm_model, query, desc_str, fk_str, evidence))
-            return decompositions
-
-        def process_parallel(llm_lis_):
-            decompositions = []
-            max_workers_ = self.max_workers if self.max_workers else len(llm_lis_) * self.generate_num
-            with ThreadPoolExecutor(max_workers=max_workers_) as executor:
-                futures = []
-                for llm_model in llm_lis_:
-                    for _ in range(self.generate_num):
-                        futures.append(executor.submit(self.generate_decomposition, llm_model, query, desc_str, fk_str, evidence))
-                for future in as_completed(futures):
-                    try:
-                        result = future.result()
-                        decompositions.append(result)
-                    except Exception as e:
-                        from loguru import logger
-                        logger.error(f"Error in decomposition: {e}")
-            return decompositions
-
         # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        # 过滤掉 None 值
-        llm_lis = [llm for llm in llm_lis if llm is not None]
-        
-        if not llm_lis:
+        if isinstance(self.llm, list) and self.llm:
+            llm = self.llm[0]
+        else:
+            llm = self.llm
+
+        if llm is None:
             # 如果没有有效的 LLM，返回空结果
             return []
             
-        sub_questions = []
-        if self.use_llm_scaling and isinstance(self.llm, list):
-            sub_questions = process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis)
-        else:
-            sub_questions = process_serial([llm_lis[0]])
+        # 仅使用第一个 LLM 生成分解结果
+        decompositions = []
+        for _ in range(self.generate_num):
+            decomposition = self.generate_decomposition(llm, query, desc_str, fk_str, evidence)
+            decompositions.append(decomposition)
 
-        # Flatten and deduplicate if needed
         # For simplicity, take the first decomposition
-        output = sub_questions[0] if sub_questions else []
+        output = decompositions[0] if decompositions else []
 
         if self.is_save:
             instance_id = row.get('instance_id', item)

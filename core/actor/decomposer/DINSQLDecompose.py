@@ -3,7 +3,6 @@ from os import PathLike
 from pathlib import Path
 import pandas as pd
 from loguru import logger
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from llama_index.core.llms import LLM
 
@@ -14,6 +13,7 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
+
 
 class DINSQLDecomposer(BaseDecomposer):
     """Decomposer implementation based on DIN-SQL's classification for identifying sub-questions in complex queries."""
@@ -150,44 +150,22 @@ Label: "NESTED"'''
 
         schema_str = parse_schema_from_df(schema) if isinstance(schema, pd.DataFrame) else str(schema)
 
-        def process_serial(llm_lis_):
-            all_sub_questions = []
-            for llm_model in llm_lis_:
-                for _ in range(self.generate_num):
-                    sub_qs = self.generate_sub_questions(llm_model, question, schema_str)
-                    all_sub_questions.extend(sub_qs)
-            return all_sub_questions
-
-        def process_parallel(llm_lis_):
-            all_sub_questions = []
-            max_workers_ = self.max_workers if self.max_workers else len(llm_lis_) * self.generate_num
-            with ThreadPoolExecutor(max_workers=max_workers_) as executor:
-                futures = []
-                for llm_model in llm_lis_:
-                    for _ in range(self.generate_num):
-                        futures.append(executor.submit(self.generate_sub_questions, llm_model, question, schema_str))
-                for future in as_completed(futures):
-                    try:
-                        sub_qs = future.result()
-                        all_sub_questions.extend(sub_qs)
-                    except Exception as e:
-                        logger.error(f"Error in decomposition: {e}")
-            return all_sub_questions
-
         # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        # 过滤掉 None 值
-        llm_lis = [llm for llm in llm_lis if llm is not None]
-        
-        if not llm_lis:
-            # 如果没有有效的 LLM，返回空结果
-            return []
-            
-        sub_questions = []
-        if self.use_llm_scaling and isinstance(self.llm, list):
-            sub_questions = process_parallel(llm_lis) if self.open_parallel else process_serial(llm_lis)
+        if isinstance(self.llm, list) and self.llm:
+            llm = self.llm[0]
         else:
-            sub_questions = process_serial([llm_lis[0]])
+            llm = self.llm
+
+        if llm is None:
+            return []
+
+        # 仅使用第一个 LLM 生成子问题
+        all_sub_questions = []
+        for _ in range(self.generate_num):
+            sub_qs = self.generate_sub_questions(llm, question, schema_str)
+            all_sub_questions.extend(sub_qs)
+
+        sub_questions = all_sub_questions
 
         # Deduplicate
         sub_questions = list(set(sub_questions))
@@ -200,4 +178,4 @@ Label: "NESTED"'''
             save_dataset(sub_questions, new_data_source=save_path)
             self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
 
-        return sub_questions 
+        return sub_questions
