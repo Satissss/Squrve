@@ -48,18 +48,24 @@ class OpenSearchSQLSelector(BaseSelector):
         """Safely execute SQL and return result with timing."""
         start_time = time.time()
         try:
-            if db_type == "sqlite":
-                result = execute_sql(db_type, db_path, sql, None)
-            elif db_type in ["snowflake", "big_query"]:
-                credential_path = credential if isinstance(credential, str) else None
-                if not credential_path and self.dataset and hasattr(self.dataset, 'credential'):
-                    credential_path = self.dataset.credential.get(db_type)
-                if not credential_path:
-                    return {"success": False, "result": None, "error": "No credential", "time_cost": 0, "sql": sql}
-                result = execute_sql(db_type, db_path, sql, credential_path)
-            else:
-                return {"success": False, "result": None, "error": "Unsupported db_type", "time_cost": 0, "sql": sql}
-
+            # Extract credential_path from credential parameter
+            credential_path = None
+            if isinstance(credential, dict) and "credential_path" in credential:
+                credential_path = credential["credential_path"]
+            elif isinstance(credential, str):
+                credential_path = credential
+            
+            # If credential_path not provided in credential parameter, try to get from dataset
+            if not credential_path and self.dataset and hasattr(self.dataset, 'credential'):
+                dataset_credential = self.dataset.credential
+                if isinstance(dataset_credential, dict) and db_type in dataset_credential:
+                    credential_path = dataset_credential[db_type]
+                elif isinstance(dataset_credential, str):
+                    credential_path = dataset_credential
+            
+            # Execute SQL with credential_path if available
+            result = execute_sql(db_type, db_path, sql, credential_path)
+            
             time_cost = time.time() - start_time
             return {"success": True, "result": result, "error": None, "time_cost": time_cost, "sql": sql}
         except Exception as e:

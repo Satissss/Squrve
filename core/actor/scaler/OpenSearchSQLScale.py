@@ -625,7 +625,6 @@ class OpenSearchSQLScaler(BaseScaler):
     ) -> List[str]:
         row = self.dataset[item]
         question = row['question']
-        evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
         db_id = row.get('db_id')
 
         # Load and process schema like ChessScale

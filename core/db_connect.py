@@ -150,13 +150,17 @@ def execute_sql(db_type, db_path, sql, credential):
     if db_type not in ["sqlite", "snowflake", "big_query"]:
         return "Unsupported db_type"
     args = {"sql_query": sql}
+    
+    # Set db_path for sqlite, db_id for other database types
     if db_type == "sqlite":
         args["db_path"] = db_path
-    elif db_type == "snowflake":
+    else:
         args["db_id"] = db_path
+    
+    # Add credential_path if provided (for any database type)
+    if credential is not None:
         args["credential_path"] = credential
-    elif db_type == "big_query":
-        args["credential_path"] = credential
+    
     exec_result = get_sql_exec_result(db_type, **args)
     if isinstance(exec_result, tuple):
         if len(exec_result) == 3:

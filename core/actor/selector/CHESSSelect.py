@@ -82,40 +82,23 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
     def _execute_sql_safe(self, sql: str, db_type: str, db_path: str, credential: Dict = None) -> Dict[str, Any]:
         """Safely execute SQL and return result with error handling"""
         try:
-            # Handle different database types and their connection parameters
-            if db_type == "sqlite":
-                # For SQLite, db_path should be the database file path
-                result = execute_sql(db_type, db_path, sql, None)
-            elif db_type in ["snowflake", "big_query"]:
-                # For cloud databases, db_path is the database ID, credential is the credential path
-                if isinstance(credential, dict) and "credential_path" in credential:
-                    credential_path = credential["credential_path"]
-                elif isinstance(credential, str):
-                    credential_path = credential
-                else:
-                    # Try to get credential from dataset
-                    credential_path = None
-                    if self.dataset and hasattr(self.dataset, 'credential'):
-                        dataset_credential = self.dataset.credential
-                        if isinstance(dataset_credential, dict) and db_type in dataset_credential:
-                            credential_path = dataset_credential[db_type]
-                        elif isinstance(dataset_credential, str):
-                            credential_path = dataset_credential
-                
-                if not credential_path:
-                    return {
-                        "success": False,
-                        "result": None,
-                        "error": f"No credential path provided for {db_type} database"
-                    }
-                
-                result = execute_sql(db_type, db_path, sql, credential_path)
-            else:
-                return {
-                    "success": False,
-                    "result": None,
-                    "error": f"Unsupported database type: {db_type}"
-                }
+            # Extract credential_path from credential parameter
+            credential_path = None
+            if isinstance(credential, dict) and "credential_path" in credential:
+                credential_path = credential["credential_path"]
+            elif isinstance(credential, str):
+                credential_path = credential
+            
+            # If credential_path not provided in credential parameter, try to get from dataset
+            if not credential_path and self.dataset and hasattr(self.dataset, 'credential'):
+                dataset_credential = self.dataset.credential
+                if isinstance(dataset_credential, dict) and db_type in dataset_credential:
+                    credential_path = dataset_credential[db_type]
+                elif isinstance(dataset_credential, str):
+                    credential_path = dataset_credential
+            
+            # Execute SQL with credential_path if available
+            result = execute_sql(db_type, db_path, sql, credential_path)
             
             return {
                 "success": True,

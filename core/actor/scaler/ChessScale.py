@@ -1,5 +1,4 @@
 import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Union, List, Optional, Dict
 from pathlib import Path
 from loguru import logger
@@ -179,44 +178,23 @@ Evidence: {HINT}
         keywords = self._extract_keywords(question)
         context = self._retrieve_context(question, schema, keywords)
 
-        # Convert LLM to list for consistent handling
-        llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
-        
-        # Generate candidates
-        def process_serial():
-            pred_sqls = []
-            for i in range(self.generate_num):
-                # 确保有可用的 LLM
-                if not llm_lis:
-                    logger.warning("No LLM available for SQL generation")
-                    break
-                llm_ = llm_lis[i % len(llm_lis)]
-                sql = self._generate_single_candidate(llm_, question, context, evidence)
-                if sql:
-                    pred_sqls.append(sql)
-            return pred_sqls
+        # 在 act 方法内部初始化 llm，考虑 self.llm 是否为列表
+        if isinstance(self.llm, list) and self.llm:
+            llm = self.llm[0]
+        else:
+            llm = self.llm
 
-        def process_parallel():
-            pred_sqls = []
-            if not llm_lis:
-                logger.warning("No LLM available for parallel SQL generation")
-                return pred_sqls
-                
-            with ThreadPoolExecutor(max_workers=self.max_workers or self.generate_num) as executor:
-                futures = []
-                for i in range(self.generate_num):
-                    llm_ = llm_lis[i % len(llm_lis)]
-                    futures.append(executor.submit(self._generate_single_candidate, llm_, question, context, evidence))
-                for future in as_completed(futures):
-                    try:
-                        sql = future.result()
-                        if sql:
-                            pred_sqls.append(sql)
-                    except Exception as e:
-                        logger.warning(f"Error in parallel generation: {e}")
-            return pred_sqls
+        if llm is None:
+            # 如果没有有效的 LLM，返回空结果
+            logger.warning("No LLM available for SQL generation")
+            return []
 
-        pred_sqls = process_parallel() if self.open_parallel else process_serial()
+        # 仅使用第一个 LLM 生成 SQL 候选
+        pred_sqls = []
+        for _ in range(self.generate_num):
+            sql = self._generate_single_candidate(llm, question, context, evidence)
+            if sql:
+                pred_sqls.append(sql)
 
         # Deduplicate
         pred_sqls = list(dict.fromkeys(pred_sqls))
