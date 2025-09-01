@@ -12,6 +12,7 @@ from core.data_manage import Dataset, load_dataset, save_dataset, single_central
 from core.db_connect import get_sql_exec_result
 from core.utils import parse_schema_from_df
 
+
 class RSLSQLOptimizer(BaseOptimizer):
     NAME = "RSLSQLOptimizer"
 
@@ -443,17 +444,18 @@ You are an intelligent agent responsible for identifying the conditions in the u
         try:
             # Since schema is already a string format, we need to work with it directly
             # For RSLSQLOptimizer, we'll use a simplified approach that doesn't require DataFrame conversion
-            
+
             # Extract table and column information from the schema string
             table_info_aug = schema  # Use the schema string directly
-            
+
             # Get evidence and example from dataset if available
             evidence = ""
             example = ""
             if self.dataset and db_id:
                 row = self.dataset[db_id] if db_id in self.dataset else None
                 if row:
-                    evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
+                    evidence = row.get('evidence', '') or (
+                        load_dataset(row.get('external', '')) if self.use_external else '')
                     example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
 
             word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
@@ -490,10 +492,8 @@ You are an intelligent agent responsible for identifying the conditions in the u
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get('db_id')
         db_path = Path(self.dataset.db_path) / (
-                    db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
+                db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
-        evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
-        example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
 
         # Load and normalize schema
         if schema is None:

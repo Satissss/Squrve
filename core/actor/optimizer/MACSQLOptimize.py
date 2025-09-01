@@ -128,15 +128,14 @@ Provide the corrected SQL after thinking step by step:
         for turn in range(self.debug_turn_n):
             exec_args = {
                 "db_type": db_type,
-                "sql_query": current_sql
+                "sql_query": current_sql,
+                "db_path": db_path,
+                "db_id": db_id
             }
-            if db_type == "sqlite":
-                exec_args["db_path"] = db_path
-            elif db_type == "snowflake":
-                exec_args["db_id"] = db_id
-                exec_args["credential_path"] = credential.get("snowflake") if credential else None
-            elif db_type == "big_query":
-                exec_args["credential_path"] = credential.get("big_query") if credential else None
+            
+            # Add credential_path for any database type if credential is provided
+            if credential and credential.get(db_type):
+                exec_args["credential_path"] = credential.get(db_type)
 
             exec_result = get_sql_exec_result(**exec_args)
 

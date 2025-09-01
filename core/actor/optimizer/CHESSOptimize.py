@@ -340,14 +340,14 @@ SELECT column FROM table WHERE condition
         debug_args = {
             "db_type": db_type,
             "sql_query": sql_clean(sql),
+            "db_path": db_path,
+            "db_id": db_id
         }
-        if db_type == "sqlite":
-            debug_args["db_path"] = db_path
-        elif db_type == "snowflake":
-            debug_args["db_id"] = db_id
-            debug_args["credential_path"] = credential.get(db_type) if credential else None
-        elif db_type == "big_query":
-            debug_args["credential_path"] = credential.get(db_type) if credential else None
+        # Add credential_path for any database type if credential is provided
+        if isinstance(credential, dict) and db_type in credential:
+            debug_args["credential_path"] = credential.get(db_type)
+        else:
+            debug_args["credential_path"] = credential
 
         for turn in range(self.debug_turn_n):
             exec_result = get_sql_exec_result(**debug_args)
@@ -395,7 +395,7 @@ SELECT column FROM table WHERE condition
         evidence = row.get('evidence', '')
 
         db_path = None
-        if db_type == "sqlite" and self.dataset.db_path:
+        if hasattr(self.dataset, 'db_path') and self.dataset.db_path:
             db_path = Path(self.dataset.db_path) / f"{db_id}.sqlite"
 
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
@@ -447,7 +447,8 @@ SELECT column FROM table WHERE condition
 
         if self.is_save:
             instance_id = row.get("instance_id")
-            save_path_base = Path(self.save_dir) / str(self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
+            save_path_base = Path(self.save_dir) / str(
+                self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
             save_path_base.mkdir(parents=True, exist_ok=True)
             if is_single:
                 save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"

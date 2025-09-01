@@ -121,8 +121,11 @@ SELECT"""
             "sql_query": sql_query,
             "db_path": db_path,
             "db_id": db_id,
-            "credential_path": credential.get(db_type) if credential else None
         }
+        if isinstance(credential, dict) and db_type in credential:
+            debug_args["credential_path"] = credential.get(db_type)
+        else:
+            debug_args["credential_path"] = credential
 
         for turn in range(self.debug_turn_n):
             res = get_sql_exec_result(**debug_args)
@@ -143,12 +146,12 @@ SELECT"""
             )
 
             prompt_template = self._get_feedback_debug_prompt(db_type)
-            
+
             # 限制 schema 长度，避免 prompt 过长
             truncated_schema = schema
             if len(schema) > 6000:  # 为错误历史留出空间
                 truncated_schema = schema[:6000] + "\n... (schema truncated)"
-            
+
             prompt = prompt_template.format(
                 question=question,
                 schema=truncated_schema,
@@ -213,7 +216,7 @@ SELECT"""
         db_type = row['db_type']
         db_id = row.get("db_id")
         db_path = Path(self.dataset.db_path) / (
-                    db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
+                db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
         # Load schema if not provided

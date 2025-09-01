@@ -278,7 +278,7 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         question = row['question']
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get('db_id', '')
-        credential = row.get('credential', None)
+        credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
         # Load pred_sql to list of strings
         if pred_sql is None:

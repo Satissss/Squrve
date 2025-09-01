@@ -123,7 +123,7 @@ class OpenSearchSQLSelector(BaseSelector):
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get('db_id', '')
         db_path = row.get('db_path', db_id)
-        credential = row.get('credential', None)
+        credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
         # Load pred_sql
         is_single = isinstance(pred_sql, (str, Path)) or (isinstance(pred_sql, list) and len(pred_sql) == 1)

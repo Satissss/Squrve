@@ -6,10 +6,13 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/selector/CHESSSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/CHESSSelect.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/db_connect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/db_connect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/OpenSearchSQLSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/OpenSearchSQLSelect.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -503,7 +506,7 @@
       <workItem from="1756274995159" duration="4000" />
       <workItem from="1756694776861" duration="2090000" />
       <workItem from="1756698507258" duration="1538000" />
-      <workItem from="1756721704072" duration="5219000" />
+      <workItem from="1756721704072" duration="7941000" />
     </task>
     <servers />
   </component>
