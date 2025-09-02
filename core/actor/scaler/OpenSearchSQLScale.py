@@ -549,20 +549,15 @@ class OpenSearchSQLScaler(BaseScaler):
             max_workers=None,
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm
+        super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.bert_model = SentenceTransformer(bert_model_name)
         self.n_candidates = n_candidates
         self.temperature = temperature
         self.top_k = top_k
         self.use_few_shot = use_few_shot
         self.db_path = db_path or (dataset.db_path if dataset else None)
-        self.is_save = is_save
-        self.save_dir = save_dir
         self.tables_json_path = tables_json_path
         self.tables_info_dir = tables_info_dir
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
 
     def get_ans(self, prompt, temperature=0.0, n=1):
         def single_complete(llm_, prompt, temperature):
@@ -627,28 +622,8 @@ class OpenSearchSQLScaler(BaseScaler):
         question = row['question']
         db_id = row.get('db_id')
 
-        # Load and process schema like ChessScale
-        if isinstance(schema, (str, Path)) and Path(schema).exists():
-            schema = load_dataset(schema)
-
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas")
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-
-        if isinstance(schema, dict):
-            schema = pd.DataFrame(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        if isinstance(schema, pd.DataFrame):
-            schema = parse_schema_from_df(schema)
-        else:
-            raise Exception("Failed to load a valid database schema for the sample!")
+        # Load and process schema using base class method
+        schema = self.process_schema(schema, item)
 
         # 如果没有 db_id，尝试从其他字段获取
         if not db_id:
@@ -729,30 +704,7 @@ class OpenSearchSQLScaler(BaseScaler):
 
         logger.info(f"OpenSearchSQLScaler: Final pred_sqls for item {item}: {len(pred_sqls)} candidates")
 
-        if self.is_save:
-            instance_id = row.get("instance_id", item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
-                                                                               'dataset_index') and self.dataset.dataset_index else save_path
-            save_path.mkdir(parents=True, exist_ok=True)
-
-            # Save each SQL candidate in separate files
-            sql_paths = []
-            for i, sql in enumerate(pred_sqls):
-                sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
-                save_dataset(sql, new_data_source=sql_save_path)
-                sql_paths.append(str(sql_save_path))
-
-            # Set dataset field - single path if one SQL, list of paths if multiple
-            if len(sql_paths) == 1:
-                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths[0])
-            else:
-                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths)
-        else:
-            # 即使不保存文件，也要设置 pred_sql 字段
-            if len(pred_sqls) == 1:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls[0])
-            else:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls)
+        # Save results using base class method
+        self.save_results(pred_sqls, item, row.get("instance_id", item))
 
         return pred_sqls

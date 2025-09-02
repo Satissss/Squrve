@@ -5,14 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/LinkAlignOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/LinkAlignOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/BaseScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/BaseScale.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -509,7 +502,7 @@
       <workItem from="1756721704072" duration="8116000" />
       <workItem from="1756738398378" duration="2063000" />
       <workItem from="1756778656238" duration="6225000" />
-      <workItem from="1756814510204" duration="5455000" />
+      <workItem from="1756814510204" duration="5867000" />
     </task>
     <servers />
   </component>

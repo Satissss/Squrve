@@ -59,14 +59,9 @@ Evidence: {HINT}
             max_workers: int = None,
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm
+        super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.generate_num = generate_num
         self.temperature = temperature
-        self.is_save = is_save
-        self.save_dir = save_dir
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
 
     def _extract_keywords(self, question: str) -> List[str]:
         """Extract keywords from the question using LLM"""
@@ -151,28 +146,8 @@ Evidence: {HINT}
         question = row['question']
         evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
 
-        # Load and process schema
-        if isinstance(schema, (str, Path)) and Path(schema).exists():
-            schema = load_dataset(schema)
-
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas")
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-
-        if isinstance(schema, dict):
-            schema = pd.DataFrame(schema)  # Assuming single_central_process equivalent
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        if isinstance(schema, pd.DataFrame):
-            schema = parse_schema_from_df(schema)
-        else:
-            raise Exception("Failed to load a valid database schema for the sample!")
+        # Load and process schema using base class method
+        schema = self.process_schema(schema, item)
 
         # Information Retrieval
         keywords = self._extract_keywords(question)
@@ -206,29 +181,7 @@ Evidence: {HINT}
         
         logger.info(f"ChessScaler: Final pred_sqls for item {item}: {len(pred_sqls)} candidates")
 
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path.mkdir(parents=True, exist_ok=True)
-            
-            # Save each SQL candidate in separate files
-            sql_paths = []
-            for i, sql in enumerate(pred_sqls):
-                sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
-                save_dataset(sql, new_data_source=sql_save_path)
-                sql_paths.append(str(sql_save_path))
-            
-            # Set dataset field - single path if one SQL, list of paths if multiple
-            if len(sql_paths) == 1:
-                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths[0])
-            else:
-                self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths)
-        else:
-            # 即使不保存文件，也要设置 pred_sql 字段
-            if len(pred_sqls) == 1:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls[0])
-            else:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls)
+        # Save results using base class method
+        self.save_results(pred_sqls, item, row.get("instance_id"))
 
         return pred_sqls 
