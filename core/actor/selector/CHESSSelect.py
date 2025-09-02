@@ -73,45 +73,8 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             save_dir: Union[str, Path] = "../files/pred_sql",
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm
+        super().__init__(dataset, llm, is_save, save_dir, **kwargs)
         self.config = config or CHESSConfig()
-        self.is_save = is_save
-        self.save_dir = save_dir
-
-    def _execute_sql_safe(self, sql: str, db_type: str, db_path: str, credential: Dict = None) -> Dict[str, Any]:
-        """Safely execute SQL and return result with error handling"""
-        try:
-            # Extract credential_path from credential parameter
-            credential_path = None
-            if isinstance(credential, dict) and "credential_path" in credential:
-                credential_path = credential["credential_path"]
-            elif isinstance(credential, str):
-                credential_path = credential
-            
-            # If credential_path not provided in credential parameter, try to get from dataset
-            if not credential_path and self.dataset and hasattr(self.dataset, 'credential'):
-                dataset_credential = self.dataset.credential
-                if isinstance(dataset_credential, dict) and db_type in dataset_credential:
-                    credential_path = dataset_credential[db_type]
-                elif isinstance(dataset_credential, str):
-                    credential_path = dataset_credential
-            
-            # Execute SQL with credential_path if available
-            result = execute_sql(db_type, db_path, sql, credential_path)
-            
-            return {
-                "success": True,
-                "result": result,
-                "error": None
-            }
-        except Exception as e:
-            logger.warning(f"SQL execution failed: {e}")
-            return {
-                "success": False,
-                "result": None,
-                "error": str(e)
-            }
 
     def _compare_execution_results(self, results: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Compare execution results and return voting information"""
@@ -280,29 +243,9 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         db_id = row.get('db_id', '')
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
-        # Load pred_sql to list of strings
-        if pred_sql is None:
-            pred_sql = row.get('pred_sql', [])
-
-        if isinstance(pred_sql, (str, Path)):
-            pred_sql_path = Path(pred_sql)
-            pred_sql = [load_dataset(pred_sql_path) if pred_sql_path.exists() else str(pred_sql)]
-
-        elif isinstance(pred_sql, list):
-            pred_sql_list = []
-            for p in pred_sql:
-                p_path = Path(p) if isinstance(p, str) else p
-                if isinstance(p_path, Path) and p_path.exists():
-                    pred_sql_list.append(load_dataset(p_path))
-                else:
-                    pred_sql_list.append(str(p))
-            pred_sql = pred_sql_list
-
-        else:
-            raise ValueError("Invalid pred_sql type")
-
+        # Load pred_sql using base class method
+        pred_sql = self.load_pred_sql(pred_sql, item)
         if not pred_sql:
-            logger.warning("No pred_sql provided")
             return ""
 
         candidates = [{"SQL": sql} for sql in pred_sql]
@@ -313,7 +256,7 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             logger.debug(f"Executing {len(candidates)} SQL candidates concurrently...")
             with ThreadPoolExecutor() as executor:
                 future_to_idx = {
-                    executor.submit(self._execute_sql_safe, cand["SQL"], db_type, db_id, credential): i
+                    executor.submit(self.execute_sql_safe, cand["SQL"], db_type, db_id, credential): i
                     for i, cand in enumerate(candidates)
                 }
                 for future in as_completed(future_to_idx):
@@ -390,15 +333,7 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
                     best_sql = revised_sql
                     logger.debug("SQL revised successfully")
 
-        # Save the result if enabled
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path = Path(self.save_dir)
-            if self.dataset.dataset_index:
-                save_path = save_path / str(self.dataset.dataset_index)
-            save_path = save_path / f"{self.NAME}_{instance_id}.sql"
-            save_dataset(best_sql, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
-            logger.debug(f"Result saved to: {save_path}")
+        # Save the result using base class method
+        best_sql = self.save_result(best_sql, item, row.get("instance_id"))
 
         return best_sql 
