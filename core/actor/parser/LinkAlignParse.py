@@ -31,31 +31,18 @@ class LinkAlignParser(BaseParser):
             save_dir: Union[str, PathLike] = "../files/schema_links",
             use_external: bool = False,
             generate_num: int = 1,
-            use_llm_scaling: bool = False,
             automatic: bool = True,
             parse_mode: str = "agent",  # `agent` or `pipeline`
             parse_turn_n: int = 1,
             parse_link_num: int = 3,
-            open_parallel: bool = False,
-            max_workers: int = None,
             **kwargs
     ):
-        self.dataset: Dataset = dataset
-        self.llm: Union[LLM, List[LLM]] = llm
-        self.output_format: str = output_format
-        self.is_save: bool = is_save
-        self.save_dir: Union[str, PathLike] = save_dir
-        self.use_external: bool = use_external
-        self.generate_num: int = generate_num
-        self.use_llm_scaling: bool = use_llm_scaling
-        self.automatic: bool = automatic
-
-        self.parse_mode: str = parse_mode
-        self.parse_turn_n: int = parse_turn_n
-        self.parse_link_num: int = parse_link_num
-
-        self.open_parallel: bool = open_parallel
-        self.max_workers: int = max_workers
+        super().__init__(dataset, llm, output_format, is_save, save_dir, use_external, **kwargs)
+        self.generate_num = generate_num
+        self.automatic = automatic
+        self.parse_mode = parse_mode
+        self.parse_turn_n = parse_turn_n
+        self.parse_link_num = parse_link_num
 
     @classmethod
     def load_turn_n(cls, db_size: int):
@@ -86,38 +73,20 @@ class LinkAlignParser(BaseParser):
             if external_knowledge:
                 question += "\n" + external_knowledge
 
-        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-            schema = load_dataset(schema)
-
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas", None)
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        # 转换 schema 为自然语言形式
-        schema_context = parse_schema_from_df(schema)
+        # Use base class method to process schema
+        schema_df = self.process_schema(item, schema)
+        schema_context = parse_schema_from_df(schema_df)
 
         turn_n, link_num = (self.load_turn_n(db_size) if self.automatic
                             else (self.parse_turn_n, self.parse_link_num))
 
-        if isinstance(self.llm, list) and self.llm:
-            llm = self.llm[0]
-        else:
-            llm = self.llm
-
+        # Use base class method to get LLM
+        llm = self.get_llm()
         if llm is None:
             # 如果没有有效的 LLM，返回空结果
             return []
 
-        # 仅使用第一个 LLM 生成 schema links
+        # Generate schema links
         schema_links = []
         select_args = {
             "mode": self.parse_mode,
@@ -133,15 +102,10 @@ class LinkAlignParser(BaseParser):
 
         schema_links = list(dict.fromkeys(schema_links))
 
-        if self.is_save:
-            instance_id = row.get("instance_id", item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            if self.output_format == "str":
-                save_path = save_path / f"{self.NAME}_{instance_id}.txt"
-            else:
-                save_path = save_path / f"{self.NAME}_{instance_id}.json"
-            save_dataset(schema_links, new_data_source=save_path)
-            self.dataset.setitem(item, "schema_links", str(save_path))
+        output = self.format_output(schema_links)
 
-        return str(schema_links) if self.output_format == "str" else schema_links
+        # Use base class method to save output
+        file_ext = ".txt" if self.output_format == "str" else ".json"
+        self.save_output(output, item, file_ext=file_ext)
+
+        return output

@@ -218,17 +218,12 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
             self,
             dataset: Dataset = None,
             llm: Union[LLM, List[LLM]] = None,
-            generate_num: int = 1,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/sub_questions",
             dataset_name: str = "bird",  # or "spider"
-            use_llm_scaling: bool = False,
-            open_parallel: bool = False,
-            max_workers: int = None,
             **kwargs
     ):
-        super().__init__(dataset, llm, generate_num, is_save, save_dir, use_llm_scaling, open_parallel, max_workers,
-                         **kwargs)
+        super().__init__(dataset, llm, is_save, save_dir, **kwargs)
         self.dataset_name = dataset_name
 
     def parse_qa_pairs(self, response: str) -> List[Tuple[str, str]]:

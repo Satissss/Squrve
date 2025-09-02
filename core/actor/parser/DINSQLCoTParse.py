@@ -49,21 +49,10 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
             save_dir: Union[str, PathLike] = "../files/schema_links",
             use_external: bool = False,
             generate_num: int = 1,
-            use_llm_scaling: bool = False,
-            open_parallel: bool = False,
-            max_workers: int = None,
             **kwargs
     ):
-        self.dataset: Dataset = dataset
-        self.llm: Union[LLM, List[LLM]] = llm
-        self.output_format: str = output_format
-        self.is_save: bool = is_save
-        self.save_dir: Union[str, PathLike] = save_dir
-        self.use_external: bool = use_external
-        self.generate_num: int = generate_num
-        self.use_llm_scaling: bool = use_llm_scaling
-        self.open_parallel: bool = open_parallel
-        self.max_workers: int = max_workers
+        super().__init__(dataset, llm, output_format, is_save, save_dir, use_external, **kwargs)
+        self.generate_num = generate_num
 
     @classmethod
     def load_external_knowledge(cls, external: Union[str, Path] = None):
@@ -104,35 +93,17 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
             if external_knowledge:
                 question += "\n" + external_knowledge
 
-        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-            schema = load_dataset(schema)
+        # Use base class method to process schema
+        schema_df = self.process_schema(item, schema)
+        schema_context = parse_schema_from_df(schema_df)
 
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas", None)
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        schema_context = parse_schema_from_df(schema)
-
-        # 在 act 方法内部初始化 llm，考虑 self.llm 是否为列表
-        if isinstance(self.llm, list) and self.llm:
-            llm = self.llm[0]
-        else:
-            llm = self.llm
-
+        # Use base class method to get LLM
+        llm = self.get_llm()
         if llm is None:
             # 如果没有有效的 LLM，返回空结果
             return []
 
-        # 仅使用第一个 LLM 生成 schema links
+        # Generate schema links
         schema_links = []
         for _ in range(self.generate_num):
             links = self.generate_schema_links(llm, question, schema_context)
@@ -140,15 +111,10 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
 
         schema_links = list(dict.fromkeys(schema_links))
 
-        output = str(schema_links) if self.output_format == "str" else schema_links
+        output = self.format_output(schema_links)
 
-        if self.is_save:
-            instance_id = row.get("instance_id", item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            file_ext = ".txt" if self.output_format == "str" else ".json"
-            save_path = save_path / f"{self.NAME}_{instance_id}{file_ext}"
-            save_dataset(output, new_data_source=save_path)
-            self.dataset.setitem(item, "schema_links", str(save_path))
+        # Use base class method to save output
+        file_ext = ".txt" if self.output_format == "str" else ".json"
+        self.save_output(output, item, file_ext=file_ext)
 
         return output

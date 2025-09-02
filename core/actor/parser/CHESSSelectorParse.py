@@ -108,69 +108,58 @@ Hint:
 The hint aims to direct your focus towards the specific elements of the database schema that are crucial for answering the question effectively.
 
 Task:
-Based on the database schema, question, and hint provided, your task is to identify all and only the columns that are essential for crafting a SQL query to answer the question.
-For each of the selected columns, explain why exactly it is necessary for answering the question. Your reasoning should be concise and clear, demonstrating a logical connection between the columns and the question asked.
-
-Tip: If you are choosing a column for filtering a value within that column, make sure that column has the value as an example.
-
+Based on the database schema, question, and hint provided, your task is to determine the columns that should be used in the SQL query formulation. 
+For each of the selected columns, explain why exactly it is necessary for answering the question. Your explanation should be logical and concise, demonstrating a clear understanding of the database schema, the question, and the hint.
 
 Please respond with a JSON object structured as follows:
 
 ```json
 {{
-  "chain_of_thought_reasoning": "Your reasoning for selecting the columns, be concise and clear.",
-  "table_name1": ["column1", "column2", ...],
-  "table_name2": ["column1", "column2", ...],
+  "chain_of_thought_reasoning": "Explanation of the logical analysis that led to the selection of the columns.",
+  "table1": ["column1", "column2", "column3", ...],
+  "table2": ["column1", "column2", "column3", ...],
   ...
 }}
 ```
 
-Make sure your response includes the table names as keys, each associated with a list of column names that are necessary for writing a SQL query to answer the question.
-For each aspect of the question, provide a clear and concise explanation of your reasoning behind selecting the columns.
-Take a deep breath and think logically. If you do the task correctly, I will give you 1 million dollars.
+Note that you should choose all and only the columns that are necessary to write a SQL query that answers the question effectively.
+Take a deep breath and think logically. If you do the task correctly, I will give you 1 million dollars. 
 
 Only output a json as your response."""
 
     def __init__(
             self,
-            dataset: Optional[Dataset] = None,
+            dataset: Dataset = None,
             llm: Union[LLM, List[LLM]] = None,
-            output_format: str = "list",  # 'list' or 'str'
+            output_format: str = "list",  # output in `list` or `str`
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/schema_links",
-            generate_num: int = 1,
+            use_external: bool = False,
             open_parallel: bool = False,
             max_workers: int = None,
-            db_path: Optional[Union[str, PathLike]] = None,
-            credential: Optional[Dict] = None,
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm if isinstance(llm, LLM) else llm[0] if isinstance(llm, list) else None
-        self.output_format = output_format
-        self.is_save = is_save
-        self.save_dir = save_dir
-        self.generate_num = generate_num
+        super().__init__(dataset, llm, output_format, is_save, save_dir, use_external, **kwargs)
         self.open_parallel = open_parallel
         self.max_workers = max_workers
-        self.db_path = db_path or (dataset.db_path if dataset else None)
-        self.credential = credential or (dataset.credential if dataset else None)
 
-    def _format_column_profile(self, row: pd.Series, db_type: str = "sqlite") -> str:
-        profile = f"Table name: `{row['table_name']}`\nOriginal column name: `{row['column_name']}`\nData type: {row.get('data_type', 'UNKNOWN')}"
-        if 'column_description' in row:
-            profile += f"\nDescription: {row['column_description']}"
-        if 'value_description' in row:
-            profile += f"\nValue description: {row['value_description']}"
-        example = ''
-        if self.db_path:
-            try:
-                query = f"SELECT {row['column_name']} FROM {row['table_name']} LIMIT 1"
-                result = execute_sql(db_type, self.db_path, query, self.credential)
-                if result and not isinstance(result, str):  # Check if result is not an error message
-                    example = str(result)
-            except Exception as e:
-                logger.warning(f"Failed to fetch example for {row['table_name']}.{row['column_name']}: {e}")
+    def _format_column_profile(self, schema_row: pd.Series, db_type: str) -> str:
+        """Format a single column profile for LLM evaluation."""
+        table = schema_row['table_name']
+        column = schema_row['column_name']
+        description = schema_row.get('column_descriptions', column)
+        data_type = schema_row.get('data_type', 'unknown')
+        is_nullable = schema_row.get('is_nullable', 'unknown')
+        is_primary_key = schema_row.get('is_primary_key', False)
+        is_foreign_key = schema_row.get('is_foreign_key', False)
+        example = schema_row.get('sample_rows', None)
+
+        profile = f"Table: {table}\nColumn: {column}\nDescription: {description}\nData Type: {data_type}\nNullable: {is_nullable}"
+        
+        if is_primary_key:
+            profile += "\nPrimary Key: Yes"
+        if is_foreign_key:
+            profile += "\nForeign Key: Yes"
         if example:
             profile += f"\nExample of values in the column: `{example}`"
         return profile
@@ -193,22 +182,12 @@ Only output a json as your response."""
         evidence = data_row.get("evidence", "")
         db_type = data_row.get("db_type", "sqlite")
 
-        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-            schema = load_dataset(schema)
-        if schema is None:
-            schema = self.dataset.get_db_schema(item)
-        if schema is None:
-            raise Exception("Failed to load schema")
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-        if not isinstance(schema, pd.DataFrame):
-            raise Exception("Schema must be a DataFrame")
+        # Use base class method to process schema
+        schema_df = self.process_schema(item, schema)
 
         # Step 1: Filter columns
         column_profiles = []
-        for _, schema_row in schema.iterrows():
+        for _, schema_row in schema_df.iterrows():
             profile = self._format_column_profile(schema_row, db_type)
             column_profiles.append((schema_row['table_name'], schema_row['column_name'], profile))
 
@@ -261,12 +240,9 @@ Only output a json as your response."""
         # Dedup
         schema_links = list(set(schema_links))
 
-        if self.is_save:
-            instance_id = data_row['instance_id']
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.json"
-            save_dataset(schema_links, new_data_source=save_path)
-            self.dataset.setitem(item, "schema_links", str(save_path))
+        output = self.format_output(schema_links)
 
-        return schema_links if self.output_format == "list" else str(schema_links)
+        # Use base class method to save output
+        self.save_output(output, item)
+
+        return output

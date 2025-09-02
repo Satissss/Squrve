@@ -98,31 +98,19 @@ Your main tasks are:
 - Ensure that the SQL statement accurately reflects the query requirements and conditions in the user questions.
 - Reasonably construct query logic based on database structure and sample data.
 - When generating SQL statements, consider all the information provided to ensure the correctness and efficiency of the statements.
-- If the user question involves complex query requirements, please consider all requirements and conditions to generate SQL statements.
-
-### The most important thing is to remember:
-- definition: Information for prompts, this message is very important.
-- In the generated SQL statement, table names and field names need to be enclosed in backticks, such as `table_name`, `column_name`.
-- In the generated SQL statement, table names and field names must be correct to ensure the correctness and efficiency of the statement.
 '''
 
     def __init__(
             self,
-            dataset: Optional[Dataset] = None,
-            llm: Optional[LLM] = None,
+            dataset: Dataset = None,
+            llm: Union[LLM, List[LLM]] = None,
+            output_format: str = "list",  # output in `list` or `str`
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/schema_links",
-            use_external: bool = True,
-            use_few_shot: bool = True,
+            use_external: bool = False,
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm
-        self.is_save = is_save
-        self.save_dir = save_dir
-        self.use_external = use_external
-        self.use_few_shot = use_few_shot
-        self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
+        super().__init__(dataset, llm, output_format, is_save, save_dir, use_external, **kwargs)
 
     def parse_json_response(self, response):
         """
@@ -390,38 +378,8 @@ Your main tasks are:
             evidence = evidence or ''
             example = example or ''
 
-            # Process schema to DataFrame
-            if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-                schema = load_dataset(schema)
-            if schema is None:
-                instance_schema_path = row.get("instance_schemas")
-                if instance_schema_path:
-                    schema = load_dataset(instance_schema_path)
-                else:
-                    schema = self.dataset.get_db_schema(item)
-                if schema is None:
-                    raise ValueError("Failed to load a valid database schema for the sample!")
-
-            # Convert schema to DataFrame format
-            if isinstance(schema, dict):
-                schema = single_central_process(schema)
-            elif isinstance(schema, list):
-                if schema and isinstance(schema[0], dict):
-                    # If it's already a list of dicts (processed schema), convert to DataFrame
-                    schema = pd.DataFrame(schema)
-                else:
-                    # If it's raw schema format, process it
-                    schema = single_central_process(schema)
-            elif isinstance(schema, pd.DataFrame):
-                schema_df = schema
-            else:
-                raise ValueError("Invalid schema format")
-
-            # Ensure we have a DataFrame
-            if not isinstance(schema, pd.DataFrame):
-                schema_df = pd.DataFrame(schema)
-            else:
-                schema_df = schema
+            # Use base class method to process schema
+            schema_df = self.process_schema(item, schema)
 
             # Preliminary SQL generation for reverse linking
             try:
@@ -451,13 +409,8 @@ Your main tasks are:
                 logger.error(f"Error in schema linking: {e}")
                 schema_links = {"tables": [], "columns": []}
 
-            if self.is_save:
-                instance_id = row.get("instance_id", item)
-                save_path = Path(self.save_dir)
-                save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-                save_path = save_path / f"{self.NAME}_{instance_id}.json"
-                save_dataset(schema_links, new_data_source=save_path)
-                self.dataset.setitem(item, "schema_links", str(save_path))
+            # Use base class method to save output
+            self.save_output(schema_links, item)
 
             return schema_links
 

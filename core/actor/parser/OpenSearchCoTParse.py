@@ -84,16 +84,12 @@ class OpenSearchCoTParser(BaseParser):
     def __init__(self, dataset=None, llm=None, bert_model_name="all-mpnet-base-v2", top_k=10, tables_json_path=None,
                  tables_info_dir=None, db_path=None, is_save=True, save_dir="../files/schema_links",
                  output_format="list", use_few_shot=False, **kwargs):
-        self.dataset = dataset
-        self.llm = llm
+        super().__init__(dataset, llm, output_format, is_save, save_dir, **kwargs)
         self.bert_model = SentenceTransformer(bert_model_name)
         self.top_k = top_k
         self.tables_json_path = tables_json_path
         self.tables_info_dir = tables_info_dir
         self.db_path = db_path or (dataset.db_path if dataset else None)
-        self.is_save = is_save
-        self.save_dir = save_dir
-        self.output_format = output_format
         self.use_few_shot = use_few_shot
 
     def get_ans(self, prompt, temperature=0.0):
@@ -473,17 +469,10 @@ Please conclude the database in the following format:
 
         schema_links = list(set(cols_select + [x[1] for x in L_values]))
 
-        output = str(schema_links) if self.output_format == "str" else schema_links
+        output = self.format_output(schema_links)
 
-        if self.is_save:
-            instance_id = row.get("instance_id", item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            file_ext = ".txt" if self.output_format == "str" else ".json"
-            save_path = save_path / f"{self.NAME}_{instance_id}{file_ext}"
-
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            save_dataset(output, new_data_source=save_path)
-            self.dataset.setitem(item, "schema_links", str(save_path))
+        # Use base class method to save output
+        file_ext = ".txt" if self.output_format == "str" else ".json"
+        self.save_output(output, item, file_ext=file_ext)
 
         return output

@@ -34,7 +34,7 @@ class BaseDecomposer(Actor):
     def process_schema(self, item, schema: Union[str, PathLike, Dict, List] = None) -> str:
         """Process and normalize database schema from various input formats."""
         logger.debug("Processing database schema...")
-        
+
         if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
@@ -74,19 +74,16 @@ class BaseDecomposer(Actor):
         """Save output to file and update dataset."""
         if not self.is_save:
             return
-            
+
         if instance_id is None:
             instance_id = self.dataset[item].get('instance_id', item)
-        
+
         save_path = Path(self.save_dir)
         save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-        
+
         # Handle different naming conventions for different decomposers
-        if db_id:
-            filename = f"{self.NAME}_{db_id}_{instance_id}.json"
-        else:
-            filename = f"{self.NAME}_{instance_id}.json"
-            
+        filename = f"{self.NAME}_{instance_id}.json"
+
         save_path = save_path / filename
         save_dataset(output, new_data_source=save_path)
         self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
@@ -100,4 +97,3 @@ class BaseDecomposer(Actor):
             **kwargs
     ):
         pass
-
