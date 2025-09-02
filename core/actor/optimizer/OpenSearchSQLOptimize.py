@@ -65,14 +65,9 @@ Answer in the following format:
         correct_dic: dict = None,
         **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm
-        self.is_save = is_save
-        self.save_dir = Path(save_dir)
+        super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.use_feedback_debug = use_feedback_debug
         self.debug_turn_n = debug_turn_n
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
         self.correct_dic = correct_dic or {"default": ""}
 
     def sql_raw_parse(self, sql, return_question=False):
@@ -187,23 +182,15 @@ Answer in the following format:
         db_path = Path(self.dataset.db_path) / (db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
-        # Load schema if not provided (placeholder, adapt as needed)
-        if schema is None:
-            schema = ""  # Implement schema loading if required
+        # Load and process schema using base class method
+        schema = self.process_schema(schema, item)
 
         # Load schema_links if not provided
         if schema_links is None:
             schema_links = row.get("schema_links", "None")
 
-        # Handle pred_sql input
-        if pred_sql is None:
-            raise ValueError("pred_sql is required for optimization")
-
-        is_single = not isinstance(pred_sql, list)
-        sql_list = [pred_sql] if is_single else pred_sql
-
-        # Load SQL from paths if necessary
-        sql_list = [load_dataset(sql) if isinstance(sql, (str, Path)) and Path(sql).exists() else sql for sql in sql_list]
+        # Load pred_sql using base class method
+        sql_list, is_single = self.load_pred_sql(pred_sql, item)
 
         def process_sql(sql):
             return self.optimize_single_sql(
@@ -220,23 +207,8 @@ Answer in the following format:
             for sql in sql_list:
                 optimized_sqls.append(process_sql(sql))
 
-        output = optimized_sqls[0] if is_single else optimized_sqls
-
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path_base = Path(self.save_dir) / str(self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
-            save_path_base.mkdir(parents=True, exist_ok=True)
-            if is_single:
-                save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"
-                save_dataset(output, new_data_source=save_path)
-                self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
-            else:
-                paths = []
-                for i, opt_sql in enumerate(optimized_sqls):
-                    save_path = save_path_base / f"{self.NAME}_{instance_id}_{i}.sql"
-                    save_dataset(opt_sql, new_data_source=save_path)
-                    paths.append(str(save_path))
-                self.dataset.setitem(item, self.OUTPUT_NAME, paths)
+        # Save results using base class method
+        output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
 
         logger.info(f"OpenSearchSQLOptimizer completed processing item {item}")
         return output 

@@ -37,14 +37,8 @@ class MACSQLOptimizer(BaseOptimizer):
             max_workers: Optional[int] = None,
             **kwargs
     ):
-        super().__init__()
-        self.dataset = dataset
-        self.llm = llm
-        self.is_save = is_save
-        self.save_dir = Path(save_dir)
+        super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.debug_turn_n = debug_turn_n
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
 
     def _build_desc_str(self, schema_df: pd.DataFrame) -> str:
         desc_str = ""
@@ -181,39 +175,15 @@ Provide the corrected SQL after thinking step by step:
         db_path = Path(self.dataset.db_path) / f"{db_id}.sqlite" if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
-        # Load schema if not provided
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas", None)
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        schema = parse_schema_from_df(schema)
+        # Load and process schema using base class method
+        schema = self.process_schema(schema, item)
 
         # Load schema_links if not provided
         if schema_links is None:
             schema_links = row.get("schema_links", "None")
 
-        # Handle pred_sql input
-        if pred_sql is None:
-            # 尝试从数据集中获取 pred_sql
-            pred_sql = row.get(self.OUTPUT_NAME)
-            if pred_sql is None:
-                raise ValueError("pred_sql is required for optimization")
-
-        # Normalize pred_sql to list
-        is_single = not isinstance(pred_sql, list)
-        sql_list = [pred_sql] if is_single else pred_sql
-
-        # Load SQL from paths if necessary
-        sql_list = [load_dataset(sql) if isinstance(sql, (str, Path)) and Path(sql).exists() else sql for sql in sql_list]
+        # Load pred_sql using base class method
+        sql_list, is_single = self.load_pred_sql(pred_sql, item)
 
         def process_sql(sql):
             return self.optimize_single_sql(
@@ -230,24 +200,8 @@ Provide the corrected SQL after thinking step by step:
             for sql in sql_list:
                 optimized_sqls.append(process_sql(sql))
 
-        # Return single or list based on input
-        output = optimized_sqls[0] if is_single else optimized_sqls
-
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path_base = Path(self.save_dir) / str(self.dataset.dataset_index) if self.dataset.dataset_index else Path(self.save_dir)
-            save_path_base.mkdir(parents=True, exist_ok=True)
-            if is_single:
-                save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"
-                save_dataset(output, new_data_source=save_path)
-                self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
-            else:
-                paths = []
-                for i, opt_sql in enumerate(optimized_sqls):
-                    save_path = save_path_base / f"{self.NAME}_{instance_id}_{i}.sql"
-                    save_dataset(opt_sql, new_data_source=save_path)
-                    paths.append(str(save_path))
-                self.dataset.setitem(item, self.OUTPUT_NAME, paths)
+        # Save results using base class method
+        output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
 
         logger.info(f"MACSQLOptimizer completed processing item {item}")
         return output 
