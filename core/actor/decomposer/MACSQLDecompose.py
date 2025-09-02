@@ -5,6 +5,7 @@ import pandas as pd
 from os import PathLike
 from pathlib import Path
 import re
+from loguru import logger
 
 from core.data_manage import Dataset, single_central_process
 from core.actor.decomposer.BaseDecompose import BaseDecomposer
@@ -13,6 +14,8 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
+
+
 # Import for database connection (for future use if needed)
 # from core.db_connect import get_sql_exec_result, execute_sql
 
@@ -192,7 +195,7 @@ When generating SQL, we should always consider constraints:
   (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
   (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
   (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)
+  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
 ]
 # Table: district
 [
@@ -224,18 +227,9 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
             max_workers: int = None,
             **kwargs
     ):
-        # 直接设置实例属性，不调用父类的 __init__ 方法
-        self.dataset = dataset
-        # 不修改 llm 属性，保持原始传入的参数
-        self.llm = llm
-        self.generate_num = generate_num
-        self.is_save = is_save
-        self.save_dir = save_dir
+        super().__init__(dataset, llm, generate_num, is_save, save_dir, use_llm_scaling, open_parallel, max_workers,
+                         **kwargs)
         self.dataset_name = dataset_name
-        self.use_llm_scaling = use_llm_scaling
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
-        self.kwargs = kwargs
 
     def parse_qa_pairs(self, response: str) -> List[Tuple[str, str]]:
         qa_pairs = []
@@ -248,9 +242,11 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
                 qa_pairs.append((sub_q, sub_sql))
         return qa_pairs
 
-    def generate_decomposition(self, llm_: LLM, query: str, desc_str: str, fk_str: str, evidence: str) -> List[Tuple[str, str]]:
+    def generate_decomposition(self, llm_: LLM, query: str, desc_str: str, fk_str: str, evidence: str) -> List[
+        Tuple[str, str]]:
         if self.dataset_name == 'bird':
-            prompt = self.DECOMPOSE_TEMPLATE_BIRD.format(query=query, desc_str=desc_str, fk_str=fk_str, evidence=evidence)
+            prompt = self.DECOMPOSE_TEMPLATE_BIRD.format(query=query, desc_str=desc_str, fk_str=fk_str,
+                                                         evidence=evidence)
         else:
             prompt = self.DECOMPOSE_TEMPLATE_SPIDER.format(query=query, desc_str=desc_str, fk_str=fk_str)
         response = llm_.complete(prompt).text.strip()
@@ -269,45 +265,20 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
         evidence = row.get("evidence", "")
         db_id = row.get("db_id", "")
 
-        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-            schema = load_dataset(schema)
-
-        if schema is None:
-            schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise Exception("Failed to load a valid database schema for the sample!")
-
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        desc_str = parse_schema_from_df(schema)  # Assuming this function generates the schema string in the required format
+        # Use base class method to process schema
+        desc_str = self.process_schema(item, schema)
         fk_str = ""  # TODO: Implement foreign key extraction if needed, or assume it's part of desc_str
 
-        # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
-        if isinstance(self.llm, list) and self.llm:
-            llm = self.llm[0]
-        else:
-            llm = self.llm
-
+        # Use base class method to get LLM
+        llm = self.get_llm()
         if llm is None:
             # 如果没有有效的 LLM，返回空结果
             return []
-            
-        # 仅使用第一个 LLM 生成分解结果
-        decompositions = []
-        for _ in range(self.generate_num):
-            decomposition = self.generate_decomposition(llm, query, desc_str, fk_str, evidence)
-            decompositions.append(decomposition)
 
-        # For simplicity, take the first decomposition
-        output = decompositions[0] if decompositions else []
+        # Generate decomposition results
+        sub_questions = self.generate_decomposition(llm, query, desc_str, fk_str, evidence)
 
-        if self.is_save:
-            instance_id = row.get('instance_id', item)
-            save_path = Path(self.save_dir) / f"{self.NAME}_{db_id}_{instance_id}.json"
-            save_dataset(output, new_data_source=save_path)
-            self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
+        # Use base class method to save output
+        self.save_output(sub_questions, item, db_id=db_id)
 
-        return output 
+        return sub_questions

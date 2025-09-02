@@ -1,18 +1,10 @@
 from typing import Union, List, Optional, Dict
 from os import PathLike
-from pathlib import Path
-import pandas as pd
-from loguru import logger
 
 from llama_index.core.llms import LLM
 
 from core.actor.decomposer.BaseDecompose import BaseDecomposer
-from core.data_manage import Dataset, single_central_process
-from core.utils import (
-    parse_schema_from_df,
-    load_dataset,
-    save_dataset
-)
+from core.data_manage import Dataset
 
 
 class DINSQLDecomposer(BaseDecomposer):
@@ -65,22 +57,11 @@ Label: "NESTED"'''
             self,
             dataset: Optional[Dataset] = None,
             llm: Union[LLM, List[LLM]] = None,
-            generate_num: int = 1,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/sub_questions",
-            use_llm_scaling: bool = False,
-            open_parallel: bool = False,
-            max_workers: int = None,
             **kwargs
     ):
-        self.dataset = dataset
-        self.llm = llm  # 不修改 llm 属性，保持原始传入的参数
-        self.generate_num = generate_num
-        self.is_save = is_save
-        self.save_dir = save_dir
-        self.use_llm_scaling = use_llm_scaling
-        self.open_parallel = open_parallel
-        self.max_workers = max_workers
+        super().__init__(dataset, llm, is_save, save_dir, **kwargs)
 
     def schema_linking_prompt_maker(self, question: str, schema: str) -> str:
         instruction = "# Find the schema_links for generating SQL queries for each question based on the database schema and Foreign keys.\n"
@@ -127,55 +108,22 @@ Label: "NESTED"'''
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             **kwargs
-    ) -> List[str]:
+    ):
         row = self.dataset[item]
         question = row['question']
 
-        if schema is None:
-            instance_schema_path = row.get("instance_schemas", None)
-            if instance_schema_path:
-                schema = load_dataset(instance_schema_path)
-            if schema is None:
-                schema = self.dataset.get_db_schema(item)
-            if schema is None:
-                raise ValueError("Failed to load a valid database schema for the sample!")
+        # Use base class method to process schema
+        schema_str = self.process_schema(item, schema)
 
-        if isinstance(schema, (str, PathLike)) and Path(schema).exists():
-            schema = load_dataset(schema)
-
-        if isinstance(schema, dict):
-            schema = single_central_process(schema)
-        if isinstance(schema, list):
-            schema = pd.DataFrame(schema)
-
-        schema_str = parse_schema_from_df(schema) if isinstance(schema, pd.DataFrame) else str(schema)
-
-        # 在 act 方法内部初始化 llm_lis，考虑 self.llm 是否为列表
-        if isinstance(self.llm, list) and self.llm:
-            llm = self.llm[0]
-        else:
-            llm = self.llm
-
+        # Use base class method to get LLM
+        llm = self.get_llm()
         if llm is None:
             return []
 
-        # 仅使用第一个 LLM 生成子问题
-        all_sub_questions = []
-        for _ in range(self.generate_num):
-            sub_qs = self.generate_sub_questions(llm, question, schema_str)
-            all_sub_questions.extend(sub_qs)
+        # Generate sub questions
+        sub_questions = self.generate_sub_questions(llm, question, schema_str)
 
-        sub_questions = all_sub_questions
-
-        # Deduplicate
-        sub_questions = list(set(sub_questions))
-
-        if self.is_save:
-            instance_id = row.get('instance_id', item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.json"
-            save_dataset(sub_questions, new_data_source=save_path)
-            self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
+        # Use base class method to save output
+        self.save_output(sub_questions, item)
 
         return sub_questions
