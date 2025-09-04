@@ -205,6 +205,17 @@ For detailed configuration explanations, refer to the [API Documentation](API%20
 
 This project is licensed under the [MIT License](LICENSE).
 
+## 📖 Citation
 
+If you find **Squrve** useful for your research or work, please consider citing it:
+
+```bibtex
+@misc{squrve2025,
+  author       = {Yihan Wang and Jiaxing Wang and Peiyu Liu},
+  title        = {Squrve: A Lightweight Toolkit for Text-to-SQL},
+  year         = {2025},
+  howpublished = {\url{https://github.com/Satissss/Squrve}},
+}
+```
 
 
