@@ -71,11 +71,11 @@ class Evaluator:
             if type_ not in self._eval_type_lis:
                 warnings.warn(f"The eval_type `{type_}` is incorrect.", category=UserWarning)
                 continue
-            
+
             valid_num, res_lis, acc_res = 0, [], 0
             total_items = len(self.dataset)
             print(f"Evaluating {type_} for {total_items} items...")
-            
+
             for ind in range(total_items):
                 try:
                     res = self.eval(ind, type_)
@@ -88,9 +88,9 @@ class Evaluator:
                 except Exception as e:
                     print(f"Error evaluating item {ind} for {type_}: {e}")
                     continue
-            
+
             print(f"Completed {type_}: {valid_num}/{total_items} valid results")
-            
+
             # 防止除零错误，当没有有效结果时设置默认值
             if valid_num == 0:
                 eval_results[type_] = {
@@ -110,7 +110,7 @@ class Evaluator:
                     "total_items": total_items
                 }
                 print(f"Average for {type_}: {avg_result:.4f}")
-        
+
         self.eval_results.update(eval_results)
         return eval_results
 
@@ -166,7 +166,7 @@ class Evaluator:
             if db_size is None or db_size == 0:
                 print(f"Warning: db_size is None or 0 for item {item}")
                 return None
-                
+
             pred_schemas = load_dataset(row.get("instance_schemas", None))
             pred_schemas = self._normalize_pred_schemas(pred_schemas)
 
@@ -254,17 +254,20 @@ class Evaluator:
                 print(f"Warning: Row {item} is not a dictionary")
                 return None
 
-            pred_sql = load_dataset(row.get("pred_sql", None))
-            gold_sql = row.get("query", None)
+            pred_sql = load_dataset(row.get("pred_sql", ""))
+            gold_sql = row.get("query", "")
 
             if not pred_sql or not gold_sql:
                 print(f"Warning: The pred sql or gold sql is not available for item {item}")
                 return None
 
-            db_id = row.get("db_id", None)
-            db_type = row.get("db_type", None)
+            db_id = row.get("db_id", "")
+            db_type = row.get("db_type", "")
             if not db_id or not db_type:
                 print(f"Warning: Missing db_id or db_type for item {item}")
+                return None
+            if not self.db_path:
+                print(f"Warning: Missing db_path for item {item}")
                 return None
 
             db_path = Path(self.db_path) / (db_id + ".sqlite")
