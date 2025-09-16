@@ -7,6 +7,7 @@ from loguru import logger
 import json
 import re
 from dataclasses import dataclass
+import ast
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, single_central_process
@@ -14,6 +15,17 @@ from core.utils import (
     parse_schema_from_df,
     load_dataset,
     save_dataset
+)
+from core.actor.prompts.CHESSPrompt import (
+    template_generate_candidate_one,
+    template_generate_candidate_two,
+    template_generate_candidate_three,
+    template_generate_candidate_retrieval,
+    template_revise_one,
+    template_evaluate,
+    template_generate_unit_tests,
+    template_select_tables,
+    template_extract_keywords
 )
 
 
@@ -53,73 +65,6 @@ class CHESSGenerator(BaseGenerator):
 
     NAME = "CHESSGenerator"
 
-    # Embed templates as class constants for isolation
-    CANDIDATE_TEMPLATE = '''You are an experienced database expert.
-Now you need to generate a SQL query given the database information, a question and some additional information.
-
-Given the table schema information description and the `Question`. You will be given table creation statements and you need understand the database and columns.
-
-You will be using a way called "recursive divide-and-conquer approach to SQL query generation from natural language".
-
-Database admin instructions:
-1. **SELECT Clause:** Only select columns mentioned in the user's question.
-2. **Aggregation (MAX/MIN):** Always perform JOINs before using MAX() or MIN().
-3. **ORDER BY with Distinct Values:** Use `GROUP BY <column>` before `ORDER BY <column> ASC|DESC`.
-4. **Handling NULLs:** If a column may contain NULL values, use `JOIN` or `WHERE <column> IS NOT NULL`.
-5. **FROM/JOIN Clauses:** Only include tables essential to answer the question.
-6. **Strictly Follow Hints:** Adhere to all provided hints.
-7. **Thorough Question Analysis:** Address all conditions mentioned in the question.
-8. **DISTINCT Keyword:** Use `SELECT DISTINCT` when the question requires unique values.
-9. **Column Selection:** Carefully analyze column descriptions and hints to choose the correct column.
-10. **JOIN Preference:** Prioritize `INNER JOIN` over nested `SELECT` statements.
-11. **SQLite Functions Only:** Use only functions available in SQLite.
-
-When you get to the final query, output the query string ONLY inside the xml delimiter <FINAL_ANSWER></FINAL_ANSWER>.
-
-【Database Info】
-{DATABASE_SCHEMA}
-
-【Question】
-Question: {QUESTION}
-
-Evidence: {HINT}
-
-【Answer】
-'''
-
-    REVISE_TEMPLATE = '''You are an expert SQL developer. Revise the following SQL query based on the feedback provided.
-
-Database Schema:
-{DATABASE_SCHEMA}
-
-Question: {QUESTION}
-
-Original SQL: {SQL}
-
-Feedback: {FEEDBACK}
-
-Please provide the corrected SQL query. Output only the SQL query without any explanations.'''
-
-    UNIT_TEST_TEMPLATE = '''Generate natural language unit tests for the following SQL query.
-
-Question: {QUESTION}
-SQL: {SQL}
-
-Generate {UNIT_TEST_COUNT} unit tests that can be used to validate the SQL query.
-Each test should be a natural language question that the SQL should answer correctly.
-
-Return the tests as a Python list of strings.'''
-
-    EVALUATE_TEMPLATE = '''Evaluate the following SQL query based on the unit tests.
-
-Question: {QUESTION}
-SQL: {SQL}
-
-Unit Tests:
-{UNIT_TESTS}
-
-Evaluate if the SQL query correctly answers the unit tests.
-Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
 
     def __init__(
             self,
@@ -155,14 +100,37 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         else:
             self.credential = None
 
+
+    def _build_evidence(self, question: str, schema_text: str, keywords: List[str], dataset_evidence: str) -> str:
+        """Construct lightweight evidence/chain-of-thought style hints.
+
+        This mimics baseline's aggregated CoT from table/column selection in a minimal way.
+        """
+        lines = schema_text.split('\n') if schema_text else []
+        matched_lines = []
+        lower_keywords = [kw.lower() for kw in (keywords or [])]
+        for line in lines:
+            li = line.strip()
+            lwr = li.lower()
+            if any(kw in lwr for kw in lower_keywords):
+                matched_lines.append(li)
+
+        top_matches = matched_lines[:12]  # cap for brevity
+        summary_parts = []
+        if keywords:
+            summary_parts.append(f"Identified keywords: {', '.join(keywords[:10])}.")
+        if top_matches:
+            summary_parts.append("Relevant schema snippets:")
+            summary_parts.extend(top_matches)
+        if dataset_evidence:
+            summary_parts.append("Additional hints:")
+            summary_parts.append(str(dataset_evidence))
+
+        return "\n".join(summary_parts).strip()
+
     def _extract_keywords(self, question: str) -> List[str]:
         """Extract keywords from the question using LLM"""
-        prompt = f"""Extract key entities and concepts from the following question that are relevant for SQL query generation. 
-        Focus on table names, column names, conditions, and operations.
-
-        Question: {question}
-
-        Return only a Python list of keywords, for example: ['customer', 'name', 'age', '>', '30']"""
+        prompt = template_extract_keywords().format(QUESTION=question, HINT="")
 
         try:
             response = self.llm.complete(prompt, temperature=self.config.ir_temperature).text
@@ -199,80 +167,104 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
     def _select_schema(self, schema: str, question: str) -> str:
         if not self.config.use_schema_selector:
             return schema
-        # Implement schema selection similar to SelectTables tool
-        prompt = f"""Select relevant tables from the following schema based on the question.
-
-Schema:
-{schema}
-
-Question: {question}
-
-Please return only the filtered schema as a string, with each table on a new line."""
+        # Use template_select_tables for schema selection
+        prompt = template_select_tables().format(DATABASE_SCHEMA=schema, QUESTION=question, HINT="")
         try:
             response = self.llm.complete(prompt, temperature=self.config.ss_temperature).text
-            # Parse and filter schema
-            filtered_schema_lines = [line for line in response.split('\n') if line.strip()]
-            return '\n'.join(filtered_schema_lines)
+            # Parse JSON response to get table names
+            match = re.search(r'\{.*\}', response, re.DOTALL)
+            if match:
+                result = json.loads(match.group(0))
+                table_names = result.get("table_names", [])
+                # Filter schema to include only selected tables
+                schema_lines = schema.split('\n')
+                filtered_lines = []
+                current_table = None
+                for line in schema_lines:
+                    if line.strip().upper().startswith('CREATE TABLE'):
+                        table_name = line.split()[2].strip('`()')
+                        current_table = table_name
+                    if current_table in table_names:
+                        filtered_lines.append(line)
+                return '\n'.join(filtered_lines)
+            return schema
         except Exception as e:
             logger.warning(f"Failed to select schema: {e}")
             return schema
 
     def _generate_candidate_sql(self, question: str, schema: str, evidence: str = "") -> List[Dict[str, Any]]:
-        """Generate candidate SQL queries using the recursive divide-and-conquer approach"""
+        """Generate candidate SQL queries using multiple baseline-style templates if available."""
 
-        # Use CANDIDATE_TEMPLATE
-        template = self.CANDIDATE_TEMPLATE
+        # Use diversified baseline templates
+        template_functions = [
+            template_generate_candidate_one,
+            template_generate_candidate_two,
+            template_generate_candidate_three,
+            template_generate_candidate_retrieval,
+        ]
 
-        candidates = []
-        for i in range(self.config.cg_sampling_count):
-            try:
-                prompt = template.format(
-                    DATABASE_SCHEMA=schema,
-                    QUESTION=question,
-                    HINT=evidence
-                )
+        total_samples = max(1, self.config.cg_sampling_count)
+        samples_per_template = max(1, total_samples // len(template_functions))
 
-                response = self.llm.complete(prompt, temperature=self.config.cg_temperature).text
+        candidates: List[Dict[str, Any]] = []
+        for template_func in template_functions:
+            for i in range(samples_per_template):
+                try:
+                    # Prepare template parameters
+                    template_params = {
+                        "DATABASE_SCHEMA": schema,
+                        "QUESTION": question,
+                        "HINT": evidence
+                    }
+                    
+                    # Add EXAMPLES placeholder for template_generate_candidate_retrieval
+                    if template_func == template_generate_candidate_retrieval:
+                        template_params["EXAMPLES"] = ""  # Empty examples for now, can be enhanced later
 
-                # Extract SQL from response
-                sql_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', response, re.DOTALL)
-                if sql_match:
-                    sql = sql_match.group(1).strip()
-                    candidates.append({
-                        "SQL": sql,
-                        "chain_of_thought_reasoning": response,
-                        "confidence": 0.8  # Default confidence
-                    })
-                else:
-                    # Fallback: try to extract SQL from the response
-                    lines = response.split('\n')
-                    for line in lines:
-                        if line.strip().upper().startswith('SELECT'):
-                            candidates.append({
-                                "SQL": line.strip(),
-                                "chain_of_thought_reasoning": response,
-                                "confidence": 0.6
-                            })
-                            break
+                    prompt = template_func().format(**template_params)
 
-            except Exception as e:
-                logger.warning(f"Failed to generate candidate {i}: {e}")
-                continue
+                    response = self.llm.complete(prompt, temperature=self.config.cg_temperature).text
+
+                    # Extract SQL from response
+                    sql_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', response, re.DOTALL)
+                    if sql_match:
+                        sql = sql_match.group(1).strip()
+                        candidates.append({
+                            "SQL": sql,
+                            "chain_of_thought_reasoning": response,
+                            "confidence": 0.8
+                        })
+                    else:
+                        # Fallback: try to extract first SELECT line
+                        lines = response.split('\n')
+                        for line in lines:
+                            if line.strip().upper().startswith('SELECT'):
+                                candidates.append({
+                                    "SQL": line.strip(),
+                                    "chain_of_thought_reasoning": response,
+                                    "confidence": 0.6
+                                })
+                                break
+
+                except Exception as e:
+                    logger.warning(f"Failed to generate candidate: {e}")
+                    continue
 
         return candidates
 
     def _revise_sql(self, question: str, schema: str, sql: str, feedback: str = "") -> str:
         """Revise SQL query based on feedback"""
 
-        # Use REVISE_TEMPLATE
-        template = self.REVISE_TEMPLATE
+        # Use baseline revise template
+        template = template_revise_one()
 
         try:
             prompt = template.format(
                 DATABASE_SCHEMA=schema,
                 QUESTION=question,
-                SQL=sql,
-                FEEDBACK=feedback
+                HINT=feedback,  # Use HINT instead of FEEDBACK
+                QUERY=sql,      # Use QUERY instead of SQL
+                RESULT=feedback  # Use RESULT instead of FEEDBACK
             )
 
             response = self.llm.complete(prompt, temperature=self.config.ut_temperature).text
@@ -292,14 +284,17 @@ Please return only the filtered schema as a string, with each table on a new lin
     def _generate_unit_tests(self, question: str, sql: str) -> List[str]:
         """Generate unit tests for the SQL query"""
 
-        # Use UNIT_TEST_TEMPLATE
-        template = self.UNIT_TEST_TEMPLATE
+        # Use baseline unit test template
+        template = template_generate_unit_tests()
 
         try:
             prompt = template.format(
                 QUESTION=question,
+                HINT="",  # Add missing HINT parameter
                 SQL=sql,
-                UNIT_TEST_COUNT=self.config.ut_unit_test_count
+                UNIT_TEST_CAP=self.config.ut_unit_test_count,
+                DATABASE_SCHEMA="",  # Not used in this template
+                CANDIDATE_QUERIES=sql  # Use the SQL as candidate query
             )
 
             response = self.llm.complete(prompt, temperature=self.config.ut_temperature).text
@@ -308,7 +303,10 @@ Please return only the filtered schema as a string, with each table on a new lin
             match = re.search(r'\[.*\]', response, re.DOTALL)
             if match:
                 tests_str = match.group(0)
-                tests = eval(tests_str)  # In production, use ast.literal_eval
+                try:
+                    tests = ast.literal_eval(tests_str)
+                except Exception:
+                    tests = eval(tests_str)
                 return tests if isinstance(tests, list) else []
             return []
 
@@ -322,16 +320,18 @@ Please return only the filtered schema as a string, with each table on a new lin
         if not unit_tests:
             return {"score": 0.5, "feedback": "No unit tests available"}
 
-        # Use EVALUATE_TEMPLATE
-        template = self.EVALUATE_TEMPLATE
+        # Use baseline evaluate template
+        template = template_evaluate()
 
         try:
             unit_tests_text = "\n".join([f"{i + 1}. {test}" for i, test in enumerate(unit_tests)])
 
             prompt = template.format(
+                DATABASE_SCHEMA="",  # Not used in this template
                 QUESTION=question,
-                SQL=sql,
-                UNIT_TESTS=unit_tests_text
+                HINT="",  # Not used in this template
+                CANDIDATE_RESPONSES=sql,
+                UNIT_TEST=unit_tests_text
             )
 
             response = self.llm.complete(prompt, temperature=self.config.ut_temperature).text
@@ -339,7 +339,11 @@ Please return only the filtered schema as a string, with each table on a new lin
             # Extract JSON from response
             match = re.search(r'\{.*\}', response, re.DOTALL)
             if match:
-                result = eval(match.group(0))  # In production, use json.loads
+                json_str = match.group(0)
+                try:
+                    result = json.loads(json_str)
+                except Exception:
+                    result = eval(json_str)
                 return result if isinstance(result, dict) else {"score": 0.5, "feedback": "Invalid evaluation result"}
             return {"score": 0.5, "feedback": "Could not parse evaluation result"}
 
@@ -425,7 +429,9 @@ Please return only the filtered schema as a string, with each table on a new lin
 
         # Step 3: Candidate Generation (CG)
         logger.debug("开始候选SQL生成...")
-        candidates = self._generate_candidate_sql(question, context, evidence)
+        # Build lightweight hints to mimic baseline CoT aggregation
+        built_evidence = self._build_evidence(question, context, keywords, evidence)
+        candidates = self._generate_candidate_sql(question, context, built_evidence)
         logger.debug(f"生成 {len(candidates)} 个候选SQL")
 
         if not candidates:
