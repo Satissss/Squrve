@@ -24,14 +24,24 @@ SYSTEM_NAME = 'System'
 # 工具函数
 def parse_json(text: str) -> dict:
     """解析 JSON 格式的文本"""
+    # 查找 JSON 块
     start = text.find("```json")
     end = text.find("```", start + 7)
+    
     if start != -1 and end != -1:
-        json_string = text[start + 7: end]
+        json_string = text[start + 7: end].strip()
         try:
             return json.loads(json_string)
-        except:
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON 解析失败: {e}")
             return {}
+    
+    # 如果没有找到 JSON 块，尝试直接解析整个文本
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        pass
+    
     return {}
 
 
@@ -87,6 +97,32 @@ Here is a typical example:
   (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
   (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
 ]
+# Table: loan
+[
+  (loan_id, the id number identifying the loan data. Value examples: [4959, 4960, 4961].),
+  (account_id, the id number identifying the account. Value examples: [10, 80, 55, 43].),
+  (date, the date when the loan is approved. Value examples: ['1998-07-12', '1998-04-19'].),
+  (amount, the id number identifying the loan data. Value examples: [1567, 7877, 9988].),
+  (duration, the id number identifying the loan data. Value examples: [60, 48, 24, 12, 36].),
+  (payments, the id number identifying the loan data. Value examples: [3456, 8972, 9845].),
+  (status, the id number identifying the loan data. Value examples: ['C', 'A', 'D', 'B'].)
+]
+# Table: district
+[
+  (district_id, location of branch. Value examples: [77, 76].),
+  (A2, area in square kilometers. Value examples: [50.5, 48.9].),
+  (A4, number of inhabitants. Value examples: [95907, 95616].),
+  (A5, number of households. Value examples: [35678, 34892].),
+  (A6, literacy rate. Value examples: [95.6, 92.3, 89.7].),
+  (A7, number of entrepreneurs. Value examples: [1234, 1456].),
+  (A8, number of cities. Value examples: [5, 4].),
+  (A9, number of schools. Value examples: [15, 12, 10].),
+  (A10, number of hospitals. Value examples: [8, 6, 4].),
+  (A11, average salary. Value examples: [12541, 11277].),
+  (A12, poverty rate. Value examples: [12.4, 9.8].),
+  (A13, unemployment rate. Value examples: [8.2, 7.9].),
+  (A15, number of crimes. Value examples: [256, 189].)
+]
 【Foreign keys】
 client.`district_id` = district.`district_id`
 【Question】
@@ -98,6 +134,7 @@ Later birthdate refers to younger age; A11 refers to average salary
 {{
   "account": "keep_all",
   "client": "keep_all",
+  "loan": "drop_all",
   "district": ["district_id", "A11", "A2", "A4", "A6", "A7"]
 }}
 ```
@@ -188,6 +225,70 @@ Question Solved.
 ==========
 
 【Database schema】
+# Table: account
+[
+  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),
+  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
+]
+# Table: client
+[
+  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
+  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
+  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].)
+]
+# Table: district
+[
+  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
+  (A4, number of inhabitants . Value examples: ['95907', '95616', '94812'].),
+  (A11, average salary. Value examples: [12541, 11277, 8114].)
+]
+【Foreign keys】
+account.`district_id` = district.`district_id`
+client.`district_id` = district.`district_id`
+【Question】
+What is the gender of the youngest client who opened account in the lowest average salary branch?
+【Evidence】
+Later birthdate refers to younger age; A11 refers to average salary
+
+Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
+Sub question 1: What is the district_id of the branch with the lowest average salary?
+SQL
+```sql
+SELECT `district_id`
+  FROM district
+  ORDER BY `A11` ASC
+  LIMIT 1
+```
+
+Sub question 2: What is the youngest client who opened account in the lowest average salary branch?
+SQL
+```sql
+SELECT T1.`client_id`
+  FROM client AS T1
+  INNER JOIN district AS T2
+  ON T1.`district_id` = T2.`district_id`
+  ORDER BY T2.`A11` ASC, T1.`birth_date` DESC 
+  LIMIT 1
+```
+
+Sub question 3: What is the gender of the youngest client who opened account in the lowest average salary branch?
+SQL
+```sql
+SELECT T1.`gender`
+  FROM client AS T1
+  INNER JOIN district AS T2
+  ON T1.`district_id` = T2.`district_id`
+  ORDER BY T2.`A11` ASC, T1.`birth_date` DESC 
+  LIMIT 1 
+```
+Question Solved.
+
+==========
+
+【Database schema】
 {desc_str}
 【Foreign keys】
 {fk_str}
@@ -237,6 +338,44 @@ Question Solved.
 ==========
 
 【Database schema】
+# Table: singer
+[
+  (Singer_ID, singer id. Value examples: [1, 2].),
+  (Name, name. Value examples: ['Tribal King', 'Timbaland'].),
+  (Country, country. Value examples: ['France', 'United States', 'Netherlands'].),
+  (Song_Name, song name. Value examples: ['You', 'Sun', 'Love', 'Hey Oh'].),
+  (Song_release_year, song release year. Value examples: ['2016', '2014'].),
+  (Age, age. Value examples: [52, 43].)
+]
+# Table: concert
+[
+  (concert_ID, concert id. Value examples: [1, 2].),
+  (concert_Name, concert name. Value examples: ['Super bootcamp', 'Home Visits', 'Auditions'].),
+  (Theme, theme. Value examples: ['Wide Awake', 'Party All Night'].),
+  (Stadium_ID, stadium id. Value examples: ['2', '9'].),
+  (Year, year. Value examples: ['2015', '2014'].)
+]
+# Table: singer_in_concert
+[
+  (concert_ID, concert id. Value examples: [1, 2].),
+  (Singer_ID, singer id. Value examples: ['3', '6'].)
+]
+【Foreign keys】
+singer_in_concert.`Singer_ID` = singer.`Singer_ID`
+singer_in_concert.`concert_ID` = concert.`concert_ID`
+【Question】
+Show the name and the release year of the song by the youngest singer.
+
+SQL
+```sql
+SELECT `Song_Name`, `Song_release_year` FROM singer WHERE Age = (SELECT MIN(Age) FROM singer)
+```
+
+Question Solved.
+
+==========
+
+【Database schema】
 {desc_str}
 【Foreign keys】
 {fk_str}
@@ -247,22 +386,33 @@ SQL
 
 '''
 
-refiner_template = '''Given the original SQL query that failed execution, the error message, the database schema, evidence, and question, generate a corrected SQL query.
-
-【Database schema】
+refiner_template = '''【Instruction】
+When executing SQL below, some errors occurred, please fix up SQL based on query and database info.
+Solve the task step by step if you need to. Using SQL format in the code block, and indicate script type in the code block.
+When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible.
+【Constraints】
+- In `SELECT <column>`, just select needed columns in the 【Question】 without any unnecessary column or value
+- In `FROM <table>` or `JOIN <table>`, do not include unnecessary table
+- If use max or min func, `JOIN <table>` FIRST, THEN use `SELECT MAX(<column>)` or `SELECT MIN(<column>)`
+- If [Value examples] of <column> has 'None' or None, use `JOIN <table>` or `WHERE <column> is NOT NULL` is better
+- If use `ORDER BY <column> ASC|DESC`, add `GROUP BY <column>` before to select distinct values
+【Query】
+-- {query}
+【Evidence】
+{evidence}
+【Database info】
 {desc_str}
 【Foreign keys】
 {fk_str}
-【Question】
-{query}
-【Evidence】
-{evidence}
-【Original SQL】
+【old SQL】
+```sql
 {original_sql}
-【Error】
+```
+【SQLite error】 
 {error}
 
-Provide the corrected SQL after thinking step by step:
+Now please fixup old SQL and generate new SQL again.
+【correct SQL】
 '''
 
 
@@ -323,11 +473,26 @@ class Selector:
         if self.without_selector:
             return False
 
-        # 简单的启发式规则：如果表格数量超过5个或总列数超过30个则需要剪枝
+        # 更精确的启发式规则，基于原始实现
         table_count = schema_str.count("# Table:")
-        column_count = schema_str.count("(")
+        
+        # 计算总列数（更精确的计算）
+        column_count = 0
+        lines = schema_str.split('\n')
+        for line in lines:
+            if line.strip().startswith('(') and ',' in line:
+                column_count += 1
 
-        return table_count > 5 or column_count > 30
+        # 基于原始实现的判断逻辑
+        if table_count <= 3:
+            return False
+            
+        # 如果平均每表列数 <= 6 且总列数 <= 30，则不需要剪枝
+        avg_columns = column_count / table_count if table_count > 0 else 0
+        if avg_columns <= 6 and column_count <= 30:
+            return False
+            
+        return True
 
     def _prune_schema(self, db_id: str, query: str, schema_str: str, fk_str: str, evidence: str) -> Dict:
         """使用 LLM 进行模式剪枝"""
