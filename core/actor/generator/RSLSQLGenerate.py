@@ -225,6 +225,7 @@ Your main tasks are:
 - Hint: Information for prompting, this message is very important.
 - In the generated SQL statement, table names and field names need to be enclosed in backquotes, such as `table_name`, `column_name`.
 - In the generated SQL statement, table names and field names must be correct to ensure the correctness and efficiency of the statement.
+- The hint aims to direct your focus towards the specific elements of the database schema that are crucial for answering the question effectively.
 '''
 
 BINARY_PROMPT = '''{table_info}
@@ -253,6 +254,7 @@ class RSLSQLGenerator(BaseGenerator):
             use_few_shot: bool = True,
             db_path: Optional[Union[str, PathLike]] = None,
             credential: Optional[dict] = None,
+            few_shot_examples: Optional[list] = None,
             **kwargs
     ):
         self.dataset = dataset
@@ -261,6 +263,7 @@ class RSLSQLGenerator(BaseGenerator):
         self.save_dir = save_dir
         self.use_external = use_external
         self.use_few_shot = use_few_shot
+        self.few_shot_examples = few_shot_examples or []
 
         # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
         if db_path is not None:
@@ -277,8 +280,6 @@ class RSLSQLGenerator(BaseGenerator):
         else:
             self.credential = None
 
-        # # Load column meanings
-        # self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
 
     @property
     def name(self):
@@ -459,7 +460,7 @@ class RSLSQLGenerator(BaseGenerator):
         return schema_list
 
     def get_simple_ddl_from_schema(self, schema_df, tables=None, columns=None):
-        """从schema DataFrame生成简单的DDL"""
+        """从schema DataFrame生成简单的DDL，更接近原始实现"""
         if schema_df is None or schema_df.empty:
             return "#\n# ", {}
 
@@ -471,12 +472,20 @@ class RSLSQLGenerator(BaseGenerator):
 
         for table in tables:
             if columns:
-                col_list = [col.split(".")[1].strip("`") for col in columns if col.split(".")[0] == table]
+                # 从columns中筛选属于当前表的列
+                col_list = []
+                for col in columns:
+                    if '.' in col:
+                        table_part, col_part = col.split('.', 1)
+                        if table_part.lower() == table.lower():
+                            col_name = col_part.strip("`")
+                            col_list.append(col_name)
             else:
                 col_list = self.get_table_columns_from_schema(schema_df, table)
 
-            simple_ddl += f"{table}(" + ",".join([f"`{col}`" for col in col_list]) + ")\n# "
-            table_list[table] = [f"`{col}`" for col in col_list]
+            if col_list:  # 只有当表有列时才添加
+                simple_ddl += f"{table}(" + ",".join([f"`{col}`" for col in col_list]) + ")\n# "
+                table_list[table] = [f"`{col}`" for col in col_list]
 
         return simple_ddl.strip(), table_list
 
@@ -579,6 +588,64 @@ class RSLSQLGenerator(BaseGenerator):
 
         return explanation
 
+    def get_enhanced_explanation_from_schema(self, schema_df, tables, columns, db_id=None):
+        """增强的列描述信息获取，包含更多语义信息"""
+        if schema_df is None or schema_df.empty:
+            return ""
+
+        explanation = ""
+        columns_lower = [col.replace("`", "").lower() for col in columns]
+
+        for _, row in schema_df.iterrows():
+            table_name = row['table_name']
+            col_name = row['column_name']
+            col_desc = row.get('column_descriptions', '')
+            col_type = row.get('column_type', '')
+
+            if table_name in tables and f"{table_name}.`{col_name}`".lower() in columns_lower:
+                # 构建更详细的列描述
+                desc_parts = []
+                if col_desc:
+                    desc_parts.append(col_desc)
+                if col_type:
+                    desc_parts.append(f"Type: {col_type}")
+                
+                if desc_parts:
+                    explanation += f"# {table_name}.{col_name}: {' | '.join(desc_parts)}\n"
+
+        return explanation
+
+    def select_few_shot_examples(self, question, k=3):
+        """简化的few-shot示例选择，基于关键词匹配"""
+        if not self.few_shot_examples or k == 0:
+            return ""
+        
+        # 简单的关键词匹配选择
+        question_words = set(question.lower().split())
+        scored_examples = []
+        
+        for example in self.few_shot_examples:
+            if 'question' in example and 'sql' in example:
+                example_words = set(example['question'].lower().split())
+                # 计算词汇重叠度
+                overlap = len(question_words.intersection(example_words))
+                if overlap > 0:
+                    scored_examples.append((overlap, example))
+        
+        # 按重叠度排序，选择前k个
+        scored_examples.sort(key=lambda x: x[0], reverse=True)
+        selected_examples = [ex[1] for ex in scored_examples[:k]]
+        
+        if not selected_examples:
+            return ""
+        
+        # 格式化示例
+        formatted_examples = "### Some example pairs of question and corresponding SQL query are provided based on similar problems:\n"
+        for example in selected_examples:
+            formatted_examples += f"\n### {example['question'].replace(chr(10), ' ').strip()}\n{example['sql'].replace(chr(10), ' ').strip()}"
+        
+        return formatted_examples
+
     def table_column_selection(self, table_info, question, evidence):
         prompt = table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as specified."
         response = self.llm.complete(TABLE_AUG_INSTRUCTION + "\n" + prompt).text
@@ -608,9 +675,10 @@ class RSLSQLGenerator(BaseGenerator):
                 table, column = parts[0].lower(), '.'.join(parts[1:]).lower()
                 if table == 'sqlite_sequence':
                     continue
-                # More flexible column matching
+                # More flexible column matching - 改进匹配策略
                 column_clean = column.strip('`').strip()
-                if column_clean in text_lower:
+                # 检查列名是否在文本中，支持部分匹配
+                if column_clean in text_lower or any(word in text_lower for word in column_clean.split('_')):
                     pred.append(item)
             except (ValueError, AttributeError) as e:
                 logger.debug(f"Skipping malformed schema item {item}: {e}")
@@ -691,22 +759,47 @@ class RSLSQLGenerator(BaseGenerator):
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
     def self_correction(self, table_info, pre_sql, db_id, db_type, row=None):
-        prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
+        """增强的self-correction机制，更接近原始实现"""
+        # 构建初始prompt，包含完整的上下文信息
+        initial_prompt = SELF_CORRECTION_PROMPT + '\n' + table_info + '\n\nReturn your answer in JSON format as {"sql": "your sql"}.'
+        
         num = 0
-        while num < 5:
+        max_iterations = 5
+        conversation_history = []
+        
+        while num < max_iterations:
             try:
                 row_count, column_count, result = self.execute_sql(pre_sql, db_id, db_type, row)
             except Exception as e:
                 logger.error(f"SQL execution error: {e}")
                 break
-            if num > 0:
-                prompt += f"\n### Buggy SQL: {pre_sql.strip()}\n### The result of the buggy SQL is [{result.strip()}]. Please fix the SQL to get the correct result."
-            response = self.llm.complete(prompt).text
-            sql_dict = self.parse_json_response(response)
-            pre_sql = sql_dict['sql'].strip()
+            
+            # 如果SQL执行成功（有结果），则停止修正
             if row_count > 0 or column_count > 0:
                 break
+                
+            # 构建修正prompt
+            if num == 0:
+                # 第一次尝试，使用完整prompt
+                current_prompt = initial_prompt
+            else:
+                # 后续尝试，使用对话式修正
+                current_prompt = f"### Buggy SQL: {pre_sql.strip()}\n### The result of the buggy SQL is [{result.strip()}]. Please fix the SQL to get the correct result.\n\nReturn your answer in JSON format as {{\"sql\": \"your corrected sql\"}}."
+            
+            # 使用对话式API进行修正
+            if hasattr(self.llm, 'chat_complete'):
+                # 如果LLM支持对话式API
+                conversation_history.append({"role": "user", "content": current_prompt})
+                response = self.llm.chat_complete(conversation_history).text
+                conversation_history.append({"role": "assistant", "content": response})
+            else:
+                # 回退到单次调用
+                response = self.llm.complete(current_prompt).text
+            
+            sql_dict = self.parse_json_response(response)
+            pre_sql = sql_dict['sql'].strip()
             num += 1
+            
         return pre_sql.replace('\n', ' ')
 
     def act(
@@ -723,9 +816,14 @@ class RSLSQLGenerator(BaseGenerator):
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
         evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
-        example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
+        # 优先使用动态选择的few-shot示例，回退到静态示例
+        if self.use_few_shot:
+            dynamic_example = self.select_few_shot_examples(question, k=3)
+            static_example = load_dataset(row.get('reasoning_examples', ''))
+            example = dynamic_example or static_example or ''
+        else:
+            example = ''
         evidence = evidence or ''
-        example = example or ''
 
         # Load and process schema - 参考DINSQLGenerate的实现
         logger.debug("Processing database schema...")
@@ -792,7 +890,8 @@ class RSLSQLGenerator(BaseGenerator):
                                                                      schema_links['columns'])
             ddl_data = self.get_ddl_data_from_schema(schema_df, schema_links['tables'], table_list, db_id, db_type)
             foreign_key = self.get_foreign_key_from_schema(schema_df, schema_links['tables'])
-            explanation = self.get_explanation_from_schema(schema_df, schema_links['tables'], schema_links['columns'])
+            # 使用增强的列描述信息
+            explanation = self.get_enhanced_explanation_from_schema(schema_df, schema_links['tables'], schema_links['columns'], db_id)
             table_info_aug = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}\n### The meaning of every column:\n#\n{explanation.strip()}\n#\n'
 
             table_aug = self.table_column_selection(table_info_aug, question, evidence)  # Similar to table_augmentation
@@ -818,8 +917,10 @@ class RSLSQLGenerator(BaseGenerator):
 
         # Step 4: Self Correction
         try:
+            # 构建完整的self-correction上下文，包含所有增强信息
+            full_table_info = table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}'
             pred_sql = self.self_correction(
-                table_info_aug + f'\n### sql_keywords: {word_aug["sql_keywords"]}\n### conditions: {cond_aug["conditions"]}',
+                full_table_info,
                 selected_sql,
                 db_id,
                 db_type,
