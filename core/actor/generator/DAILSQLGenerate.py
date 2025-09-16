@@ -201,16 +201,20 @@ def sql2skeleton(sql, db_schema):
 
 
 def mask_question_with_schema_linking(data_jsons, mask_tag='<mask>', value_tag=''):
+    """Apply schema linking masks to questions for better example selection"""
     mask_questions = []
     for data_json in data_jsons:
-        sc_link = data_json["sc_link"]
-        cv_link = data_json["cv_link"]
-        q_col_match = sc_link["q_col_match"]
-        q_tab_match = sc_link["q_tab_match"]
-        num_date_match = cv_link["num_date_match"]
-        cell_match = cv_link["cell_match"]
-        question_for_copying = data_json["question_for_copying"]
-        q_col_match, q_tab_match, cell_match = match_shift(q_col_match, q_tab_match, cell_match)
+        sc_link = data_json.get("sc_link", {})
+        cv_link = data_json.get("cv_link", {})
+        q_col_match = sc_link.get("q_col_match", {})
+        q_tab_match = sc_link.get("q_tab_match", {})
+        num_date_match = cv_link.get("num_date_match", {})
+        cell_match = cv_link.get("cell_match", {})
+        question_for_copying = data_json.get("question_for_copying", data_json.get("question", "").split())
+
+        # Apply match shifting if both sc_link and cv_link exist
+        if sc_link and cv_link:
+            q_col_match, q_tab_match, cell_match = match_shift(q_col_match, q_tab_match, cell_match)
 
         def mask(question_toks, mask_ids, tag):
             new_question_toks = []
@@ -221,13 +225,15 @@ def mask_question_with_schema_linking(data_jsons, mask_tag='<mask>', value_tag='
                     new_question_toks.append(tok)
             return new_question_toks
 
-        num_date_match_ids = [int(match.split(',')[0]) for match in num_date_match]
-        cell_match_ids = [int(match.split(',')[0]) for match in cell_match]
+        # Mask value matches (numbers, dates, cell values)
+        num_date_match_ids = [int(match.split(',')[0]) for match in num_date_match.keys()]
+        cell_match_ids = [int(match.split(',')[0]) for match in cell_match.keys()]
         value_match_q_ids = num_date_match_ids + cell_match_ids
         question_toks = mask(question_for_copying, value_match_q_ids, value_tag)
 
-        q_col_match_ids = [int(match.split(',')[0]) for match in q_col_match]
-        q_tab_match_ids = [int(match.split(',')[0]) for match in q_tab_match]
+        # Mask schema matches (columns, tables)
+        q_col_match_ids = [int(match.split(',')[0]) for match in q_col_match.keys()]
+        q_tab_match_ids = [int(match.split(',')[0]) for match in q_tab_match.keys()]
         schema_match_q_ids = q_col_match_ids + q_tab_match_ids
         question_toks = mask(question_toks, schema_match_q_ids, mask_tag)
         mask_questions.append(" ".join(question_toks))
@@ -438,7 +444,8 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
         except:
             return False
 
-    def db_word_match(word, column, table, db_type, db_path, db_id, credential, exact=False, invalid_tables_cache=None, qualify_table_fn=None):
+    def db_word_match(word, column, table, db_type, db_path, db_id, credential, exact=False, invalid_tables_cache=None,
+                      qualify_table_fn=None):
         """
         Use get_sql_exec_result for database queries across different database types.
         Supports SQLite, BigQuery, Snowflake, etc.
@@ -527,9 +534,11 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
                 # Cache invalid tables to avoid repeated probing on Snowflake
                 if invalid_tables_cache is not None and db_type == "snowflake":
                     lowered = str(error).lower()
-                    if ("does not exist" in lowered) or ("not authorized" in lowered) or ("sql compilation error" in lowered):
+                    if ("does not exist" in lowered) or ("not authorized" in lowered) or (
+                            "sql compilation error" in lowered):
                         try:
-                            tbl_for_cache = qualify_table_fn(str(table).upper()) if qualify_table_fn else str(table).upper()
+                            tbl_for_cache = qualify_table_fn(str(table).upper()) if qualify_table_fn else str(
+                                table).upper()
                             invalid_tables_cache.add(tbl_for_cache)
                         except Exception:
                             pass
@@ -617,7 +626,8 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
     def qualify_table_fn_snowflake(table_upper: str) -> str:
         if '.' in table_upper:
             return table_upper
-        schema_part = table_schema_map.get(table_upper) or (str(default_sf_schema).upper() if default_sf_schema else None)
+        schema_part = table_schema_map.get(table_upper) or (
+            str(default_sf_schema).upper() if default_sf_schema else None)
         if schema_part:
             return f"{schema_part}.{table_upper}"
         return table_upper
@@ -658,16 +668,16 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
                         continue
                 # Check cell value match using the unified query
                 if db_word_match(
-                    word,
-                    col_name,
-                    table_name,
-                    db_type,
-                    db_path,
-                    db_id,
-                    credential,
-                    exact=False,
-                    invalid_tables_cache=invalid_tables_cache,
-                    qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
+                        word,
+                        col_name,
+                        table_name,
+                        db_type,
+                        db_path,
+                        db_id,
+                        credential,
+                        exact=False,
+                        invalid_tables_cache=invalid_tables_cache,
+                        qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
                 ):
                     match_q_ids.append(q_id)
                 if db_type == "snowflake":
@@ -686,16 +696,16 @@ def compute_cell_value_linking(tokens, schema_dict, db_type, db_path, db_id, cre
 
             # Try exact match first
             if db_word_match(
-                ' '.join(words),
-                col_name,
-                table_name,
-                db_type,
-                db_path,
-                db_id,
-                credential,
-                exact=True,
-                invalid_tables_cache=invalid_tables_cache,
-                qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
+                    ' '.join(words),
+                    col_name,
+                    table_name,
+                    db_type,
+                    db_path,
+                    db_id,
+                    credential,
+                    exact=True,
+                    invalid_tables_cache=invalid_tables_cache,
+                    qualify_table_fn=(qualify_table_fn_snowflake if db_type == "snowflake" else None),
             ):
                 for q_id in range(q_f, q_t):
                     cell_match[f"{q_id},{col_id}"] = CELL_EXACT_MATCH_FLAG
@@ -1131,14 +1141,41 @@ class InstructionWithRulePrompt(BasicPrompt):
 
 class SQLCOTPrompt(BasicPrompt):
     template_info = "/* Given the following database schema: */\n{}"
-    template_question = "/* Answer the following: {} */"
+    template_question = "/* Let's think step by step. Answer the following: {} */"
 
     def format_target(self, example):
-        return self.format_question(example) + "\nA: SELECT "
+        return self.format_question(example)
 
     def format_question(self, example):
-        sqls = get_sql_for_database(example['path_db'], db_id=example.get('db_id'))
-        prompt_info = self.template_info.format("\n\n".join(sqls))
+        # Handle different database types for schema extraction
+        db_type = example.get('db_type', 'sqlite')
+        path_db = example.get('path_db')
+        credential = example.get('credential_path')
+        db_id = example.get('db_id')
+
+        if path_db:
+            try:
+                sqls = get_sql_for_database(path_db, db_type, credential, db_id=db_id)
+                if sqls:
+                    prompt_info = self.template_info.format("\n\n".join(sqls))
+                else:
+                    raise ValueError("No SQL schemas retrieved")
+            except Exception as e:
+                logger.warning(f"Failed to get SQL schema from database: {e}")
+                # Fallback to table-based schema representation
+                tables_info = []
+                for table in example.get("tables", []):
+                    table_sql = f"CREATE TABLE {table.name} ({', '.join(table.schema)});"
+                    tables_info.append(table_sql)
+                prompt_info = self.template_info.format("\n\n".join(tables_info))
+        else:
+            # For cases when path_db is not available
+            tables_info = []
+            for table in example.get("tables", []):
+                table_sql = f"CREATE TABLE {table.name} ({', '.join(table.schema)});"
+                tables_info.append(table_sql)
+            prompt_info = self.template_info.format("\n\n".join(tables_info))
+
         prompt_extra = self.get_extra_info(example['db_id'])
         prompt_question = self.template_question.format(example['question'])
         components = [prompt_info] if not prompt_extra else [prompt_info, prompt_extra]
@@ -1299,7 +1336,13 @@ class BasicICLPrompt(object):
     def record_pattern_similarity(self, examples, target):
         similarity_list = []
         for example in examples:
-            similarity_list.append(jaccard_similarity(example["query_skeleton"], target["query_skeleton"]))
+            # Use question pattern if available, otherwise fall back to query skeleton
+            if "question_pattern" in example and "question_pattern" in target:
+                similarity_list.append(jaccard_similarity(example["question_pattern"], target["question_pattern"]))
+            elif "query_skeleton" in example and "query_skeleton" in target:
+                similarity_list.append(jaccard_similarity(example["query_skeleton"], target["query_skeleton"]))
+            else:
+                similarity_list.append(0.0)
         self.pattern_similarities.append(similarity_list)
 
     def get_pattern_similarity(self):
@@ -1427,10 +1470,22 @@ class RandomExampleSelector(BasicExampleSelector):
 class CosineSimilarExampleSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
+        # Use sentence transformers for better embeddings
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.bert_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device="cpu")
+            self.train_embeddings = self.bert_model.encode(self.train_questions)
+        except ImportError:
+            logger.warning("sentence-transformers not available, using dummy embeddings")
+            self.bert_model = None
+            self.train_embeddings = np.random.rand(len(self.train_questions), 768)
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
+        if self.bert_model:
+            target_embedding = self.bert_model.encode([target["question"]])
+        else:
+            target_embedding = np.random.rand(1, 768)
+
         from sklearn.metrics.pairwise import cosine_similarity
         similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
         pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
@@ -1496,24 +1551,64 @@ class EuclideanDistanceThresholdSelector(BasicExampleSelector):
 class EuclideanDistanceSkeletonSimilarityThresholdSelector(BasicExampleSelector):
     def __init__(self, data, *args, **kwargs):
         super().__init__(data)
-        self.train_embeddings = np.random.rand(len(self.train_questions), 768)  # Dummy
+        self.threshold = 0.85
+        self.mask_token = "<mask>"
+        self.value_token = "<unk>"
+
+        # Use sentence transformers for better embeddings
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.bert_model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", device="cpu")
+            # Use masked questions for better similarity matching
+            train_mask_questions = mask_question_with_schema_linking(self.train_json, mask_tag=self.mask_token,
+                                                                     value_tag=self.value_token)
+            self.train_embeddings = self.bert_model.encode(train_mask_questions)
+        except ImportError:
+            logger.warning("sentence-transformers not available, using dummy embeddings")
+            self.bert_model = None
+            self.train_embeddings = np.random.rand(len(self.train_questions), 768)
 
     def get_examples(self, target, num_example, cross_domain=False):
-        target_embedding = np.random.rand(1, 768)  # Dummy
-        from sklearn.metrics.pairwise import cosine_similarity
-        similarities = np.squeeze(cosine_similarity(target_embedding, self.train_embeddings)).tolist()
-        pairs = [(s, i) for s, i in zip(similarities, range(len(similarities)))]
-        pairs_sorted = sorted(pairs, key=lambda x: x[0], reverse=True)
+        if self.bert_model:
+            target_mask_question = mask_question_with_schema_linking([target], mask_tag=self.mask_token,
+                                                                     value_tag=self.value_token)
+            target_embedding = self.bert_model.encode(target_mask_question)
+        else:
+            target_embedding = np.random.rand(1, 768)
+
+        from sklearn.metrics.pairwise import euclidean_distances
+        distances = np.squeeze(euclidean_distances(target_embedding, self.train_embeddings)).tolist()
+        pairs = [(d, i) for d, i in zip(distances, range(len(distances)))]
+        pairs_sorted = sorted(pairs, key=lambda x: x[0])
         top_pairs = []
-        for s, index in pairs_sorted:
+
+        for d, index in pairs_sorted:
             if cross_domain and self.train_json[index]['db_id'] == target['db_id']:
                 continue
             if self.train_json[index]['question'] == target['question']:
                 continue
-            top_pairs.append((index, s))
+            # Check skeleton similarity threshold
+            if "query_skeleton" in self.train_json[index] and "query_skeleton" in target:
+                if jaccard_similarity(self.train_json[index]["query_skeleton"],
+                                      target["query_skeleton"]) < self.threshold:
+                    continue
+            top_pairs.append((index, d))
             if len(top_pairs) >= num_example:
                 break
-        return [self.train_json[index] for (index, s) in top_pairs]
+
+        # If not enough examples with threshold, add more without threshold
+        if len(top_pairs) < num_example:
+            for d, index in pairs_sorted:
+                if cross_domain and self.train_json[index]['db_id'] == target['db_id']:
+                    continue
+                if self.train_json[index]['question'] == target['question']:
+                    continue
+                if (index, d) not in top_pairs:
+                    top_pairs.append((index, d))
+                    if len(top_pairs) >= num_example:
+                        break
+
+        return [self.train_json[index] for (index, d) in top_pairs]
 
 
 class EuclideanDistanceQuestionMaskSelector(BasicExampleSelector):
@@ -1864,6 +1959,8 @@ class DAILSQLGenerate(BaseGenerator):
                 'column_names_original': schema_dict.get('column_names_original', []),
                 'table_names_original': schema_dict.get('table_names_original', []),
                 'query_skeleton': self._get_query_skeleton(row.get('query', 'SELECT'), schema_dict),
+                'pre_skeleton': self._get_query_skeleton(row.get('query', 'SELECT'), schema_dict),
+                # Add pre_skeleton for similarity matching
                 'credential_path': self.credential  # Include credential path for non-SQLite databases
             }
 
@@ -1899,6 +1996,10 @@ class DAILSQLGenerate(BaseGenerator):
                 target['sc_link'] = {'q_col_match': q_col_match, 'q_tab_match': q_tab_match}
                 target['cv_link'] = {'num_date_match': cv_link['num_date_match'], 'cell_match': cell_match}
                 target['question_for_copying'] = question_toks
+
+                # Generate question pattern for better example selection
+                target['question_pattern'] = self._generate_question_pattern(question_toks, q_col_match, q_tab_match,
+                                                                             cv_link['num_date_match'], cell_match)
                 logger.debug("模式链接计算完成")
             else:
                 # Use provided schema links
@@ -2049,6 +2150,32 @@ class DAILSQLGenerate(BaseGenerator):
         except:
             return query
 
+    def _generate_question_pattern(self, question_toks, q_col_match, q_tab_match, num_date_match, cell_match):
+        """Generate question pattern by masking schema-linked tokens"""
+
+        def mask(question_toks, mask_ids, tag):
+            new_question_toks = []
+            for id, tok in enumerate(question_toks):
+                if id in mask_ids:
+                    new_question_toks.append(tag)
+                else:
+                    new_question_toks.append(tok)
+            return new_question_toks
+
+        # Mask value matches (numbers, dates, cell values)
+        num_date_match_ids = [int(match.split(',')[0]) for match in num_date_match.keys()]
+        cell_match_ids = [int(match.split(',')[0]) for match in cell_match.keys()]
+        value_match_q_ids = num_date_match_ids + cell_match_ids
+        question_toks = mask(question_toks, value_match_q_ids, '_')
+
+        # Mask schema matches (columns, tables)
+        q_col_match_ids = [int(match.split(',')[0]) for match in q_col_match.keys()]
+        q_tab_match_ids = [int(match.split(',')[0]) for match in q_tab_match.keys()]
+        schema_match_q_ids = q_col_match_ids + q_tab_match_ids
+        question_toks = mask(question_toks, schema_match_q_ids, '_')
+
+        return " ".join(question_toks)
+
     def _build_fallback_prompt(self, target, schema_str):
         """
         Build a basic fallback prompt when DAIL-SQL prompt system is not available.
@@ -2077,8 +2204,11 @@ SELECT """
         Post-process generated SQL for different database types.
         Database-agnostic SQL cleaning and validation.
         """
+        # Extract SQL from response text that may contain explanations and code blocks
+        sql = self._extract_sql_from_response(sql_text)
+        
         # Clean up the SQL text
-        sql = " ".join(sql_text.replace("\n", " ").split())
+        sql = " ".join(sql.replace("\n", " ").split())
         sql = process_duplication(sql)
 
         # Ensure SQL starts with SELECT
@@ -2088,35 +2218,74 @@ SELECT """
             else:
                 sql = 'SELECT ' + sql
 
-        # Database-specific SQL adjustments
-        if db_type == "big_query":
-            # BigQuery specific adjustments
-            sql = self._adjust_sql_for_bigquery(sql)
-        elif db_type == "snowflake":
-            # Snowflake specific adjustments
-            sql = self._adjust_sql_for_snowflake(sql)
-        elif db_type == "sqlite":
-            # SQLite specific adjustments
-            sql = self._adjust_sql_for_sqlite(sql)
-
         return sql
 
-    def _adjust_sql_for_bigquery(self, sql):
-        """Adjust SQL for BigQuery syntax"""
-        # BigQuery uses backticks for identifiers
-        # This is a basic adjustment - more sophisticated parsing might be needed
-        return sql
+    def _extract_sql_from_response(self, response_text):
+        """
+        Extract SQL statement from LLM response that may contain explanations and code blocks.
+        Uses a more robust approach with multiple fallback strategies.
+        """
+        import re
+        
+        # Strategy 1: Look for SQL in code blocks (most reliable)
+        sql_code_block_patterns = [
+            r'```sql\s*(.*?)\s*```',  # ```sql ... ```
+            r'```\s*(SELECT.*?)\s*```',  # ``` SELECT ... ```
+            r'`(SELECT.*?)`',  # `SELECT ... `
+        ]
+        
+        for pattern in sql_code_block_patterns:
+            matches = re.findall(pattern, response_text, re.DOTALL | re.IGNORECASE)
+            for match in matches:
+                sql = match.strip()
+                if sql.upper().startswith('SELECT') and self._is_valid_sql(sql):
+                    return sql
+        
+        # Strategy 2: Look for SELECT statement after common prefixes
+        select_patterns = [
+            r'(?:Here\'s the SQL query:|SQL query:|Query:|SELECT)\s*(SELECT\s+.*?)(?:\n\n|\n###|\nExplanation|$)',  # After explanations
+            r'SELECT\s+.*?(?=\n\n|\n###|\nExplanation|$)',  # Direct SELECT until explanation
+        ]
+        
+        for pattern in select_patterns:
+            matches = re.findall(pattern, response_text, re.DOTALL | re.IGNORECASE)
+            for match in matches:
+                sql = match.strip()
+                if sql.upper().startswith('SELECT') and self._is_valid_sql(sql):
+                    return sql
+        
+        # Strategy 3: Find any line that starts with SELECT
+        lines = response_text.split('\n')
+        for line in lines:
+            line = line.strip()
+            if line.upper().startswith('SELECT') and self._is_valid_sql(line):
+                return line
+        
+        # Strategy 4: Fallback - return the original text (will be cleaned up later)
+        return response_text
 
-    def _adjust_sql_for_snowflake(self, sql):
-        """Adjust SQL for Snowflake syntax"""
-        # Snowflake uses double quotes for case-sensitive identifiers
-        # This is a basic adjustment - more sophisticated parsing might be needed
-        return sql
-
-    def _adjust_sql_for_sqlite(self, sql):
-        """Adjust SQL for SQLite syntax"""
-        # SQLite uses standard SQL syntax
-        return sql
+    def _is_valid_sql(self, sql):
+        """
+        Basic validation to check if the extracted text looks like valid SQL.
+        """
+        if not sql or len(sql.strip()) < 10:  # Too short to be meaningful SQL
+            return False
+        
+        sql_upper = sql.upper().strip()
+        
+        # Must start with SELECT
+        if not sql_upper.startswith('SELECT'):
+            return False
+        
+        # Should contain basic SQL keywords
+        basic_keywords = ['FROM', 'WHERE', 'JOIN', 'GROUP', 'ORDER', 'HAVING', 'UNION', 'INTERSECT', 'EXCEPT']
+        has_keywords = any(keyword in sql_upper for keyword in basic_keywords)
+        
+        # Should not contain explanation text
+        explanation_indicators = ['explanation', 'explain', 'note:', 'this will', 'the query', 'result']
+        has_explanations = any(indicator in sql.lower() for indicator in explanation_indicators)
+        
+        return has_keywords and not has_explanations
 
     def _load_external_knowledge(self, external_path):
         """Load external knowledge if available"""
@@ -2164,11 +2333,46 @@ SELECT """
                                 'query': item.get('query', 'SELECT'),
                                 'db_id': item.get('db_id', 'default'),
                                 'path_db': item.get('path_db', ''),
-                                'tables': []  # Will be populated as needed
+                                'tables': [],  # Will be populated as needed
+                                'query_skeleton': self._get_query_skeleton_safe(item.get('query', 'SELECT')),
+                                'pre_skeleton': self._get_query_skeleton_safe(item.get('query', 'SELECT')),
+                                'question_for_copying': item.get('question', '').split(),
+                                'sc_link': item.get('sc_link', {}),
+                                'cv_link': item.get('cv_link', {}),
+                                'question_pattern': self._generate_question_pattern_safe(item)
                             }
                             self.train_json.append(adapted_item)
                             self.db_ids.append(adapted_item['db_id'])
                             self.train_questions.append(adapted_item['question'])
+
+            def _get_query_skeleton_safe(self, query):
+                """Safely get query skeleton"""
+                try:
+                    if query and query.strip().upper().startswith('SELECT'):
+                        # Use a simple skeleton generation for training data
+                        return query.replace('SELECT', 'SELECT').replace('FROM', 'FROM').replace('WHERE', 'WHERE')
+                    return query
+                except:
+                    return query
+
+            def _generate_question_pattern_safe(self, item):
+                """Safely generate question pattern"""
+                try:
+                    question = item.get('question', '')
+                    if not question:
+                        return question
+                    # Simple pattern generation - replace common words with placeholders
+                    pattern = question.lower()
+                    # Replace common question words
+                    replacements = {
+                        'what': '_', 'how': '_', 'which': '_', 'who': '_', 'when': '_', 'where': '_',
+                        'show': '_', 'list': '_', 'find': '_', 'get': '_', 'select': '_'
+                    }
+                    for word, replacement in replacements.items():
+                        pattern = pattern.replace(word, replacement)
+                    return pattern
+                except:
+                    return item.get('question', '')
 
             def get_train_json(self):
                 return self.train_json
