@@ -171,49 +171,6 @@ Question Solved.
 Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
 '''
 
-    DECOMPOSE_TEMPLATE_SPIDER = '''Given a 【Database schema】 description, a knowledge 【Evidence】 and the 【Question】, you need to use valid SQLite and understand the database and knowledge, and then decompose the question into subquestions for text-to-SQL generation.
-When generating SQL, we should always consider constraints:
-【Constraints】
-- In `SELECT <column>`, just select needed columns in the 【Question】 without any unnecessary column or value
-- In `FROM <table>` or `JOIN <table>`, do not include unnecessary table
-- If use max or min func, `JOIN <table>` FIRST, THEN use `SELECT MAX(<column>)` or `SELECT MIN(<column>)`
-- If [Value examples] of <column> has 'None' or None, use `JOIN <table>` or `WHERE <column> is NOT NULL` is better
-- If use `ORDER BY <column> ASC|DESC`, add `GROUP BY <column>` before to select distinct values
-
-==========
-
-【Database schema】
-# Table: account
-[
-  (account_id, the id of the account. Value examples: [11382, 11362, 2, 1, 2367].),
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
-  (frequency, frequency of the acount. Value examples: ['POPLATEK MESICNE', 'POPLATEK TYDNE', 'POPLATEK PO OBRATU'].),
-  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
-]
-# Table: client
-[
-  (client_id, the unique number. Value examples: [13998, 13971, 2, 1, 2839].),
-  (gender, gender. Value examples: ['M', 'F']. And F：female . M：male ),
-  (birth_date, birth date. Value examples: ['1987-09-27', '1986-08-13'].),
-  (date, the creation date of the account. Value examples: ['1997-12-29', '1997-12-28'].)
-]
-# Table: district
-[
-  (district_id, location of branch. Value examples: [77, 76, 2, 1, 39].),
-  (A4, number of inhabitants . Value examples: ['95907', '95616', '94812'].),
-  (A11, average salary. Value examples: [12541, 11277, 8114].)
-]
-【Foreign keys】
-account.`district_id` = district.`district_id`
-client.`district_id` = district.`district_id`
-【Question】
-What is the gender of the youngest client who opened account in the lowest average salary branch?
-【Evidence】
-Later birthdate refers to younger age; A11 refers to average salary
-
-Decompose the question into sub questions, considering 【Constraints】, and generate the SQL after thinking step by step:
-'''
-
     def __init__(
             self,
             dataset: Dataset = None,
@@ -239,11 +196,9 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
 
     def generate_decomposition(self, llm_: LLM, query: str, desc_str: str, fk_str: str, evidence: str) -> List[
         Tuple[str, str]]:
-        if self.dataset_name == 'bird':
-            prompt = self.DECOMPOSE_TEMPLATE_BIRD.format(query=query, desc_str=desc_str, fk_str=fk_str,
-                                                         evidence=evidence)
-        else:
-            prompt = self.DECOMPOSE_TEMPLATE_SPIDER.format(query=query, desc_str=desc_str, fk_str=fk_str)
+        prompt = self.DECOMPOSE_TEMPLATE_BIRD.format(query=query, desc_str=desc_str, fk_str=fk_str,
+                                                     evidence=evidence)
+
         response = llm_.complete(prompt).text.strip()
         return self.parse_qa_pairs(response)
 
