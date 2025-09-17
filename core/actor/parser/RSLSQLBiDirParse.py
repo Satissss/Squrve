@@ -374,7 +374,7 @@ Your main tasks are:
             row = self.dataset[item]
             question = row['question']
             evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
-            example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
+            example = load_dataset(row.get('reasoning_examples', ''))
             evidence = evidence or ''
             example = example or ''
 
