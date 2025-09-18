@@ -8,6 +8,13 @@ from core.actor.scaler.BaseScale import BaseScaler
 from core.data_manage import Dataset
 from core.utils import parse_schema_from_df, load_dataset, save_dataset
 from llama_index.core.llms.llm import LLM
+from core.actor.prompts.CHESSPrompt import (
+    template_generate_candidate_one,
+    template_generate_candidate_two,
+    template_generate_candidate_three,
+    template_generate_candidate_retrieval,
+    template_extract_keywords,
+)
 
 class ChessScaler(BaseScaler):
     """Scaler implementation based on CHESS-SQL's candidate generation for producing multiple SQL candidates."""
@@ -63,22 +70,16 @@ Evidence: {HINT}
         self.generate_num = generate_num
         self.temperature = temperature
 
-    def _extract_keywords(self, question: str) -> List[str]:
-        """Extract keywords from the question using LLM"""
-        prompt = f"""Extract key entities and concepts from the following question that are relevant for SQL query generation. 
-        Focus on table names, column names, conditions, and operations.
-
-        Question: {question}
-
-        Return only a Python list of keywords, for example: ['customer', 'name', 'age', '>', '30']"""
-        
+    def _extract_keywords(self, question: str, hint: str = "") -> List[str]:
+        """Extract keywords from the question using the same template as CHESSGenerate."""
         try:
             llm_lis = self.llm if isinstance(self.llm, list) else [self.llm]
             llm_to_use = llm_lis[0] if llm_lis else None
             if llm_to_use is None:
                 logger.warning("No LLM available for keyword extraction")
                 return []
-                
+
+            prompt = template_extract_keywords().format(QUESTION=question, HINT=hint or "")
             response = llm_to_use.complete(prompt, temperature=0.2).text
             match = re.search(r'\[.*\]', response)
             if match:
@@ -106,6 +107,93 @@ Evidence: {HINT}
         if relevant_tables:
             return '\n'.join(relevant_tables)
         return schema
+
+    def _build_evidence(self, question: str, schema_text: str, keywords: List[str], dataset_evidence: str, schema_links: Union[str, List[str]] = None, sub_questions: Union[str, List[str]] = None) -> str:
+        """Construct lightweight evidence in parity with CHESSGenerate."""
+        lines = schema_text.split('\n') if schema_text else []
+        matched_lines = []
+        lower_keywords = [kw.lower() for kw in (keywords or [])]
+        for line in lines:
+            li = line.strip()
+            lwr = li.lower()
+            if any(kw in lwr for kw in lower_keywords):
+                matched_lines.append(li)
+
+        top_matches = matched_lines[:12]
+        summary_parts = []
+        if keywords:
+            summary_parts.append(f"Identified keywords: {', '.join(keywords[:10])}.")
+        if top_matches:
+            summary_parts.append("Relevant schema snippets:")
+            summary_parts.extend(top_matches)
+        if dataset_evidence:
+            summary_parts.append("Additional hints:")
+            summary_parts.append(str(dataset_evidence))
+        if schema_links:
+            if isinstance(schema_links, list):
+                schema_links_str = ', '.join(schema_links)
+            else:
+                schema_links_str = str(schema_links)
+            summary_parts.append("Schema links (Identified Critical Tables & Columns):")
+            summary_parts.append(schema_links_str)
+        if sub_questions:
+            if isinstance(sub_questions, list):
+                sub_questions_str = '\n'.join([f"- {q}" for q in sub_questions])
+            else:
+                sub_questions_str = str(sub_questions)
+            summary_parts.append("Sub-questions (Sub-question Decomposition of the Original Question):")
+            summary_parts.append(sub_questions_str)
+
+        return "\n".join(summary_parts).strip()
+
+    def _generate_candidates_with_templates(
+        self,
+        llm_: LLM,
+        question: str,
+        schema: str,
+        evidence: str,
+        total_samples: int,
+        temperature: float,
+    ) -> List[str]:
+        """Use diversified CHESS templates to generate multiple SQL candidates."""
+        template_functions = [
+            template_generate_candidate_one,
+            template_generate_candidate_two,
+            template_generate_candidate_three,
+            template_generate_candidate_retrieval,
+        ]
+
+        total_samples = max(1, int(total_samples))
+        samples_per_template = max(1, total_samples // len(template_functions))
+
+        candidates: List[str] = []
+        for template_func in template_functions:
+            for _ in range(samples_per_template):
+                try:
+                    params = {
+                        "DATABASE_SCHEMA": schema,
+                        "QUESTION": question,
+                        "HINT": evidence,
+                    }
+                    if template_func == template_generate_candidate_retrieval:
+                        params["EXAMPLES"] = ""
+                    prompt = template_func().format(**params)
+                    response = llm_.complete(prompt, temperature=temperature).text
+                    sql_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', response, re.DOTALL)
+                    if sql_match:
+                        sql = sql_match.group(1).strip()
+                        if sql:
+                            candidates.append(sql)
+                    else:
+                        for line in response.split('\n'):
+                            if line.strip().upper().startswith('SELECT'):
+                                candidates.append(line.strip())
+                                break
+                except Exception as e:
+                    logger.warning(f"Failed to generate candidate: {e}")
+                    continue
+
+        return candidates
 
     def _generate_single_candidate(self, llm_: LLM, question: str, schema: str, evidence: str) -> Optional[str]:
         """Generate a single SQL candidate"""
@@ -149,9 +237,10 @@ Evidence: {HINT}
         # Load and process schema using base class method
         schema = self.process_schema(schema, item)
 
-        # Information Retrieval
-        keywords = self._extract_keywords(question)
+        # Information Retrieval (align with CHESSGenerate)
+        keywords = self._extract_keywords(question, evidence)
         context = self._retrieve_context(question, schema, keywords)
+        built_evidence = self._build_evidence(question, context, keywords, evidence, schema_links, sub_questions)
 
         # 在 act 方法内部初始化 llm，考虑 self.llm 是否为列表
         if isinstance(self.llm, list) and self.llm:
@@ -164,12 +253,15 @@ Evidence: {HINT}
             logger.warning("No LLM available for SQL generation")
             return []
 
-        # 仅使用第一个 LLM 生成 SQL 候选
-        pred_sqls = []
-        for _ in range(self.generate_num):
-            sql = self._generate_single_candidate(llm, question, context, evidence)
-            if sql:
-                pred_sqls.append(sql)
+        # 仅使用第一个 LLM 生成 SQL 候选（使用多策略模板）
+        pred_sqls = self._generate_candidates_with_templates(
+            llm_ = llm,
+            question = question,
+            schema = context,
+            evidence = built_evidence,
+            total_samples = self.generate_num,
+            temperature = self.temperature,
+        )
 
         # Deduplicate
         pred_sqls = list(dict.fromkeys(pred_sqls))

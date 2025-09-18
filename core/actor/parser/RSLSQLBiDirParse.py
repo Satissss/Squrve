@@ -98,6 +98,11 @@ Your main tasks are:
 - Ensure that the SQL statement accurately reflects the query requirements and conditions in the user questions.
 - Reasonably construct query logic based on database structure and sample data.
 - When generating SQL statements, consider all the information provided to ensure the correctness and efficiency of the statements.
+    
+    ### The most important thing is to remember:
+    - definition: Information for prompts, this message is very important.
+    - In the generated SQL statement, table names and field names need to be enclosed in backticks, such as `table_name`, `column_name`.
+    - In the generated SQL statement, table names and field names must be correct to ensure the correctness and efficiency of the statement.
 '''
 
     def __init__(
@@ -309,25 +314,43 @@ Your main tasks are:
         return explanation
 
     def extract_from_text(self, text, db_schema):
+        """Extract schema links from text (evidence or SQL) using flexible column name matching.
+        Reproduces the improved behavior in RSLSQLGenerator.
+        """
         pred = []
+        if not text or not db_schema:
+            return {"tables": [], "columns": []}
+
         text_lower = text.lower()
         for item in db_schema:
             try:
                 if '.' not in item:
                     continue
-                table, column = item.lower().split('.', 1)  # Split only on first occurrence
-                if table == 'sqlite_sequence':
+                parts = item.split('.')
+                if len(parts) < 2:
                     continue
-                if column in text_lower:
+                table_part, column_part = parts[0].lower(), '.'.join(parts[1:]).lower()
+                if table_part == 'sqlite_sequence':
+                    continue
+                column_clean = column_part.strip('`').strip()
+                # Flexible matching: full column or any underscore-separated token present
+                if column_clean in text_lower or any(word in text_lower for word in column_clean.split('_')):
                     pred.append(item)
             except (ValueError, AttributeError):
                 continue
+
         pred = list(set(pred))
         tables = list(set([p.split('.')[0] for p in pred if '.' in p]))
         columns = []
         for p in pred:
-            t, c = p.split('.', 1)
-            columns.append(f"{t}.`{c}`")
+            if '.' in p:
+                t, c = p.split('.', 1)
+                c_fmt = c
+                if not c_fmt.startswith('`'):
+                    c_fmt = '`' + c_fmt
+                if not c_fmt.endswith('`'):
+                    c_fmt = c_fmt + '`'
+                columns.append(f"{t}.{c_fmt}")
         return {"tables": tables, "columns": columns}
 
     def merge_schema_links(self, sl_sql, sl_llm, sl_hint):
@@ -360,7 +383,7 @@ Your main tasks are:
     def preliminary_sql_gen(self, table_info, table_column, example, question, evidence):
         table_info += f'### tables: {table_column["tables"]}\n'
         table_info += f'### columns: {table_column["columns"]}\n'
-        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {'sql': 'your sql'}."
+        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
         response = self.llm.complete(self.SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 

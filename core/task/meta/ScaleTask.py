@@ -8,6 +8,9 @@ from llama_index.core.llms.llm import LLM
 from core.task.meta.MetaTask import MetaTask
 from core.actor.scaler.ChessScale import ChessScaler
 from core.actor.scaler.OpenSearchSQLScale import OpenSearchSQLScaler
+from core.actor.scaler.DINSQLScale import DINSQLScaler
+from core.actor.scaler.MACSQLScale import MACSQLScaler
+from core.actor.scaler.RSLSQLScale import RSLSQLScaler
 from core.actor.scaler.BaseScale import BaseScaler
 
 
@@ -17,7 +20,10 @@ class ScaleTask(MetaTask):
     NAME = "ScaleTask"
     registered_scale_type = [
         "ChessScaler", "CHESS",
-        "OpenSearchSQLScaler", "OpenSearchSQL"
+        "OpenSearchSQLScaler", "OpenSearchSQL",
+        "DINSQLScaler", "DINSQL",
+        "MACSQLScaler", "MACSQL", 
+        "RSLSQLScaler", "RSLSQL"
     ]
 
     def __init__(
@@ -76,6 +82,18 @@ class ScaleTask(MetaTask):
 
         elif actor_type in ("OpenSearchSQLScaler", "OpenSearchSQL"):
             actor = OpenSearchSQLScaler(**scale_args)
+            return actor
+
+        elif actor_type in ("DINSQLScaler", "DINSQL"):
+            actor = DINSQLScaler(**scale_args)
+            return actor
+
+        elif actor_type in ("MACSQLScaler", "MACSQL"):
+            actor = MACSQLScaler(**scale_args)
+            return actor
+
+        elif actor_type in ("RSLSQLScaler", "RSLSQL"):
+            actor = RSLSQLScaler(**scale_args)
             return actor
 
         warnings.warn(f"The scale_type `{actor_type}` is not available.", category=UserWarning)
