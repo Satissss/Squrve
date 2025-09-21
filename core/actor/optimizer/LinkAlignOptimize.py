@@ -275,32 +275,6 @@ For the given question, analyze and refine the erroneous SQL statement using the
         exe_flag, _ = get_sql_exec_result(**debug_args)
         return (True, debug_args["sql_query"]) if exe_flag is not None else (False, debug_args["sql_query"])
 
-    def optimize_single_sql(
-            self,
-            sql: str,
-            question: str,
-            schema: str,
-            db_type: str,
-            schema_links: Union[str, List] = "None",
-            db_id: Optional[str] = None,
-            db_path: Optional[Union[str, Path]] = None,
-            credential: Optional[dict] = None
-    ) -> str:
-        """Optimize a single SQL query using experience and feedback debugging."""
-        # Step 1: Debug by experience
-        debugged_sql = self._sql_debug_by_experience(
-            question, schema, sql, db_type, schema_links
-        )
-
-        # Step 2: Debug by feedback if enabled
-        if self.use_feedback_debug:
-            success, final_sql = self._sql_debug_by_feedback(
-                question, schema, debugged_sql, db_id, db_path, db_type, credential
-            )
-            debugged_sql = final_sql
-
-        return debugged_sql
-
     def act(
             self,
             item,
@@ -320,7 +294,7 @@ For the given question, analyze and refine the erroneous SQL statement using the
         db_type = row['db_type']
         db_id = row.get("db_id")
         db_path = Path(self.dataset.db_path) / (
-                    db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
+                db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
 
         # Load and process schema using base class method
@@ -334,9 +308,10 @@ For the given question, analyze and refine the erroneous SQL statement using the
         sql_list, is_single = self.load_pred_sql(pred_sql, item)
 
         def process_sql(sql):
-            return self.optimize_single_sql(
-                sql, question, schema, db_type, schema_links, db_id, db_path, credential
+            _, final_sql = self._sql_debug_by_feedback(
+                question, schema, sql, db_id, db_path, db_type, credential
             )
+            return final_sql
 
         optimized_sqls = []
         if self.open_parallel and len(sql_list) > 1:

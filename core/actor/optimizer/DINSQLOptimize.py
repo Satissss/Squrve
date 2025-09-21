@@ -63,12 +63,12 @@ class DINSQLOptimizer(BaseOptimizer):
                 schema +
                 '#### Question: ' + question +
                 f'\n#### {db_type.upper()} SQL QUERY\n' + sql_query +
-                f'\n#### {db_type.upper()} FIXED SQL QUERY\nSELECT'
+                f'\n#### Output only the fixed SQL query, without any explanation or extra text:'
         )
 
         try:
             debugged_sql = self.llm.complete(prompt).text.strip().replace("\n", " ")
-            return "SELECT " + debugged_sql
+            return debugged_sql
         except Exception as e:
             logger.error(f"Error in _sql_debug_by_experience: {e}")
             # 如果出错，返回原始 SQL
