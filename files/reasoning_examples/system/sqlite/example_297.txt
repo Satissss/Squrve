@@ -1,0 +1,14 @@
+# [Question]: Which customer has the highest average monthly change in payment amounts? Provide the customer's full name.
+# [Schema links]: ['PAYMENT.payment_date', 'CUSTOMER.first_name', 'CUSTOMER.last_name', 'PAYMENT.amount', 'PAYMENT.customer_id', 'CUSTOMER.customer_id']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the need to calculate the average monthly change in payment amounts for each customer.
+2. Extract the month from the payment_date to group payments by month.
+3. Join the PAYMENT and CUSTOMER tables on customer_id to get customer names.
+4. For each customer and month, calculate the total payment amount (SUM).
+5. Use a Common Table Expression (CTE) named result_table to store monthly totals per customer.
+6. Calculate the absolute difference between consecutive months' payments for each customer using LAG window function partitioned by customer and ordered by month.
+7. Create a CTE named difference_per_mon to store these monthly differences.
+8. Compute the average of these monthly differences for each customer, ignoring NULL differences (which occur for the first month).
+9. Create a CTE named average_difference to store the average monthly change per customer.
+10. Select the customer with the highest average monthly change by ordering in descending order and limiting to 1 result.
+# [Sql]: WITH result_table AS (     SELECT          TO_CHAR(TO_TIMESTAMP(pm."payment_date"), 'MM') AS pay_mon,  -- Direct conversion to timestamp, no format needed         cust."first_name" || ' ' || cust."last_name" AS fullname,          SUM(pm."amount") AS pay_amount      FROM          SQLITE_SAKILA.SQLITE_SAKILA.PAYMENT AS pm      JOIN          SQLITE_SAKILA.SQLITE_SAKILA.CUSTOMER AS cust      ON          pm."customer_id" = cust."customer_id"      GROUP BY          1,          2 ),  difference_per_mon AS (     SELECT          rt.fullname,          ABS(rt.pay_amount - LAG(rt.pay_amount) OVER (PARTITION BY rt.fullname ORDER BY rt.pay_mon)) AS diff      FROM          result_table rt ),  average_difference AS (     SELECT          fullname,          AVG(diff) AS avg_diff     FROM          difference_per_mon      WHERE          diff IS NOT NULL     GROUP BY          fullname ) SELECT      fullname FROM      average_difference ORDER BY      avg_diff DESC LIMIT 1;

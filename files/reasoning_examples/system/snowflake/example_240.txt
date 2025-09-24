@@ -1,0 +1,15 @@
+# [Question]: How many US B2 patents granted between 2008 and 2018 contain claims that do not include the word 'claim'?
+# [Schema links]: ['PUBLICATIONS.publication_number', 'PUBLICATIONS.claims_localized', 'PUBLICATIONS.country_code', 'PUBLICATIONS.grant_date']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant table and columns: `PUBLICATIONS` with columns `publication_number`, `claims_localized`, `country_code`, and `grant_date`.
+2. Filter for US patents with `country_code = 'US'`.
+3. Filter for patents granted between 2008 and 2018 using `grant_date BETWEEN 20080101 AND 20181231`.
+4. Exclude records where `grant_date` is 0.
+5. Filter for B2 patents by checking `publication_number LIKE '%B2%'`.
+6. Use `LATERAL FLATTEN` on `claims_localized` to extract individual claims from the structured data.
+7. Extract the text of each claim using `claim.value:"text"`.
+8. Create a CTE `patents_sample` to store the flattened claims data along with the publication number.
+9. In a second CTE `Publication_data`, count for each publication the number of claims that do not contain the word 'claim' using `COUNT_IF(claims_text NOT LIKE '%claim%')`.
+10. Group the results by `publication_number` to get the count of non-'claim' claims per patent.
+11. In the main query, count the number of patents that have at least one claim without the word 'claim' (i.e., `nb_indep_claims != 0`).
+# [Sql]: WITH patents_sample AS (   SELECT      t1."publication_number" AS publication_number,     claim.value:"text" AS claims_text   FROM      PATENTS.PATENTS.PUBLICATIONS t1,     LATERAL FLATTEN(input => t1."claims_localized") AS claim   WHERE      t1."country_code" = 'US'     AND t1."grant_date" BETWEEN 20080101 AND 20181231     AND t1."grant_date" != 0     AND t1."publication_number" LIKE '%B2%' ), Publication_data AS (   SELECT     publication_number,     COUNT_IF(claims_text NOT LIKE '%claim%') AS nb_indep_claims   FROM     patents_sample   GROUP BY     publication_number )  SELECT COUNT(nb_indep_claims) FROM Publication_data WHERE nb_indep_claims != 0

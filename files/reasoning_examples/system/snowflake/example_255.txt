@@ -1,0 +1,13 @@
+# [Question]: How many commit messages are there in repositories that use the 'Shell' programming language and 'apache-2.0' license, where the length of the commit message is more than 5 characters but less than 10,000 characters, and the messages do not start with the word 'merge', 'update' or 'test'?
+# [Schema links]: ['LANGUAGES.repo_name', 'LANGUAGES.language', 'LICENSES.repo_name', 'LICENSES.license', 'SAMPLE_COMMITS.repo_name', 'SAMPLE_COMMITS.message']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables: `LANGUAGES` (contains programming language data), `LICENSES` (contains license data), and `SAMPLE_COMMITS` (contains commit messages).
+2. Extract the language names from the `LANGUAGES` table, which stores languages as an array. Use `LATERAL FLATTEN` to unnest the array and access the `name` field for each language.
+3. Filter the flattened language data to only include rows where the language name is 'Shell'.
+4. Filter the `LICENSES` table to only include rows where the license is 'apache-2.0'.
+5. Join the filtered language data (`lang_table`) with the filtered license data (`license_table`) on `repo_name` to get repositories that use both 'Shell' language and 'apache-2.0' license.
+6. Join the result with the `SAMPLE_COMMITS` table (aliased as `commits_table`) on `repo_name` to access the commit messages for the relevant repositories.
+7. Apply the message length filters: `LENGTH(message) > 5` and `LENGTH(message) < 10000`.
+8. Apply the message content filters: exclude messages starting with 'merge', 'update', or 'test' using `LOWER(message) NOT LIKE` for each term.
+9. Count the number of commit messages that meet all the criteria using `COUNT(commits_table."message")`.
+# [Sql]: SELECT   COUNT(commits_table."message") AS "num_messages" FROM (   SELECT     L."repo_name",     language_struct.value:"name"::STRING AS "language_name"   FROM     GITHUB_REPOS.GITHUB_REPOS.LANGUAGES AS L,     LATERAL FLATTEN(input => L."language") AS language_struct ) AS lang_table JOIN    GITHUB_REPOS.GITHUB_REPOS.LICENSES AS license_table ON    license_table."repo_name" = lang_table."repo_name" JOIN (   SELECT     *   FROM     GITHUB_REPOS.GITHUB_REPOS.SAMPLE_COMMITS ) AS commits_table ON    commits_table."repo_name" = lang_table."repo_name" WHERE   license_table."license" LIKE 'apache-2.0'   AND lang_table."language_name" LIKE 'Shell'   AND LENGTH(commits_table."message") > 5   AND LENGTH(commits_table."message") < 10000   AND LOWER(commits_table."message") NOT LIKE 'update%'   AND LOWER(commits_table."message") NOT LIKE 'test%'   AND LOWER(commits_table."message") NOT LIKE 'merge%';

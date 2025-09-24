@@ -1,0 +1,15 @@
+# [Question]: Among all cities with delivered orders, find the five cities whose summed payments are the lowest, then calculate the average of their total payments and the average of their total delivered order counts.
+# [Schema links]: ['OLIST_CUSTOMERS.customer_city', 'OLIST_CUSTOMERS.customer_id', 'OLIST_ORDERS.customer_id', 'OLIST_ORDERS.order_id', 'OLIST_ORDERS.order_status', 'OLIST_ORDER_PAYMENTS.order_id', 'OLIST_ORDER_PAYMENTS.payment_value']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables: `OLIST_CUSTOMERS` (customer_city, customer_id), `OLIST_ORDERS` (customer_id, order_id, order_status), and `OLIST_ORDER_PAYMENTS` (order_id, payment_value).
+2. Filter orders to only include those with status 'delivered' using a WHERE clause on `OLIST_ORDERS.order_status`.
+3. Join `OLIST_CUSTOMERS` to `OLIST_ORDERS` on `customer_id` to link cities to orders.
+4. Join `OLIST_ORDERS` to `OLIST_ORDER_PAYMENTS` on `order_id` to access payment values.
+5. Group the results by `customer_city` to aggregate data per city.
+6. Calculate the sum of `payment_value` for each city as "Total_Payment_By_Customers".
+7. Count the number of `order_id` for each city as "Total_Number_Of_Orders".
+8. Order the cities by "Total_Payment_By_Customers" in ascending order to find the lowest summed payments.
+9. Limit the result to the top 5 cities using LIMIT 5, storing this in a CTE named `bottom_five_cities`.
+10. From the CTE, compute the average of "Total_Payment_By_Customers" and the average of "Total_Number_Of_Orders" using AVG functions.
+11. Select these averages as the final output.
+# [Sql]: WITH bottom_five_cities AS (     SELECT          C."customer_city",         SUM(CAST(P."payment_value" AS DOUBLE)) AS "Total_Payment_By_Customers",         COUNT(O."order_id") AS "Total_Number_Of_Orders"     FROM BRAZILIAN_E_COMMERCE.BRAZILIAN_E_COMMERCE.OLIST_CUSTOMERS C     JOIN BRAZILIAN_E_COMMERCE.BRAZILIAN_E_COMMERCE.OLIST_ORDERS O ON C."customer_id" = O."customer_id"     JOIN BRAZILIAN_E_COMMERCE.BRAZILIAN_E_COMMERCE.OLIST_ORDER_PAYMENTS P ON O."order_id" = P."order_id"     WHERE O."order_status" = 'delivered'     GROUP BY C."customer_city"     ORDER BY "Total_Payment_By_Customers" ASC     LIMIT 5 ) SELECT      AVG("Total_Payment_By_Customers") AS "Average_Total_Payment",     AVG("Total_Number_Of_Orders") AS "Average_Total_Orders" FROM bottom_five_cities;

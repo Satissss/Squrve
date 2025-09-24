@@ -1,0 +1,16 @@
+# [Question]: Could you tell me the number of orders, average payment per order and customer lifespan in weeks of the 3 custumers with the highest average payment per order, where the lifespan is calculated by subtracting the earliest purchase date from the latest purchase date in days, dividing by seven, and if the result is less than seven days, setting it to 1.0?
+# [Schema links]: ['CUSTOMERS.customer_unique_id', 'CUSTOMERS.customer_id', 'ORDERS.order_id', 'ORDERS.order_purchase_timestamp', 'ORDER_PAYMENTS.payment_value']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables and columns: `CUSTOMERS` (customer_unique_id, customer_id), `ORDERS` (order_id, order_purchase_timestamp), and `ORDER_PAYMENTS` (payment_value).
+2. Join the tables: `CUSTOMERS` to `ORDERS` using `customer_id`, and `ORDERS` to `ORDER_PAYMENTS` using `order_id`.
+3. Group the results by `customer_unique_id` to aggregate data per customer.
+4. Calculate the number of distinct orders per customer using `COUNT(DISTINCT order_id)`.
+5. Sum the `payment_value` for each customer to get the total payment amount.
+6. Find the earliest and latest `order_purchase_timestamp` for each customer using `MIN` and `MAX`, and extract the day of the year for each.
+7. Compute the customer lifespan in days by subtracting the earliest day from the latest day.
+8. Apply a conditional logic: if the lifespan in days is less than 7, set it to 1; otherwise, divide by 7 to convert to weeks.
+9. Calculate the average payment per order by dividing the total payment by the order count.
+10. Round the average payment per order to two decimal places.
+11. Order the results by the average payment per order in descending order.
+12. Limit the output to the top 3 customers.
+# [Sql]: WITH CustomerData AS (     SELECT         "customer_unique_id",         COUNT(DISTINCT E_COMMERCE.E_COMMERCE.ORDERS."order_id") AS order_count,         SUM(TO_NUMBER("payment_value")) AS total_payment,         DATE_PART('day', MIN(TO_TIMESTAMP("order_purchase_timestamp", 'YYYY-MM-DD HH24:MI:SS'))) AS first_order_day,         DATE_PART('day', MAX(TO_TIMESTAMP("order_purchase_timestamp", 'YYYY-MM-DD HH24:MI:SS'))) AS last_order_day     FROM E_COMMERCE.E_COMMERCE.CUSTOMERS          JOIN E_COMMERCE.E_COMMERCE.ORDERS USING ("customer_id")         JOIN E_COMMERCE.E_COMMERCE.ORDER_PAYMENTS USING ("order_id")     GROUP BY "customer_unique_id" ) SELECT     "customer_unique_id",     order_count AS PF,     ROUND(total_payment / order_count, 2) AS AOV,     CASE         WHEN (last_order_day - first_order_day) < 7 THEN             1         ELSE             (last_order_day - first_order_day) / 7         END AS ACL FROM CustomerData ORDER BY AOV DESC LIMIT 3;

@@ -1,0 +1,10 @@
+# [Question]: Based on the most recent refresh date, identify the top-ranked rising search term for the week that is exactly one year prior to the latest available week in the dataset.
+# [Schema links]: ['TOP_RISING_TERMS.week', 'TOP_RISING_TERMS.refresh_date', 'TOP_RISING_TERMS.term', 'TOP_RISING_TERMS.score', 'TOP_RISING_TERMS.dma_name', 'TOP_RISING_TERMS.rank']
+# [Analysis]: # Output: Let’s think step by step.
+1. Determine the latest available week in the dataset and subtract 52 weeks (one year) to get the target week for analysis.
+2. Identify the most recent refresh date in the dataset to ensure we use the latest data snapshot.
+3. Filter the TOP_RISING_TERMS table to include only records from the target week (one year prior to the latest week) and the latest refresh date.
+4. For each term and week combination, assign a row number (rn) based on descending score to identify the highest-scoring record for duplicate terms.
+5. Select the term where the row number is 1 (indicating the highest score for that term) and the rank is the smallest (top-ranked).
+6. Order the results by rank in ascending order and limit to 1 to get the top-ranked rising search term.
+# [Sql]: WITH LatestWeek AS (     SELECT         DATEADD(WEEK, -52, MAX("week")) AS "last_year_week"     FROM         GOOGLE_TRENDS.GOOGLE_TRENDS.TOP_RISING_TERMS ), LatestRefreshDate AS (     SELECT         MAX("refresh_date") AS "latest_refresh_date"     FROM         GOOGLE_TRENDS.GOOGLE_TRENDS.TOP_RISING_TERMS ), RankedTerms AS (     SELECT         "term",         "week",         CASE WHEN "score" IS NULL THEN NULL ELSE "dma_name" END AS "dma_name",         "rank",         "score",         ROW_NUMBER() OVER (             PARTITION BY "term", "week"             ORDER BY "score" DESC         ) AS rn     FROM         GOOGLE_TRENDS.GOOGLE_TRENDS.TOP_RISING_TERMS     WHERE         "week" = (SELECT "last_year_week" FROM LatestWeek)         AND "refresh_date" = (SELECT "latest_refresh_date" FROM LatestRefreshDate) )  SELECT     "term" FROM     RankedTerms WHERE     rn = 1 ORDER BY     "rank" LIMIT 1;

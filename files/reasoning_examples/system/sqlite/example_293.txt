@@ -1,0 +1,13 @@
+# [Question]: Could you generate a report that shows the number of delivered orders for each month in the years 2016, 2017, and 2018? Each column represents a year, and each row represents a month
+# [Schema links]: ['OLIST_ORDERS.order_delivered_customer_date', 'OLIST_ORDERS.order_status', 'OLIST_ORDERS.customer_id', 'OLIST_ORDERS.order_id']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant table and columns: `OLIST_ORDERS` with columns `order_delivered_customer_date`, `order_status`, `customer_id`, and `order_id`.
+2. Filter the data to include only delivered orders where `order_status` = 'delivered' and ensure `order_delivered_customer_date` is not null and not empty.
+3. Extract the year and month from `order_delivered_customer_date` using `TO_VARCHAR(TO_DATE(...))` to get 'YYYY' for year and 'MM' for month.
+4. Group the data by `customer_id`, `order_id`, `order_delivered_customer_date`, and `order_status` to ensure each order is counted once.
+5. Create a subquery (aliased as A) to produce this filtered and transformed dataset.
+6. In the outer query, group the results by the extracted month ("Month").
+7. Use conditional aggregation with `SUM(CASE ... END)` to count orders for each year (2016, 2017, 2018) within each month group.
+8. Alias the conditional sums as "Year2016", "Year2017", and "Year2018" respectively.
+9. Order the final result by the month number ("month_no") in ascending order.
+# [Sql]: SELECT   "Month" AS "month_no",   SUM(CASE WHEN A."Year" = '2016' THEN 1 ELSE 0 END) AS "Year2016",   SUM(CASE WHEN A."Year" = '2017' THEN 1 ELSE 0 END) AS "Year2017",   SUM(CASE WHEN A."Year" = '2018' THEN 1 ELSE 0 END) AS "Year2018" FROM (   SELECT      "customer_id",     "order_id",     "order_delivered_customer_date",     "order_status",     TO_VARCHAR(TO_DATE("order_delivered_customer_date"), 'YYYY') AS "Year",     TO_VARCHAR(TO_DATE("order_delivered_customer_date"), 'MM') AS "Month"   FROM BRAZILIAN_E_COMMERCE.BRAZILIAN_E_COMMERCE.OLIST_ORDERS   WHERE "order_status" = 'delivered'      AND "order_delivered_customer_date" IS NOT NULL     AND "order_delivered_customer_date" <> ''   GROUP BY "customer_id", "order_id", "order_delivered_customer_date", "order_status"   ORDER BY "order_delivered_customer_date" ASC ) A GROUP BY "Month" ORDER BY "month_no" ASC;

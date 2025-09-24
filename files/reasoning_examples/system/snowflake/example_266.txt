@@ -1,0 +1,11 @@
+# [Question]: In the dicom_pivot table, how many unique StudyInstanceUID values exactly match the SegmentedPropertyTypeCodeSequence of "15825003" (case-insensitive) and also have a collection_id of either "Community" or "nsclc_radiomics"?
+# [Schema links]: ['DICOM_PIVOT.SegmentedPropertyTypeCodeSequence', 'DICOM_PIVOT.collection_id', 'DICOM_PIVOT.StudyInstanceUID']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the need to count unique StudyInstanceUID values that meet two conditions: matching SegmentedPropertyTypeCodeSequence and having a specific collection_id.
+2. Since the SegmentedPropertyTypeCodeSequence match should be case-insensitive, use LOWER() function to compare with the lowercase value '15825003'.
+3. The collection_id must be either 'Community' or 'nsclc_radiomics', so use an IN clause for these values.
+4. To find StudyInstanceUIDs that satisfy both conditions, use an intersection of two subqueries: one for SegmentedPropertyTypeCodeSequence and one for collection_id.
+5. Group the results by StudyInstanceUID in each subquery to ensure uniqueness before the intersection.
+6. Use the intersected StudyInstanceUIDs as a filter in the main query's WHERE clause with an IN subquery.
+7. Finally, count the distinct StudyInstanceUIDs that pass this filter using COUNT(*).
+# [Sql]: SELECT   COUNT(*) AS "total_count" FROM   IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot" WHERE   "StudyInstanceUID" IN (     SELECT       "StudyInstanceUID"     FROM       IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"     WHERE       "StudyInstanceUID" IN (         SELECT           "StudyInstanceUID"         FROM           IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"         WHERE           LOWER("dicom_pivot"."SegmentedPropertyTypeCodeSequence") LIKE LOWER('15825003')         GROUP BY           "StudyInstanceUID"         INTERSECT         SELECT           "StudyInstanceUID"         FROM           IDC.IDC_V17.DICOM_PIVOT AS "dicom_pivot"         WHERE           "dicom_pivot"."collection_id" IN ('Community', 'nsclc_radiomics')         GROUP BY           "StudyInstanceUID"       )     GROUP BY       "StudyInstanceUID"   );

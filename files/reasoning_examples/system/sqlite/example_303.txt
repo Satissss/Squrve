@@ -1,0 +1,13 @@
+# [Question]: Can you identify the year and month with the highest rental orders created by the store's staff for each store? Please list the store ID, the year, the month, and the total rentals for those dates.
+# [Schema links]: ['RENTAL.rental_date', 'RENTAL.staff_id', 'RENTAL.rental_id', 'STAFF.staff_id', 'STAFF.store_id']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables and columns: `RENTAL` (rental_date, staff_id, rental_id) and `STAFF` (staff_id, store_id).
+2. Join the `RENTAL` and `STAFF` tables on `staff_id` to link rentals to their respective stores.
+3. Extract the year and month from the `rental_date` column using `EXTRACT` functions to group rentals by time period.
+4. Count the number of rentals (`rental_id`) for each combination of store, year, and month.
+5. Create a CTE named `result_table` to store the aggregated counts grouped by year, month, and store_id.
+6. Create a second CTE named `monthly_sales` to sum the rental counts for each store, year, and month combination.
+7. Create a third CTE named `store_max_sales` that uses a window function (`MAX() OVER`) to find the maximum rental count for each store across all months and years.
+8. Select the store_id, year, month, and total_rentals from `store_max_sales` where the total_rentals equals the maximum rentals for that store.
+9. Order the final results by store_id for clear presentation.
+# [Sql]: WITH result_table AS (   SELECT      EXTRACT(YEAR FROM TO_TIMESTAMP("rental_date", 'YYYY-MM-DD HH24:MI:SS.FF')) AS "year",      EXTRACT(MONTH FROM TO_TIMESTAMP("rental_date", 'YYYY-MM-DD HH24:MI:SS.FF')) AS "rental_month",      "st"."store_id",      COUNT("re"."rental_id") AS "count"   FROM      SQLITE_SAKILA.SQLITE_SAKILA.RENTAL "re"     JOIN SQLITE_SAKILA.SQLITE_SAKILA.STAFF "st"        ON "re"."staff_id" = "st"."staff_id"   GROUP BY      EXTRACT(YEAR FROM TO_TIMESTAMP("re"."rental_date", 'YYYY-MM-DD HH24:MI:SS.FF')),     EXTRACT(MONTH FROM TO_TIMESTAMP("re"."rental_date", 'YYYY-MM-DD HH24:MI:SS.FF')),     "st"."store_id" ),  monthly_sales AS (   SELECT      "year",      "rental_month",      "store_id",      SUM("count") AS "total_rentals"   FROM      result_table   GROUP BY      "year",      "rental_month",      "store_id" ), store_max_sales AS (   SELECT      "store_id",      "year",      "rental_month",      "total_rentals",      MAX("total_rentals") OVER (PARTITION BY "store_id") AS "max_rentals"   FROM      monthly_sales ) SELECT    "store_id",    "year",    "rental_month",    "total_rentals" FROM    store_max_sales WHERE    "total_rentals" = "max_rentals" ORDER BY    "store_id";

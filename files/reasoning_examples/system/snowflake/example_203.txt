@@ -1,0 +1,11 @@
+# [Question]: Using data from the FEMA National Flood Insurance Program Claim Index, for each year from 2010 through 2019, what were the total building damage amounts and total contents damage amounts reported under the National Flood Insurance Program for the NFIP community named 'City Of New York,' grouped by each year of loss?
+# [Schema links]: ['fema_national_flood_insurance_program_claim_index.date_of_loss', 'fema_national_flood_insurance_program_claim_index.nfip_community_name', 'fema_national_flood_insurance_program_claim_index.building_damage_amount', 'fema_national_flood_insurance_program_claim_index.contents_damage_amount']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the required columns: `date_of_loss` to extract the year, `nfip_community_name` for filtering, `building_damage_amount` and `contents_damage_amount` for summation.
+2. Filter the records to include only those where `nfip_community_name` is 'City Of New York'.
+3. Extract the year from `date_of_loss` using the `YEAR` function to group the data by year.
+4. Apply a filter to include only years between 2010 and 2019 (inclusive) using the extracted year.
+5. Aggregate the data by the extracted year and community name using `GROUP BY`.
+6. Calculate the sum of `building_damage_amount` and `contents_damage_amount` for each group using `SUM`.
+7. Order the results by `year_of_loss` and `nfip_community_name` for a sorted output.
+# [Sql]: SELECT      YEAR(claims.date_of_loss)               AS year_of_loss,     claims.nfip_community_name,     SUM(claims.building_damage_amount) AS total_building_damage_amount,     SUM(claims.contents_damage_amount) AS total_contents_damage_amount FROM WEATHER__ENVIRONMENT.CYBERSYN.fema_national_flood_insurance_program_claim_index claims WHERE      claims.nfip_community_name = 'City Of New York'      AND year_of_loss >=2010 AND year_of_loss <=2019 GROUP BY year_of_loss, claims.nfip_community_name ORDER BY year_of_loss, claims.nfip_community_name;

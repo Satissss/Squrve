@@ -1,0 +1,14 @@
+# [Question]: How do the average reputation and number of badges vary among Stack Overflow users based on the number of complete years they have been members, considering only those who joined on or before October 1, 2021?
+# [Schema links]: ['USERS.id', 'USERS.creation_date', 'USERS.reputation', 'BADGES.user_id']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables and columns: `USERS` (id, creation_date, reputation) and `BADGES` (user_id).
+2. Filter users who joined on or before October 1, 2021 by converting the `creation_date` epoch to a date and comparing it to '2021-10-01'.
+3. Perform a LEFT JOIN between `USERS` and `BADGES` on `user_id` to include all users even if they have no badges.
+4. Group the results by `users.id` to aggregate data per user.
+5. For each user, calculate their creation date (using MAX to handle grouping), their reputation (using MAX since it's per user), and the number of badges (using COUNT or SUM on badge occurrences).
+6. Create a Common Table Expression (CTE) named `sub` to store these per-user aggregates.
+7. From the CTE, compute the user tenure in complete years by finding the difference in years between the user's creation date and '2021-10-01' using DATEDIFF.
+8. Group the results by `user_tenure` to analyze metrics per tenure group.
+9. For each tenure group, calculate the number of users (COUNT), average reputation (AVG), and average number of badges (AVG).
+10. Order the final output by `user_tenure` to show results in ascending order of tenure.
+# [Sql]: WITH sub AS (   SELECT      "users"."id",     CAST(TO_TIMESTAMP(MAX("users"."creation_date") / 1000000.0) AS DATE) AS "user_creation_date",  -- 使用 MAX 聚合 creation_date 并转换为 DATE     MAX("users"."reputation") AS "reputation",       SUM(CASE WHEN badges."user_id" IS NULL THEN 0 ELSE 1 END) AS "num_badges"   FROM "STACKOVERFLOW"."STACKOVERFLOW"."USERS" "users"   LEFT JOIN "STACKOVERFLOW"."STACKOVERFLOW"."BADGES" badges     ON "users"."id" = badges."user_id"   WHERE CAST(TO_TIMESTAMP("users"."creation_date" / 1000000.0) AS DATE) <= DATE '2021-10-01'   GROUP BY "users"."id" )  SELECT    DATEDIFF(YEAR, "user_creation_date", DATE '2021-10-01') AS "user_tenure",   COUNT(1) AS "Num_Users",   AVG("reputation") AS "Avg_Reputation",   AVG("num_badges") AS "Avg_Num_Badges" FROM sub GROUP BY "user_tenure" ORDER BY "user_tenure";

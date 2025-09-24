@@ -1,0 +1,14 @@
+# [Question]: What is the most common 4-digit IPC code among US B2 utility patents granted from June to August in 2022?
+# [Schema links]: ['PUBLICATIONS.publication_number', 'PUBLICATIONS.ipc', 'PUBLICATIONS.country_code', 'PUBLICATIONS.grant_date']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant table: `PUBLICATIONS` with columns `publication_number`, `ipc`, `country_code`, and `grant_date`.
+2. Filter for US patents (`country_code = 'US'`) granted between June and August 2022 (`grant_date` between 20220601 and 20220831) and exclude invalid grant dates (`grant_date != 0`).
+3. Filter for utility patents by checking if `publication_number` contains 'B2' (using `LIKE '%B2%'`).
+4. Extract the IPC codes from the `ipc` column, which is a semi-structured array, using `LATERAL FLATTEN` to unnest the array.
+5. For each IPC code, extract the first 4 digits using `SUBSTR(ipc_u.value:"code", 0, 4)` to get the 4-digit IPC code.
+6. Group by `publication_number` and the 4-digit IPC code to ensure each patent is counted only once per IPC code (avoiding double-counting if a patent has multiple IPC codes).
+7. Create a CTE named `interim_table` to store these results.
+8. From the CTE, group by the 4-digit IPC code (`ipc4`) and count the number of distinct patents (`publication_number`) for each IPC code.
+9. Order the results by the count of patents in descending order to find the most common IPC code.
+10. Use `LIMIT 1` to return only the top result (the most common 4-digit IPC code).
+# [Sql]: WITH interim_table as( SELECT      t1."publication_number",      SUBSTR(ipc_u.value:"code", 0, 4) as ipc4 FROM      PATENTS.PATENTS.PUBLICATIONS t1,     LATERAL FLATTEN(input => t1."ipc") AS ipc_u WHERE "country_code" = 'US'   AND "grant_date" between 20220601 AND 20220831   AND "grant_date" != 0   AND "publication_number" LIKE '%B2%'   GROUP BY      t1."publication_number",      ipc4 )  SELECT  ipc4 FROM  interim_table  GROUP BY ipc4 ORDER BY COUNT("publication_number") DESC LIMIT 1

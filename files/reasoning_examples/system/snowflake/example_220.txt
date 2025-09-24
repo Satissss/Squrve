@@ -1,0 +1,16 @@
+# [Question]: Can you calculate the daily change in the market value of USDC tokens (address `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48`) for 2023, based on Ethereum transactions? The change should be computed from minting (input pattern `0x40c10f19%`) and burning (input pattern `0x42966c68%`) operations. For each transaction, minting should be positive and burning negative. Extract the relevant amount from the 'input' field as a hexadecimal, convert it to millions, express it in USD format. Group the results by date and order them in descending order.
+# [Schema links]: ['TRANSACTIONS.block_timestamp', 'TRANSACTIONS.input', 'TRANSACTIONS.to_address']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant table and columns: `TRANSACTIONS` with `block_timestamp`, `input`, and `to_address`.
+2. Filter transactions for the year 2023 and where `to_address` is the USDC token address (`0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48`).
+3. Further filter transactions where `input` starts with either `0x40c10f19%` (minting) or `0x42966c68%` (burning).
+4. Convert `block_timestamp` to a date by dividing by 1,000,000 (to convert nanoseconds to milliseconds) and then converting to a date.
+5. For each transaction, determine if it is a mint (positive) or burn (negative) using a `CASE` statement based on the `input` pattern.
+6. Extract the hexadecimal amount from the `input` field: for minting, start at position 75 and take 64 characters; for burning, start at position 11 and take 64 characters.
+7. Convert the extracted hex string to a float by prefixing with '0x' and casting, then divide by 1,000,000 to get millions.
+8. Multiply the amount by 1 for minting or -1 for burning to get the daily change.
+9. Sum the daily changes for each date.
+10. Format the summed change as a USD currency string with commas.
+11. Group the results by the converted date.
+12. Order the results by date in descending order.
+# [Sql]: SELECT    TO_DATE(TO_TIMESTAMP_NTZ("block_timestamp" / 1000000)) AS "Date",  -- 将时间戳转换为日期格式，除以1000000   TO_CHAR(SUM(       CASE           WHEN "input" LIKE '0x40c10f19%' THEN 1           ELSE -1       END *        CAST(CONCAT('0x', LTRIM(SUBSTRING("input",                                         CASE                                             WHEN "input" LIKE '0x40c10f19%' THEN 75                                            ELSE 11                                        END, 64), '0')) AS FLOAT) / 1000000)   , '$999,999,999,999') AS "Δ Total Market Value" FROM    "CRYPTO"."CRYPTO_ETHEREUM"."TRANSACTIONS" WHERE    TO_DATE(TO_TIMESTAMP_NTZ("block_timestamp" / 1000000)) BETWEEN '2023-01-01' AND '2023-12-31'   AND "to_address" = '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48'  -- USDC Token   AND ("input" LIKE '0x42966c68%' -- Burn        OR "input" LIKE '0x40c10f19%' -- Mint   ) GROUP BY    TO_DATE(TO_TIMESTAMP_NTZ("block_timestamp" / 1000000)) ORDER BY    "Date" DESC;

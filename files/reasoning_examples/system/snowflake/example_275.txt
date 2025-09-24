@@ -1,0 +1,14 @@
+# [Question]: List the repository names and commit counts for the top two GitHub repositories with JavaScript as the primary language and the highest number of commits.
+# [Schema links]: ['LANGUAGES.repo_name', 'LANGUAGES.language', 'SAMPLE_COMMITS.repo_name', 'SAMPLE_COMMITS.commit']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the need to find repositories where the primary language is JavaScript, which requires analyzing the LANGUAGES table to determine the dominant language per repository.
+2. Flatten the LANGUAGES table to extract individual language names and their byte counts for each repository.
+3. Use a subquery (t1) to select repo_name, language name (from the flattened array), and language bytes.
+4. Apply RANK() window function partitioned by repo_name and ordered by language_bytes descending to assign a rank to each language within its repository, where rank 1 indicates the primary language.
+5. Filter the results to keep only the primary language (rank = 1) for each repository, storing this in a CTE named 'repositories'.
+6. Filter the 'repositories' CTE to select only those repositories where the primary language is 'JavaScript', storing this in a CTE named 'python_repo' (note: despite the name, it filters for JavaScript).
+7. Join the SAMPLE_COMMITS table with the 'python_repo' CTE on repo_name to get commits only for JavaScript primary repositories.
+8. Group the results by repo_name and count the number of commits for each repository.
+9. Order the results by the commit count in descending order to prioritize repositories with the highest commits.
+10. Limit the output to the top 2 repositories with the highest commit counts.
+# [Sql]: WITH repositories AS (     SELECT         t2."repo_name",         t2."language"     FROM (         SELECT             t1."repo_name",             t1."language",             RANK() OVER (PARTITION BY t1."repo_name" ORDER BY t1."language_bytes" DESC) AS "rank"         FROM (             SELECT                 l."repo_name",                 lang.value:"name"::STRING AS "language",                 lang.value:"bytes"::NUMBER AS "language_bytes"             FROM                 GITHUB_REPOS.GITHUB_REPOS.LANGUAGES AS l,                 LATERAL FLATTEN(input => l."language") AS lang         ) AS t1     ) AS t2     WHERE t2."rank" = 1 ), python_repo AS (     SELECT         "repo_name",         "language"     FROM         repositories     WHERE         "language" = 'JavaScript' ) SELECT      sc."repo_name",      COUNT(sc."commit") AS "num_commits" FROM      GITHUB_REPOS.GITHUB_REPOS.SAMPLE_COMMITS AS sc INNER JOIN      python_repo  ON      python_repo."repo_name" = sc."repo_name" GROUP BY      sc."repo_name" ORDER BY      "num_commits" DESC LIMIT 2;

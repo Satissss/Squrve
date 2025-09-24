@@ -1,0 +1,13 @@
+# [Question]: Which Ethereum address has the top 3 smallest positive balance from transactions involving the token at address "0xa92a861fc11b99b24296af880011b47f9cafb5ab"?
+# [Schema links]: ['TOKEN_TRANSFERS.token_address', 'TOKEN_TRANSFERS.from_address', 'TOKEN_TRANSFERS.to_address', 'TOKEN_TRANSFERS.value']
+# [Analysis]: # Output: Let’s think step by step.
+1. Filter the TOKEN_TRANSFERS table to include only transactions where token_address is '0xa92a861fc11b99b24296af880011b47f9cafb5ab'.
+2. Create a CTE (transaction_addresses) to extract from_address, to_address, and convert value to numeric format (dividing by 1000000 to handle decimal precision).
+3. Create a CTE (out_addresses) to calculate outgoing transactions: for each from_address, sum the negative values (representing outflows).
+4. Create a CTE (in_addresses) to calculate incoming transactions: for each to_address, sum the positive values (representing inflows).
+5. Create a CTE (all_addresses) that combines both outgoing and incoming transactions using UNION ALL, with address and total_value columns.
+6. Group all_addresses by address and calculate the net balance by summing total_value for each address.
+7. Filter addresses to only include those with positive net balance (SUM(total_value) > 0).
+8. Order the results by net balance in ascending order to get the smallest positive balances first.
+9. Limit the output to the top 3 smallest positive balances.
+# [Sql]: WITH transaction_addresses AS (     SELECT          "from_address",          "to_address",          CAST("value" AS NUMERIC) / 1000000 AS "value"     FROM          "CRYPTO"."CRYPTO_ETHEREUM"."TOKEN_TRANSFERS"     WHERE          "token_address" = '0xa92a861fc11b99b24296af880011b47f9cafb5ab' ),  out_addresses AS (     SELECT          "from_address",          SUM(-1 * "value") AS "total_value"     FROM          transaction_addresses     GROUP BY          "from_address" ),  in_addresses AS (     SELECT          "to_address",          SUM("value") AS "total_value"     FROM          transaction_addresses     GROUP BY          "to_address" ),  all_addresses AS (     SELECT          "from_address" AS "address",          "total_value"     FROM          out_addresses      UNION ALL      SELECT          "to_address" AS "address",          "total_value"     FROM          in_addresses )  SELECT      "address" FROM      all_addresses GROUP BY      "address" HAVING      SUM("total_value") > 0 ORDER BY      SUM("total_value") ASC LIMIT 3;

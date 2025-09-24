@@ -40,12 +40,12 @@ class CHESSConfig:
     # Candidate Generator settings
     cg_engine: str = "gpt-4o-mini"
     cg_temperature: float = 0.5
-    cg_sampling_count: int = 10
+    cg_sampling_count: int = 4
 
     # Unit Tester settings
     ut_engine: str = "gpt-4o-mini"
     ut_temperature: float = 0.8
-    ut_unit_test_count: int = 20
+    ut_unit_test_count: int = 5
 
     # Schema Selector settings (optional)
     use_schema_selector: bool = False

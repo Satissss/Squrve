@@ -1,0 +1,14 @@
+# [Question]: Considering only the latest release versions of NPM package, which packages are the top 8 most popular based on the Github star number, as well as their versions?
+# [Schema links]: ['PACKAGEVERSIONS.Name', 'PACKAGEVERSIONS.Version', 'PACKAGEVERSIONS.VersionInfo', 'PACKAGEVERSIONTOPROJECT.Name', 'PACKAGEVERSIONTOPROJECT.Version', 'PACKAGEVERSIONTOPROJECT.ProjectType', 'PACKAGEVERSIONTOPROJECT.ProjectName', 'PROJECTS.Type', 'PROJECTS.Name', 'PROJECTS.StarsCount']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the need to filter only the latest release versions for NPM packages from the PACKAGEVERSIONS table.
+2. Use ROW_NUMBER() window function partitioned by package name and ordered by the ordinal version number (descending) to rank versions.
+3. Filter to only release versions using the VersionInfo field and system='NPM'.
+4. Create a CTE (HighestReleases) that selects only the top-ranked version (RowNumber=1) for each package.
+5. Join HighestReleases with PACKAGEVERSIONTOPROJECT to get GitHub projects associated with these latest versions.
+6. Filter PACKAGEVERSIONTOPROJECT for system='NPM' and ProjectType='GITHUB'.
+7. Create a second CTE (PVP) containing the package name, version, and associated GitHub project details.
+8. Join PVP with the PROJECTS table to access the StarsCount field for each GitHub project.
+9. Order the results by StarsCount in descending order to get the most popular packages.
+10. Limit the output to the top 8 packages to meet the requirement.
+# [Sql]: WITH HighestReleases AS (     SELECT         HR."Name",         HR."Version"     FROM (         SELECT             "Name",             "Version",             ROW_NUMBER() OVER (                 PARTITION BY "Name"                 ORDER BY                      TO_NUMBER(PARSE_JSON("VersionInfo"):"Ordinal") DESC             ) AS RowNumber         FROM             DEPS_DEV_V1.DEPS_DEV_V1.PACKAGEVERSIONS         WHERE             "System" = 'NPM'             AND TO_BOOLEAN(PARSE_JSON("VersionInfo"):"IsRelease") = TRUE     ) AS HR     WHERE HR.RowNumber = 1 ), PVP AS (     SELECT         PVP."Name",          PVP."Version",          PVP."ProjectType",          PVP."ProjectName"     FROM         DEPS_DEV_V1.DEPS_DEV_V1.PACKAGEVERSIONTOPROJECT AS PVP     JOIN         HighestReleases AS HR     ON         PVP."Name" = HR."Name"         AND PVP."Version" = HR."Version"     WHERE         PVP."System" = 'NPM'         AND PVP."ProjectType" = 'GITHUB' ) SELECT     PVP."Name",      PVP."Version" FROM     PVP JOIN     DEPS_DEV_V1.DEPS_DEV_V1.PROJECTS AS P ON     PVP."ProjectType" = P."Type"      AND PVP."ProjectName" = P."Name" ORDER BY      P."StarsCount" DESC LIMIT 8;

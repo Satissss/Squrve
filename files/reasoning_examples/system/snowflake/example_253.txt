@@ -1,0 +1,11 @@
+# [Question]: Could you please find the name of the repository that contains the most copied non-binary Swift file in the dataset, ensuring each file is uniquely identified by its ID?
+# [Schema links]: ['SAMPLE_FILES.id', 'SAMPLE_FILES.repo_name', 'SAMPLE_FILES.path', 'SAMPLE_CONTENTS.id', 'SAMPLE_CONTENTS.binary', 'SAMPLE_CONTENTS.copies']
+# [Analysis]: # Output: Let’s think step by step.
+1. Identify the relevant tables: `SAMPLE_FILES` (containing file ID, repository name, and file path) and `SAMPLE_CONTENTS` (containing file ID, binary flag, and copies count).
+2. Since files might be duplicated in `SAMPLE_FILES`, create a CTE `selected_repos` to initially select the necessary columns: `id`, `repo_name`, and `path`.
+3. Create another CTE `deduped_files` to ensure each file ID is unique by grouping by `id` and using `MIN` to select a single `repo_name` and `path` for each ID.
+4. Join `deduped_files` with `SAMPLE_CONTENTS` on the `id` column to combine file metadata with content information.
+5. Filter the results to include only non-binary files (`NOT c."binary"`) and Swift files (`f."path" LIKE '%.swift'`).
+6. Order the results by the number of copies in descending order (`c."copies" DESC`) to find the file with the highest copies.
+7. Limit the result to the top 1 row to get the repository name containing the most copied non-binary Swift file.
+# [Sql]: WITH selected_repos AS (   SELECT     f."id",     f."repo_name" AS "repo_name",     f."path" AS "path"   FROM     GITHUB_REPOS.GITHUB_REPOS.SAMPLE_FILES AS f ), deduped_files AS (   SELECT     f."id",     MIN(f."repo_name") AS "repo_name",     MIN(f."path") AS "path"   FROM     selected_repos AS f   GROUP BY     f."id" ) SELECT   f."repo_name" FROM   deduped_files AS f   JOIN GITHUB_REPOS.GITHUB_REPOS.SAMPLE_CONTENTS AS c    ON f."id" = c."id" WHERE   NOT c."binary"   AND f."path" LIKE '%.swift' ORDER BY c."copies" DESC LIMIT 1;
