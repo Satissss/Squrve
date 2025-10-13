@@ -27,6 +27,7 @@ test
 startup_run/spider_dev_config.json
 startup_run/demo.json
 startup_run/overall.json
+startup_run/config_for_paper.json
 
 startup_run/voter_1
 
@@ -40,3 +41,7 @@ experiment
 evaluation
 
 build_examples
+
+extract_schemas
+
+entension

@@ -2,8 +2,7 @@ from core.base import Router
 from core.engine import Engine
 
 if __name__ == "__main__":
-    # router = Router(config_path="startup_config.json")
-    router = Router(config_path="overall.json")  # todo 本地测试用
+    router = Router(config_path="startup_config.json")
 
     engine = Engine(router)
 

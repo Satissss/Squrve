@@ -1,3 +1,4 @@
+import json
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
@@ -56,7 +57,7 @@ class TreeActor(ComplexActor):
 
         logger.info(f"TreeActor 串行执行模式，开始处理 {len(self.actors)} 个 actors")
         for i, actor in enumerate(self.actors):
-            logger.info(f"串行执行第 {i+1}/{len(self.actors)} 个 actor: {actor.name}")
+            logger.info(f"串行执行第 {i + 1}/{len(self.actors)} 个 actor: {actor.name}")
             actor.dataset = update_dataset(dataset, actor.dataset)
             try:
                 res = actor.act(item, **kwargs)
@@ -65,7 +66,13 @@ class TreeActor(ComplexActor):
                 if output_name == "TreeOutput" and isinstance(res, dict):
                     results.update(res)
                 else:
-                    results[output_name] = res
+                    if output_name in results:
+                        if isinstance(results[output_name], list):
+                            results[output_name] = [*results[output_name], str(res)]
+                        else:
+                            results[output_name] = [str(results[output_name]), str(res)]
+                    else:
+                        results[output_name] = res
             except Exception as e:
                 error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
                 logger.error(error_msg)
@@ -90,7 +97,7 @@ class TreeActor(ComplexActor):
         futures = {}
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             for i, actor in enumerate(self.actors):
-                logger.info(f"提交第 {i+1}/{len(self.actors)} 个 actor 到线程池: {actor.name}")
+                logger.info(f"提交第 {i + 1}/{len(self.actors)} 个 actor 到线程池: {actor.name}")
                 actor.dataset = update_dataset(dataset, actor.dataset)
                 futures[executor.submit(actor.act, item, **kwargs)] = actor
 
@@ -107,7 +114,13 @@ class TreeActor(ComplexActor):
                     if output_name == "TreeOutput" and isinstance(res, dict):
                         results.update(res)
                     else:
-                        results[output_name] = res
+                        if output_name in results:
+                            if isinstance(results[output_name], list):
+                                results[output_name] = [*results[output_name], str(res)]
+                            else:
+                                results[output_name] = [str(results[output_name]), str(res)]
+                        else:
+                            results[output_name] = res
 
                 except Exception as e:
                     error_msg = f"Error occurred while executing actor '{actor.name}': {e}"

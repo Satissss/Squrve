@@ -5,113 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_200.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_201.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_202.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_203.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_204.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_205.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_206.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_207.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_208.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_209.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_210.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_211.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_212.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_213.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_214.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_215.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_216.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_217.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_218.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_219.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_220.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_221.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_222.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_223.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_224.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_225.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_226.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_227.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_228.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_229.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_230.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_231.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_232.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_233.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_234.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_235.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_236.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_237.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_238.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_239.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_240.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_241.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_242.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_243.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_244.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_245.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_246.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_247.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_248.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_249.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_250.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_251.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_252.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_253.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_254.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_255.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_256.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_257.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_258.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_259.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_260.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_261.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_262.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_263.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_264.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_265.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_266.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_267.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_268.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_269.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_270.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_271.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_272.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_273.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_274.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_275.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_276.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_277.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_278.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_279.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_280.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_281.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_282.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_283.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_284.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_285.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_286.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_287.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_288.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_289.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_290.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_291.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_292.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_293.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_294.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_295.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_296.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_297.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_298.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_299.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_300.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_301.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_302.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/files/reasoning_examples/system/snowflake/example_303.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ttt/run_efficiency.json" beforeDir="false" afterPath="$PROJECT_DIR$/ttt/run_efficiency.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/llm/QwenModel.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/llm/QwenModel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -203,7 +100,7 @@
     &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
     &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
     &quot;git-widget-placeholder&quot;: &quot;dev&quot;,
-    &quot;last_opened_file_path&quot;: &quot;D:/project/Squrve/ttt&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/project/Squrve&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -229,7 +126,7 @@
       <recent name="D:\project\Squrve\benchmarks\spider2\snow" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.po">
     <configuration name="QwenModel" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -644,7 +541,16 @@
       <workItem from="1758368127192" duration="13777000" />
       <workItem from="1758536720300" duration="28632000" />
       <workItem from="1758679553345" duration="7000" />
-      <workItem from="1758690911229" duration="354000" />
+      <workItem from="1758690911229" duration="13973000" />
+      <workItem from="1758711852515" duration="9766000" />
+      <workItem from="1758783311920" duration="800000" />
+      <workItem from="1758814115034" duration="914000" />
+      <workItem from="1758854333528" duration="3461000" />
+      <workItem from="1758897376988" duration="609000" />
+      <workItem from="1759111591888" duration="71000" />
+      <workItem from="1760156020695" duration="8951000" />
+      <workItem from="1760280033605" duration="1267000" />
+      <workItem from="1760321031013" duration="1835000" />
     </task>
     <servers />
   </component>
@@ -724,10 +630,6 @@
           <line>112</line>
           <option name="timeStamp" value="242" />
         </line-breakpoint>
-        <line-breakpoint enabled="true" type="python-line">
-          <url>file://$PROJECT_DIR$/core/actor/scaler/ChessScale.py</url>
-          <option name="timeStamp" value="243" />
-        </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
         <breakpoint type="python-line" />
@@ -750,8 +652,8 @@
     </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Squrve$MetaTask.coverage" NAME="MetaTask Coverage Results" MODIFIED="1753413700415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/QueryFlow$data_manage.coverage" NAME="data_manage Coverage Results" MODIFIED="1746755751731" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
+    <SUITE FILE_PATH="coverage/Squrve$MetaTask.coverage" NAME="MetaTask Coverage Results" MODIFIED="1753413700415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/QueryFlow$pipeline.coverage" NAME="pipeline Coverage Results" MODIFIED="1747481083513" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/nest" />
     <SUITE FILE_PATH="coverage/Squrve$run_test.coverage" NAME="run_test Coverage Results" MODIFIED="1758370544728" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/QueryFlow$.coverage" NAME=" Coverage Results" MODIFIED="1747191069112" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
@@ -761,18 +663,18 @@
     <SUITE FILE_PATH="coverage/Squrve$evaluate_ablation.coverage" NAME="evaluate_ablation Coverage Results" MODIFIED="1751257240348" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/Squrve$run_2.coverage" NAME="run_2 Coverage Results" MODIFIED="1758421083087" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$run_can.coverage" NAME="run_can Coverage Results" MODIFIED="1758369840298" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
-    <SUITE FILE_PATH="coverage/Squrve$run_.coverage" NAME="run_ Coverage Results" MODIFIED="1751182436247" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/run" />
     <SUITE FILE_PATH="coverage/Squrve$DAILSQLGenerate.coverage" NAME="DAILSQLGenerate Coverage Results" MODIFIED="1753363733659" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
+    <SUITE FILE_PATH="coverage/Squrve$run_.coverage" NAME="run_ Coverage Results" MODIFIED="1751182436247" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/run" />
     <SUITE FILE_PATH="coverage/Squrve$QwenModel.coverage" NAME="QwenModel Coverage Results" MODIFIED="1757925033158" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
     <SUITE FILE_PATH="coverage/Squrve$run__1_.coverage" NAME="run (1) Coverage Results" MODIFIED="1757946744116" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
-    <SUITE FILE_PATH="coverage/Squrve$GenerateTask.coverage" NAME="GenerateTask Coverage Results" MODIFIED="1755066366518" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/QueryFlow$run.coverage" NAME="run Coverage Results" MODIFIED="1748404194076" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
+    <SUITE FILE_PATH="coverage/Squrve$GenerateTask.coverage" NAME="GenerateTask Coverage Results" MODIFIED="1755066366518" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/QueryFlow$t.coverage" NAME="t Coverage Results" MODIFIED="1748351678349" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/QueryFlow$run_.coverage" NAME="run_ Coverage Results" MODIFIED="1748485468705" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
     <SUITE FILE_PATH="coverage/Squrve$process.coverage" NAME="process Coverage Results" MODIFIED="1754921939111" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/spider2/snow" />
     <SUITE FILE_PATH="coverage/Squrve$LinkAlignGenerate.coverage" NAME="LinkAlignGenerate Coverage Results" MODIFIED="1754968536104" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
-    <SUITE FILE_PATH="coverage/Squrve$engine.coverage" NAME="engine Coverage Results" MODIFIED="1755053646903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
     <SUITE FILE_PATH="coverage/QueryFlow$cal_efficiency.coverage" NAME="cal_efficiency Coverage Results" MODIFIED="1747735196429" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/data_source/efficiency" />
+    <SUITE FILE_PATH="coverage/Squrve$engine.coverage" NAME="engine Coverage Results" MODIFIED="1755053646903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
     <SUITE FILE_PATH="coverage/Squrve$filter.coverage" NAME="filter Coverage Results" MODIFIED="1758370277465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment/data" />
     <SUITE FILE_PATH="coverage/QueryFlow$debug.coverage" NAME="debug Coverage Results" MODIFIED="1748359856891" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/Squrve$run_ens.coverage" NAME="run_ens Coverage Results" MODIFIED="1758632886876" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
@@ -785,7 +687,7 @@
     <SUITE FILE_PATH="coverage/QueryFlow$create.coverage" NAME="create Coverage Results" MODIFIED="1746275553960" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/reasoning_examples" />
     <SUITE FILE_PATH="coverage/Squrve$po.coverage" NAME="po Coverage Results" MODIFIED="1758336833416" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/data_source" />
     <SUITE FILE_PATH="coverage/Squrve$data_clean.coverage" NAME="data_clean Coverage Results" MODIFIED="1753605198668" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/AmbiDB" />
-    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1758420471259" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
+    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1760156194072" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/Squrve$data_manage.coverage" NAME="data_manage Coverage Results" MODIFIED="1752075101039" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
     <SUITE FILE_PATH="coverage/Squrve$DeepseekModel.coverage" NAME="DeepseekModel Coverage Results" MODIFIED="1756134196221" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
     <SUITE FILE_PATH="coverage/Squrve$DINSQLOptimize.coverage" NAME="DINSQLOptimize Coverage Results" MODIFIED="1754464192185" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/optimizer" />

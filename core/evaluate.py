@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List, Union, Dict
 
 import pandas as pd
+from torch.fx.experimental.recording import shape_env_check_state_equal
 
 from core.data_manage import Dataset, load_dataset
 from core.db_connect import get_sql_exec_result
@@ -205,7 +206,8 @@ class Evaluator:
                 return None
 
             gold_schemas = row.get("gold_schemas", None)
-            pred_schemas = load_dataset(row.get("schema_links", None))
+            schema_links = row.get("schema_links", None)
+            pred_schemas = load_dataset(schema_links) if isinstance(schema_links, str) else schema_links
             res = self.cal_schema_recall(gold_schemas, pred_schemas)
 
             return res
@@ -221,7 +223,8 @@ class Evaluator:
                 return None
 
             gold_schemas = row.get("gold_schemas", None)
-            pred_schemas = load_dataset(row.get("schema_links", None))
+            schema_links = row.get("schema_links", None)
+            pred_schemas = load_dataset(schema_links) if isinstance(schema_links, str) else schema_links
             res = self.cal_schema_precision(gold_schemas, pred_schemas)
 
             return res
