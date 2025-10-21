@@ -256,8 +256,8 @@ class Evaluator:
             if not isinstance(row, dict):
                 print(f"Warning: Row {item} is not a dictionary")
                 return None
-
-            pred_sql = load_dataset(row.get("pred_sql", ""))
+            pred_sql = row.get("pred_sql", "")
+            pred_sql = load_dataset(pred_sql) if Path(pred_sql).is_file() else pred_sql
             gold_sql = row.get("query", "")
 
             if not pred_sql or not gold_sql:

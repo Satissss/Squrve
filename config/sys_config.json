@@ -84,6 +84,15 @@
           "has_label": true
         }
       ]
+    },
+    {
+      "id": "ambidb",
+      "meta_info": "",
+      "root_path": "../benchmarks/ambidb",
+      "db_type": "sqlite",
+      "has_sub": false,
+      "external": false,
+      "database": true
     }
   ],
   "task": {
