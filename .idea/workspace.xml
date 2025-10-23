@@ -5,11 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
-      <change beforePath="$PROJECT_DIR$/.idea/Squrve.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Squrve.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/config/sys_config.json" beforeDir="false" afterPath="$PROJECT_DIR$/config/sys_config.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/evaluate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/evaluate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -572,6 +568,11 @@
       <workItem from="1760880127302" duration="3092000" />
       <workItem from="1760925566691" duration="205000" />
       <workItem from="1760925808354" duration="2023000" />
+      <workItem from="1761015575703" duration="1860000" />
+      <workItem from="1761027913551" duration="6000" />
+      <workItem from="1761045016897" duration="1117000" />
+      <workItem from="1761050053471" duration="1469000" />
+      <workItem from="1761201997357" duration="1779000" />
     </task>
     <servers />
   </component>
