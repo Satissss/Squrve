@@ -8,63 +8,27 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Framework](https://img.shields.io/badge/Framework-Text--to--SQL-orange.svg)
 
-**Squrve** is a lightweight, modular framework for end-to-end Text-to-SQL model development and evaluation.
-
 </div>
 
-## 📖 Overview
+## Overview
 
-**Squrve** is a lightweight, modular framework designed for rapid development and evaluation of end-to-end **Text-to-SQL** models. It integrates schema reduction, schema linking, and query generation into a flexible, configuration-based pipeline.
+**Squrve**  is a lightweight and modular framework designed to help beginners in Text-to-SQL research quickly get
+started. It enables one-click reproduction of multiple baseline methods and provides a unified evaluation pipeline,
+making it
+easy to compare different approaches under the same metrics.
 
-### ✨ Key Features
+We sincerely welcome students and researchers to try
+Squrve, contribute new components, or report any issues. We will promptly evaluate and integrate valuable suggestions,
+and we look forward to collaborating with the community to advance Text-to-SQL research.
 
-1. Configuration-driven Text-to-SQL tasks, integrating multiple baseline methods, LLM invocations, and database connections.
-2. Component-level reproduction and sharing interfaces, supporting free combination and flexible switching of different method components for plug-and-play and quick startup.
-3. Scalable and robust modular design, with method implementations independent of specific datasets and database types, enabling rapid extension for new methods.
-4. Supports automated, modular, and specialized evaluation of generated query results metrics.
+![System Architecture](./assets/Overview1.png)
 
-## 🏗️ Core Architecture
-
-Squrve adopts a modular architecture with the following core components:
-
-- **Router**: Configuration manager, responsible for managing parameters for the entire Text-to-SQL process.
-- **DataLoader**: Data manager, handling data preparation and loading.
-- **Engine**: Execution engine, coordinating the execution flow of various components.
-- **Actor**: Executor, including specific components like Reducer, Parser, and Generator.
-- **Task**: Task manager, supporting complex task nesting and parallel execution.
-
-### Supported Baselines
-
-Squrve supports multiple Text-to-SQL baselines, enabling quick integration and comparison through modular components:
-
-| Baseline Name  | Description                                                                 | Code Link                                                              |
-|----------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------|
-| CHESS          | CHESS method implementation, focusing on hierarchical generation and optimization of complex queries. | https://github.com/ShayanTalaei/CHESS                                  |
-| DAIL-SQL       | DAIL-SQL method, using divide-and-conquer prompting and chain-of-thought for efficient SQL generation. | https://github.com/BeachWang/DAIL-SQL                                  |
-| DIN-SQL        | DIN-SQL method, using decomposition prompting to handle complex SQL query generation. | https://github.com/MohammadrezaPourreza/Few-shot-NL2SQL-with-prompting |
-| LinkAlign      | LinkAlign integrated generation, utilizing advanced schema linking to improve query accuracy. | https://github.com/Satissss/LinkAlign                                  |
-| MAC-SQL        | MAC-SQL method, employing multi-agent collaboration for high-quality SQL generation. | https://github.com/wbbeyourself/MAC-SQL                                |
-| OpenSearch-SQL | OpenSearch-based SQL generation, using search enhancement for query construction. | https://github.com/OpenSearch-AI/OpenSearch-SQL                        |
-| ReFoRCE        | ReFoRCE method, optimizing SQL generation through a reinforcement learning framework. | https://github.com/Snowflake-Labs/ReFoRCE                              |
-| RSL-SQL        | RSL-SQL method, combining rule systems and learning models for reliable SQL generation. | https://github.com/Laqcce-cao/RSL-SQL                                  |
-
-### Supported Benchmarks
-
-Squrve includes built-in support for several standard Text-to-SQL benchmarks for easy model evaluation and comparison:
-
-| Benchmark           | Description                                      | Code Link |
-|---------------------|--------------------------------------------------|-----------|
-| Spider (dev\test)   | Cross-domain Text-to-SQL benchmark, supporting dev split. | https://github.com/taoyds/spider |
-| BIRD (dev)          | Text-to-SQL benchmark with external knowledge.   | https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/bird |
-| Spider2 (snow\lite) | Extended version of Spider with more complex scenarios. | https://github.com/xlang-ai/Spider2 |
-
-These benchmarks can be easily loaded and evaluated via configuration files.
-
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Environment Setup
 
 Ensure your Python environment meets the following requirements:
+
 - Python 3.8+
 - Required dependencies (see requirements.txt)
 
@@ -94,7 +58,9 @@ Edit the configuration file to add your API keys:
 ```
 
 ### [Opt.] LinkAlign Configuration
-If using LinkAlign-related components, configure according to https://github.com/Satissss/LinkAlign/blob/master/README.md.
+
+If using LinkAlign-related components, configure according
+to https://github.com/Satissss/LinkAlign/blob/master/README.md.
 
 ### 3. Run Examples
 
@@ -102,7 +68,7 @@ If using LinkAlign-related components, configure according to https://github.com
 
 ```bash
 # Run Spider Dev dataset example
-python startup_run/run_spider_dev.py
+python startup_run/run.py
 ```
 
 #### Method 2: Programmatic Approach
@@ -112,7 +78,7 @@ from core.base import Router
 from core.engine import Engine
 
 # Initialize with configuration file
-router = Router(config_path="startup_run/spider_dev_config.json")
+router = Router(config_path="startup_run/startup_config.json")
 engine = Engine(router)
 
 # Execute task
@@ -122,97 +88,102 @@ engine.execute()
 engine.evaluate()
 ```
 
-## 📁 Project Structure
+## Supported Atomic Actors
 
-```
-Squrve/
-├── core/                    # Core modules
-│   ├── base.py             # Base classes and configuration management
-│   ├── engine.py           # Execution engine
-│   ├── data_manage.py      # Data management
-│   ├── actor/              # Executor components
-│   │   ├── reducer/        # Schema reduction
-│   │   ├── parser/         # Schema linking
-│   │   └── generator/      # Query generation
-│   └── task/               # Task management
-├── startup_run/            # Startup examples
-│   ├── run_spider_dev.py   # Spider Dev run script
-│   └── spider_dev_config.json  # Example configuration file
-├── config/                 # Configuration files
-├── files/                  # Output files
-│   ├── datasets/           # Processed datasets
-│   ├── pred_sql/           # Generated SQL queries
-│   └── schema_links/       # Schema linking results
-└── benchmarks/             # Benchmark datasets
-```
+To tackle diverse and co-occuring difficulties in real-world scenarios, Squrve abstracts and formalizes seven atomic Actor components, each representing a distinct Text-to-SQL capability validated in prior research. Through Squrve's multi-actor collaboration mechanism, different actors can interact and cooperate  that effectively fuses their complementary strengths.
 
-## 🎯 Quick Usage
+| Actor Types | Methods                      | Key Challenges |
+|-------------|------------------------------|----------------|
+| Reduce      | LinkAlign                    | Large-scale and multi-database |
+| Parse       | LinkAlign; RSL-SQL           | Ambiguous queries and redundant schemas |
+| Generate    | DIN-SQL; CHESS               | Efficient and high-quality SQL generation |
+| Decompose   | DIN-SQL; MAC-SQL             | Chain-of-Thought for complex queries |
+| Scale       | CHESS; CHASE-SQL; OpenSearch | Diverse and high-quality decoding strategies |
+| Optimize    | CHASE-SQL; CHESS; OpenSearch | Effective and broader database feedback |
+| Select      | CHASE-SQL; CHESS; MCS-SQL    | Accurate gold SQL identification |
 
-Define a Text2SQL task execution configuration file based on your scenario needs to automatically complete SQL generation tasks and evaluations. For specific startup examples, refer to the startup_run directory.
+### Reduce Actor
+This component eliminates redundant schemas from large-scale databases that may exceed LLM context windows. 
 
-```python
-from core.base import Router
-from core.engine import Engine
+### Parse Actor
+This component performs schema linking by extracting tables and columns from candidate schemas that are potentially required for SQL generation.
 
-# Use Spider Dev configuration
-router = Router(config_path="spider_dev_config.json")
-engine = Engine(router)
+### Generate Actor
+This component generates complete SQL statements, encapsulating existing end-to-end academic methods.
 
-# Execute task
-engine.execute()
+### Decompose Actor
+This component decomposes complex queries into multiple logically progressive sub-questions and generates SQL statements for each.
 
-# Evaluate results
-engine.evaluate()
-```
+### Scale Actor
+This component generates diverse high-quality SQL candidates to increase the probability of covering the gold SQL.
 
-## 📊 Output Results
+### Optimize Actor
+This component leverages environmental feedback (e.g., database errors or results) to refine the quality of the generated SQL queries.
 
-After running, you can view the results in the following directories:
+### Select Actor
+This component selects the optimal SQL statement from multiple candidates, typically in collaboration with the scale actor.
 
-- **`files/pred_sql/`**: Generated SQL query files
-- **`files/schema_links/`**: Schema linking results
-- **`files/datasets/`**: Processed datasets
-- **`files/logs/`**: Execution logs
+## Supported Datasets
 
-## 📚 Detailed Documentation
+Squrve includes built-in support for several standard Text-to-SQL benchmarks for easy model evaluation and comparison:
 
-- **[API Documentation](API%20documents.md)**: Complete API reference with detailed explanations of all configuration parameters and methods
-- **[Startup Examples](startup_run/README.md)**: Usage guide and configuration examples for the Spider Dev dataset
+| Benchmark | Involved Split | Description                                                               | Code Link                                                     |
+|-----------|----------------|---------------------------------------------------------------------------|---------------------------------------------------------------|
+| Spider    | dev \ test     | Cross-domain Text-to-SQL benchmark, supporting dev split.                 | https://github.com/taoyds/spider                                          |
+| BIRD      | dev            | Text-to-SQL benchmark with external knowledge.                            | https://github.com/AlibabaResearch/DAMO-ConvAI/tree/main/bird |
+| Spider2   | snow \ lite    | Extended version of Spider with more complex scenarios.                   | https://github.com/xlang-ai/Spider2                       |
+| AmbiDB    | N/A            | A variant of Spider, enhancing ambiguity through multi-database settings. | https://huggingface.co/datasets/satissss/AmbiDB           |
 
-## 🔧 Configuration Guide
 
-### Main Configuration Parameters
+## Supported LLM
+Currently only supports LLM services through API calls.
 
-- **LLM Configuration**: Specify the language model and parameters to use
-- **Dataset Configuration**: Data source paths and preprocessing options
-- **Database Configuration**: Database schema and vector store settings
-- **Task Configuration**: Task types and execution flow definitions
-- **Evaluation Configuration**: Evaluation metrics and result saving settings
+* Qwen
+* Deepseek
+* Openai
+* Zhipu
+* Gemini
+* ......
 
-For detailed configuration explanations, refer to the [API Documentation](API%20documents.md).
+## Supported Database
+The following are the database types currently supported by Squrve. We will continue to add more enterprise database systems as we extend our dataset support.
 
-## 📝 TODO List
+* Sqlite
+* BigQuery
+* Snowflake
 
-- [ ] Add baseline methods
-- [ ] Integrate benchmark datasets
-- [ ] Extend database connection support
-- [ ] Expand Actor component library
-- [ ] Expand evaluation metrics system
-- [ ] Extend to microservices architecture
-- [ ] Integrate reinforcement learning framework
+## Experiments
 
-## 📄 License
+Squrve successfully reproduces existing Text-to-SQL baselines under the same LLM backbone with performance closely aligned to their originally executed results. Building upon the reproduced components, we further demonstrate the extensibility and effectiveness of the Multi-Actor collaboration mechanism through evaluation on two variants.
+As shown in Table below, both ensemble methods substantially outperform all individual baselines in both benchmarks.
+![img.png](./assets/results.png)
 
-This project is licensed under the [MIT License](LICENSE).
+## Documentation
 
-## 📖 Citation
+### [API Documentation](API%20documents.md)
+Complete API reference with detailed explanations of all configuration parameters and methods.
+### [Startup Examples](startup_run/README.md)
+Usage guide and configuration examples for the Spider Dev dataset
+
+## Get Involved
+
+We welcome active participation in improving and building Squrve. Contribute optimized methods, new components, or task-specific datasets to Squrve, making them accessible to the broader Text-to-SQL research community.
+
+
+### Adding New Components
+Define the Actor class and provide concrete implementations.
+
+### Adding New Datasets
+Refer to the API documentation to ensure valid formatting.
+
+## Citation
 
 If you find **Squrve** useful for your research or work, please consider citing it:
 
 ```bibtex
 @misc{squrve2025,
-  author       = {Yihan Wang and Jiaxing Wang and Peiyu Liu},
-  title        = {Squrve: A Lightweight Toolkit for Text-to-SQL},
+  author       = {Yihan Wang and Peiyu Liu and Runyu Chen and Jiaxing Pu and Wei Xu},
+  title        = {Squrve: A Unified and Modular Framework for Complex Real-World Text-to-SQL Tasks},
   year         = {2025},
   howpublished = {\url{https://github.com/Satissss/Squrve}},
 }
