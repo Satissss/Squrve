@@ -6,8 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/benchmarks.zip" beforeDir="false" afterPath="$PROJECT_DIR$/benchmarks.zip" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -110,7 +108,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/project/Squrve/benchmarks/BookSQL",
+    "last_opened_file_path": "D:/project/Squrve",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -129,11 +127,11 @@
       <recent name="D:\project\Squrve\entension" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\project\Squrve\assets" />
       <recent name="D:\project\Squrve\benchmarks\AmbiDB" />
       <recent name="D:\project\Squrve\benchmarks\AmbiDB\dev" />
       <recent name="D:\project\Squrve\run" />
       <recent name="D:\project\Squrve\core\actor\prompts" />
-      <recent name="D:\project\Squrve\startup_run" />
     </key>
   </component>
   <component name="RunManager" selected="Python.po">
@@ -560,7 +558,8 @@
       <workItem from="1761287922828" duration="10000" />
       <workItem from="1761295353496" duration="1608000" />
       <workItem from="1761313271860" duration="2357000" />
-      <workItem from="1761652233253" duration="8483000" />
+      <workItem from="1761652233253" duration="8817000" />
+      <workItem from="1761704049185" duration="573000" />
     </task>
     <servers />
   </component>

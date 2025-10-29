@@ -92,15 +92,15 @@ engine.evaluate()
 
 To tackle diverse and co-occuring difficulties in real-world scenarios, Squrve abstracts and formalizes seven atomic Actor components, each representing a distinct Text-to-SQL capability validated in prior research. Through Squrve's multi-actor collaboration mechanism, different actors can interact and cooperate  that effectively fuses their complementary strengths.
 
-| Actor Types | Methods                      | Key Challenges |
-|-------------|------------------------------|----------------|
-| Reduce      | LinkAlign                    | Large-scale and multi-database |
-| Parse       | LinkAlign; RSL-SQL           | Ambiguous queries and redundant schemas |
-| Generate    | DIN-SQL; CHESS               | Efficient and high-quality SQL generation |
-| Decompose   | DIN-SQL; MAC-SQL             | Chain-of-Thought for complex queries |
-| Scale       | CHESS; CHASE-SQL; OpenSearch | Diverse and high-quality decoding strategies |
-| Optimize    | CHASE-SQL; CHESS; OpenSearch | Effective and broader database feedback |
-| Select      | CHASE-SQL; CHESS; MCS-SQL    | Accurate gold SQL identification |
+| Actor Types | Methods                          | Key Challenges |
+|-------------|----------------------------------|----------------|
+| Reduce      | LinkAlign                        | Large-scale and multi-database |
+| Parse       | LinkAlign; RSL-SQL ...           | Ambiguous queries and redundant schemas |
+| Generate    | DIN-SQL; CHESS ...               | Efficient and high-quality SQL generation |
+| Decompose   | DIN-SQL; MAC-SQL                 | Chain-of-Thought for complex queries |
+| Scale       | CHESS; CHASE-SQL; OpenSearch ... | Diverse and high-quality decoding strategies |
+| Optimize    | CHASE-SQL; CHESS; OpenSearch ... | Effective and broader database feedback |
+| Select      | CHASE-SQL; CHESS; MCS-SQL ...    | Accurate gold SQL identification |
 
 ### Reduce Actor
 This component eliminates redundant schemas from large-scale databases that may exceed LLM context windows. 
@@ -181,11 +181,12 @@ Refer to the API documentation to ensure valid formatting.
 If you find **Squrve** useful for your research or work, please consider citing it:
 
 ```bibtex
-@misc{squrve2025,
-  author       = {Yihan Wang and Peiyu Liu and Runyu Chen and Jiaxing Pu and Wei Xu},
-  title        = {Squrve: A Unified and Modular Framework for Complex Real-World Text-to-SQL Tasks},
-  year         = {2025},
-  howpublished = {\url{https://github.com/Satissss/Squrve}},
+@article{wang2025squrve,
+  title     = {Squrve: A Unified and Modular Framework for Complex Real-World Text-to-SQL Tasks},
+  author    = {Wang, Yihan and Liu, Peiyu and Chen, Runyu and Pu, Jiaxing and Xu, Wei},
+  journal   = {arXiv preprint arXiv:2510.24102},
+  year      = {2025},
+  url       = {https://doi.org/10.48550/arXiv.2510.24102}
 }
 ```
 
