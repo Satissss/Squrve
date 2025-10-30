@@ -1,7 +1,7 @@
 {
   "api_key": {
     "deepseek": "your_api_key_here",
-    "qwen": "sk-3f43effded4d49fc934829ee24e79f1d",
+    "qwen": "your_api_key_here",
     "zhipu": "your_api_key_here"
   },
   "llm": {
