@@ -9,6 +9,7 @@ import time
 import random
 import os
 import torch
+from loguru import logger
 
 
 def parse_list_from_str(string: str = None) -> List[str]:
@@ -120,15 +121,16 @@ def load_dataset(data_source: Union[str, PathLike]):
     """
 
     data_source = Path(data_source)
+    logger.info(f"load the dataset from the source:{data_source}")
     if not data_source.exists():
-        warnings.warn("Invalid path: the file does not exist.", category=UserWarning)
+        logger.info("Invalid path: the file does not exist.", category=UserWarning)
         return None
 
     dataset = None
     if data_source.suffix == ".json":
         with open(data_source, "r", encoding="utf-8") as f:
             dataset = json.load(f)
-    elif data_source.suffix in (".txt", ".sql"):
+    elif data_source.suffix in (".txt", ".sql", ".md"):
         with open(data_source, "r", encoding="utf-8") as f:
             dataset = f.read().strip()
     elif data_source.suffix == ".csv":
@@ -229,11 +231,11 @@ def initialize_model_safely(model_class, model_name, **kwargs):
         The initialized model
     """
     device = get_safe_device()
-    
+
     # Add device to kwargs if not already present
     if 'device' not in kwargs:
         kwargs['device'] = device
-    
+
     try:
         return model_class(model_name, **kwargs)
     except Exception as e:

@@ -68,7 +68,9 @@ to https://github.com/Satissss/LinkAlign/blob/master/README.md.
 
 ```bash
 # Run Spider Dev dataset example
-python startup_run/run.py
+cd startup_run
+
+python run.py
 ```
 
 #### Method 2: Programmatic Approach

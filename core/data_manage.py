@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Union, Dict, List, Callable, Optional, Any
 import warnings
 import random
-
+from loguru import logger
 
 class Dataset:
     """
@@ -980,7 +980,7 @@ class DataLoader:
             elif isinstance(multi_database, Dict):
                 return multi_database.get(ind, False)
         except Exception as e:
-            print(f"Error occurred while checking multi-database configuration: {e}")
+            logger.info(f"Error occurred while checking multi-database configuration: {e}")
 
         return False
 
@@ -1001,7 +1001,7 @@ class DataLoader:
             elif isinstance(vector_store, dict):
                 return vector_store.get(ind, "vector_store")
         except Exception as e:
-            print(f"Error occurred while querying vector storage path: {e}")
+            logger.info(f"Error occurred while querying vector storage path: {e}")
 
         return "vector_store"
 
@@ -1308,6 +1308,7 @@ class DataLoader:
         external_function = self.external_function if not external_function else external_function
 
         if not llm_ or not external_function:
+            logger.info("llm or external_function is not available.")
             return
         temp_data_source = self.get_data_source_by_index(source_index, output_format="dict")
         if temp_data_source is None:
@@ -1319,13 +1320,15 @@ class DataLoader:
             if not source.exists() or source.suffix != ".json":
                 return
             dataset = load_dataset(source)
-            assert isinstance(dataset, dict)
+            # assert isinstance(dataset, dict)
             for row in dataset:
                 external_path = row.get("external_path", None)
                 if not external_path:
+                    logger.info(f"Case {row['instance_id']} external_path is None, skip the process!")
                     continue
                 external = load_dataset(external_path)
                 if not external:
+                    logger.info(f"Case {row['instance_id']} external content is None, skip the process!!")
                     continue
                 external_save_path_ = save_dir / (row['instance_id'] + '.txt')
                 input_args = {
@@ -1335,6 +1338,7 @@ class DataLoader:
                     "save_path": external_save_path_
                 }
                 external_function(**input_args)
+                logger.info(f"Case {row['instance_id']} external function is done!")
                 if is_update_dataset:
                     row["external"] = str(external_save_path_)
 

@@ -86,8 +86,9 @@ If no relevant content exists, output exactly: 'No Valuable External Knowledge'
         # Save external file if needed
         if need_save and save_path:
             save_path = Path(save_path) if isinstance(save_path, str) else save_path
-            if not save_path.exists():
-                raise Exception("The specified external knowledge document path does not exist!")
+            # if not save_path.exists():
+            #     raise Exception("The specified external knowledge document path does not exist!")
+            save_path.parent.mkdir(parents=True, exist_ok=True)
             with open(save_path, "w", encoding="utf-8") as file:
                 file.write(summary)
         return summary
