@@ -10,6 +10,7 @@ from torch.fx.experimental.recording import shape_env_check_state_equal
 from core.data_manage import Dataset, load_dataset
 from core.db_connect import get_sql_exec_result
 from core.utils import parse_schema_link_from_str
+from loguru import logger
 
 
 class Evaluator:
@@ -285,9 +286,13 @@ class Evaluator:
             pred, _ = get_sql_exec_result(**pred_args)
             gold, _ = get_sql_exec_result(**gold_args)
 
-            if pred is None or gold is None:
-                print(f"Warning: SQL Execution Error for item {item}")
+            if gold is None:
+                print(f"Invalid Warning: Ground-Truth SQL Execution Error for item {item}")
                 return None
+
+            if pred is None:
+                print(f"Execution Failure: Predicted SQL failed to execute for item {item}")
+                return 0
             score = self.compare_pandas_table(pred, gold)
 
             return score
