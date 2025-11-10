@@ -155,7 +155,7 @@ Only output a json as your response."""
         example = schema_row.get('sample_rows', None)
 
         profile = f"Table: {table}\nColumn: {column}\nDescription: {description}\nData Type: {data_type}\nNullable: {is_nullable}"
-        
+
         if is_primary_key:
             profile += "\nPrimary Key: Yes"
         if is_foreign_key:
@@ -176,7 +176,9 @@ Only output a json as your response."""
                 logger.warning("Failed to parse JSON")
         return {}
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         data_row = self.dataset[item]
         question = data_row["question"]
         evidence = data_row.get("evidence", "")
@@ -216,7 +218,8 @@ Only output a json as your response."""
                     if t not in relevant_columns:
                         relevant_columns[t] = []
                     relevant_columns[t].append(c)
-
+        filtered_links = [f"{t}.{c}" for t, cols in relevant_columns.items() for c in cols]
+        self.log_schema_links(data_logger, filtered_links, stage="Filter Columns")
         tentative_schema = relevant_columns
 
         # Step 2: Select tables
@@ -226,6 +229,8 @@ Only output a json as your response."""
         result = self._parse_json(response)
         selected_tables = result.get("table_names", [])
         tentative_schema = {t: tentative_schema.get(t, []) for t in selected_tables}
+        table_links = [f"{t}.{c}" for t, cols in tentative_schema.items() for c in cols]
+        self.log_schema_links(data_logger, table_links, stage="Select tables")
 
         # Step 3: Select columns
         schema_str = "\n".join([f"{table} ({', '.join(cols)})" for table, cols in tentative_schema.items()])
@@ -239,10 +244,13 @@ Only output a json as your response."""
 
         # Dedup
         schema_links = list(set(schema_links))
-
+        self.log_schema_links(data_logger, schema_links, stage="final")
         output = self.format_output(schema_links)
 
         # Use base class method to save output
         self.save_output(output, item)
+
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output

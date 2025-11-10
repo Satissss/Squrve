@@ -229,12 +229,17 @@ class LinkAlignReducer(BaseReducer):
             return external
         return None
 
-    def act(self, item, schema: Union[Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[Dict, List] = None, data_logger=None, **kwargs):
         # schema 参数尽量为空即可，否则可能与嵌入 schema 存在不一致
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
+
         row = self.dataset[item]
         source = self.dataset.schema_source
         db_size = row.get("db_size", 0)
         question = row["question"]
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act context | db_size={db_size} | question_preview={question}")
         if self.use_external:
             external = self.load_external_knowledge(row.get("external", None))
             question = question if external is None else question + "\n" + external
@@ -250,6 +255,9 @@ class LinkAlignReducer(BaseReducer):
                 save_path = save_path / f"{self.name}_{instance_id}.json"
 
         if db_size <= self.reserve_size:
+            if data_logger:
+                data_logger.info(
+                    f"[LinkAlignReducer.act] Item {item}: db_size ({db_size}) <= reserve_size ({self.reserve_size}), using original schema")
             sub_schema = self.dataset.get_db_schema(item) if not schema else schema
             if self.output_format == "dataframe":
                 if isinstance(sub_schema, dict):
@@ -266,9 +274,14 @@ class LinkAlignReducer(BaseReducer):
             retriever = RagPipeLines.get_retriever(index=vector_index)
 
         if self.skip_retrieval:
+            if data_logger:
+                data_logger.info(f"[LinkAlignReducer.act] Item {item}: skip_retrieval=True, using original schema")
             sub_schema = self.dataset.get_db_schema(item) if not schema else schema
         else:
             if db_size <= self.min_retrival_size:
+                if data_logger:
+                    data_logger.info(
+                        f"[LinkAlignReducer.act] Item {item}: db_size ({db_size}) <= min_retrival_size ({self.min_retrival_size}), using original schema")
                 sub_schema = self.dataset.get_db_schema(item) if not schema else schema
             else:
                 # 必须保证完成 schema init，并且索引已经建立
@@ -297,12 +310,21 @@ class LinkAlignReducer(BaseReducer):
             sub_schema = single_central_process(sub_schema)
 
         df = pd.DataFrame(sub_schema)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.to_dataframe output | item={item} | shape={df.shape}")
         if not self.skip_filter:
+            if data_logger:
+                data_logger.info(f"[LinkAlignReducer.act] Item {item}: Starting post-retrieval, skip_post_retrieval=False")
             retain_schema = self.get_retain_schema(sub_schema)
-            for _ in range(self.filter_num):
+            if data_logger:
+                data_logger.info(
+                    f"{self.NAME}.retain_schema output | item={item} | shape={retain_schema.shape if hasattr(retain_schema, 'shape') else 'N/A'}")
+            for filter_iter in range(self.filter_num):
                 if len(df) > self.min_fiter_size:
                     df = self.response_filtering(data=df, question=question, reserve_df=retain_schema)
-
+                    if data_logger:
+                        data_logger.info(
+                            f"{self.NAME}.response_filtering iteration | item={item} | iteration={filter_iter + 1} | df_size={len(df)}")
             if not self.skip_post_retrieval:
                 post_top_k, post_turn_n = self.post_top_k, self.post_turn_n
                 if self.automatic:
@@ -323,6 +345,9 @@ class LinkAlignReducer(BaseReducer):
                 nodes = SchemaLinkingTool.retrieve_complete_by_multi_agent_debate(**post_retrieval_args)
                 sub_df = parse_schemas_from_nodes(nodes=nodes, schema_source=source, db_id=row["db_id"])
                 df = pd.concat([df, sub_df], axis=0)
+                if data_logger:
+                    data_logger.info(
+                        f"{self.NAME}.post_retrieval output | item={item} | nodes={len(nodes) if nodes else 0} | combined_shape={df.shape}")
 
         if self.output_format == "dataframe":
             if save_path:
@@ -335,4 +360,8 @@ class LinkAlignReducer(BaseReducer):
         if save_path:
             save_dataset(sub_schema, new_data_source=save_path)
             self.dataset.setitem(item, "instance_schemas", str(save_path))
+
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+
         return sub_schema

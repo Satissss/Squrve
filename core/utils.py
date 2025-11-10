@@ -121,7 +121,7 @@ def load_dataset(data_source: Union[str, PathLike]):
     """
 
     data_source = Path(data_source)
-    logger.info(f"load the dataset from the source:{data_source}")
+    # logger.info(f"load the dataset from the source:{data_source}")
     if not data_source.exists():
         logger.info("Invalid path: the file does not exist.", category=UserWarning)
         return None

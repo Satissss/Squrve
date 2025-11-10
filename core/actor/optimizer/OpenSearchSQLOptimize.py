@@ -168,8 +168,11 @@ Answer in the following format:
         schema: Union[str, Path, Dict, List] = None,
         schema_links: Union[str, List[str]] = None,
         pred_sql: Union[str, Path, List[str], List[Path]] = None,
+        data_logger=None,
         **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"OpenSearchSQLOptimizer processing item {item}")
 
         if self.dataset is None:
@@ -191,6 +194,8 @@ Answer in the following format:
 
         # Load pred_sql using base class method
         sql_list, is_single = self.load_pred_sql(pred_sql, item)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.input_sql_count | count={len(sql_list)}")
 
         def process_sql(sql):
             return self.optimize_single_sql(
@@ -211,4 +216,8 @@ Answer in the following format:
         output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
 
         logger.info(f"OpenSearchSQLOptimizer completed processing item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.optimized_sql | output={optimized_sqls}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+            
         return output 

@@ -391,9 +391,13 @@ Your main tasks are:
             self,
             item,
             schema: Union[str, PathLike, Dict, List, pd.DataFrame] = None,
+            data_logger=None,
             **kwargs
     ):
         try:
+            if data_logger:
+                data_logger.info(f"{self.NAME}.act start | item={item}")
+
             row = self.dataset[item]
             question = row['question']
             evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
@@ -413,10 +417,16 @@ Your main tasks are:
                 foreign_key = self.get_foreign_key_from_schema(schema_df)
                 table_info = '### Sqlite SQL tables, with their properties:\n' + simple_ddl + '\n### Here are some data information about database references.\n' + ddl_data + '\n### Foreign key information of Sqlite SQL tables, used for table joins:\n' + foreign_key
                 table_column = self.table_column_selection(table_info, question, evidence)
+                self.log_schema_links(data_logger, table_column.get('columns', []), stage="selected.columns")
+                self.log_schema_links(data_logger, table_column.get('tables', []), stage="selected.tables")
 
                 pre_sql = self.preliminary_sql_gen(table_info, table_column, example, question, evidence)
+                if data_logger:
+                    data_logger.info(f"{self.NAME}.preliminary_sql | {pre_sql}")
+
             except Exception as e:
-                logger.error(f"Error in preliminary SQL generation: {e}")
+                if data_logger:
+                    data_logger.error(f"{self.NAME}.preliminary_sql_gen error | {e}")
                 pre_sql = "SELECT 1"
                 table_column = {"tables": [], "columns": []}
 
@@ -428,12 +438,18 @@ Your main tasks are:
                 sl_llm = table_column
                 schema_links = self.merge_schema_links(sl_sql, sl_llm, sl_hint)
                 schema_links = self.filter_schema_links(schema_links, db_schema)
+                self.log_schema_links(data_logger, schema_links.get('columns', []), stage="final.columns")
+                self.log_schema_links(data_logger, schema_links.get('tables', []), stage="final.tables")
             except Exception as e:
-                logger.error(f"Error in schema linking: {e}")
+                if data_logger:
+                    data_logger.error(f"{self.NAME}.schema_linking error | {e}")
                 schema_links = {"tables": [], "columns": []}
 
             # Use base class method to save output
             self.save_output(schema_links, item)
+
+            if data_logger:
+                data_logger.info(f"{self.NAME}.act end | item={item}")
 
             return schema_links
 

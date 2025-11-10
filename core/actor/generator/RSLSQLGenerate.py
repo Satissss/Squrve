@@ -807,9 +807,12 @@ class RSLSQLGenerator(BaseGenerator):
             item,
             schema=None,
             schema_links=None,
+            data_logger=None,
             **kwargs
     ):
         """Generate predicted SQL for the given dataset item using RSLSQL methodology."""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"RSLSQLGenerator processing item {item}")
         row = self.dataset[item]
         question = row['question']
@@ -939,4 +942,7 @@ class RSLSQLGenerator(BaseGenerator):
             save_dataset(pred_sql, new_data_source=save_path)
             self.dataset.setitem(item, "pred_sql", str(save_path))
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return pred_sql

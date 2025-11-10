@@ -171,8 +171,11 @@ Now please fixup old SQL and generate new SQL again.
             schema: Union[str, Path, Dict, List, pd.DataFrame] = None,
             schema_links: Union[str, List[str]] = None,  # Unused but kept for interface
             pred_sql: Union[str, Path, List[str], List[Path]] = None,
+            data_logger=None,
             **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"MACSQLOptimizer processing item {item}")
 
         if self.dataset is None:
@@ -195,6 +198,8 @@ Now please fixup old SQL and generate new SQL again.
 
         # Load pred_sql using base class method
         sql_list, is_single = self.load_pred_sql(pred_sql, item)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.input_sql_count | count={len(sql_list)}")
 
         def process_sql(sql):
             return self.optimize_single_sql(
@@ -215,4 +220,8 @@ Now please fixup old SQL and generate new SQL again.
         output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
 
         logger.info(f"MACSQLOptimizer completed processing item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.optimized_sql | output={optimized_sqls}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+        
         return output 

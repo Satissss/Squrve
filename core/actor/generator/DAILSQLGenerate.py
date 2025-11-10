@@ -1891,8 +1891,10 @@ class DAILSQLGenerate(BaseGenerator):
                 logger.warning(f"Failed to initialize DAIL-SQL prompt system: {e}, using fallback")
                 self.prompt = None
 
-    def act(self, item, schema=None, schema_links=None, **kwargs):
+    def act(self, item, schema=None, schema_links=None, data_logger=None, **kwargs):
         """Main DAIL-SQL generation method following the Generator interface"""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"DAILSQLGenerator 开始处理样本 {item}")
 
         # Validate inputs
@@ -2045,6 +2047,9 @@ class DAILSQLGenerate(BaseGenerator):
 
             logger.debug(f"生成的 SQL: {sql[:100]}...")
             logger.info(f"DAILSQLGenerator 样本 {item} 处理完成")
+            if data_logger:
+                data_logger.info(f"{self.NAME}.final_sql | sql={sql[:200]}")
+                data_logger.info(f"{self.NAME}.act end | item={item}")
             return sql
 
         except Exception as e:

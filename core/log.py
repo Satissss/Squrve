@@ -1,7 +1,7 @@
 import warnings
 from os import PathLike
 from pathlib import Path
-from typing import Union, Dict
+from typing import Union, Dict, Optional
 from core.data_manage import save_dataset
 from datetime import datetime
 
@@ -15,6 +15,7 @@ class Logger:
         self._error_dataset = []
         self._content = ""
         self.save_path = save_path
+        self.data_logger = {}
 
     def __getitem__(self, item):
         return self._info[item]
@@ -81,3 +82,75 @@ class Logger:
             save_dataset(self._error_dataset, new_data_source=error_save_path)
 
         save_dataset(self.__str__(), new_data_source=save_path)
+
+    def generate_data_logger(self, index: int | str):
+        if index in self.data_logger:
+            return self.data_logger[index]
+
+
+        if self.save_path is None:
+            warnings.warn("Task logger save_path is unavailable, cannot create data logger.",
+                          category=UserWarning)
+            save_path = None
+        else:
+            save_path = Path(self.save_path).parent / "data_log" / f"{index}.txt"
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        data_logger = DataLogger(index, save_path)
+        self.data_logger[index] = data_logger
+
+        return data_logger
+
+    def save_all_data_logs(self):
+        for dl in self.data_logger.values():
+            if dl is not None:
+                dl.save()
+
+
+class DataLogger:
+    def __init__(
+            self,
+            index: Union[int, str],
+            save_path: Union[str, PathLike, None] = None
+    ):
+        self._index = index
+        self._save_path: Optional[Path] = Path(save_path) if save_path else None
+        self._content: str = ""
+
+    @staticmethod
+    def _get_timestamp() -> str:
+        return datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+
+    def _append(self, string: str):
+        print(string)
+        self._content += string + "\n"
+
+    def info(self, string: str):
+        self._append(f"{self._get_timestamp()} [INFO]  {string}")
+
+    def warn(self, string: str):
+        self._append(f"{self._get_timestamp()} [WARN]  {string}")
+
+    def error(self, string: str):
+        self._append(f"{self._get_timestamp()} [ERROR] {string}")
+
+    @property
+    def index(self):
+        return self._index
+
+    @property
+    def content(self) -> str:
+        return self._content
+
+    def clear(self):
+        self._content = ""
+
+    def save(self, save_path: Union[str, PathLike, None] = None):
+        target_path = Path(save_path) if save_path else self._save_path
+        if target_path is None:
+            warnings.warn(f"The save_path is not available for DataLogger {self._index}.",
+                          category=UserWarning)
+            return
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        save_dataset(self.content, new_data_source=target_path)
+        self._save_path = target_path

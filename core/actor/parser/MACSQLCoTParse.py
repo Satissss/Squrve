@@ -103,10 +103,12 @@ class MACSQLCoTParser(BaseParser):
                 pass
         return schema_links
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
         """
         Extract relevant schema links using MAC-SQL approach.
         """
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         query = row.get("question", "")
         evidence = row.get("evidence", "")
@@ -142,10 +144,12 @@ class MACSQLCoTParser(BaseParser):
 
         # Deduplicate
         schema_links = list(set(schema_links))
-
+        self.log_schema_links(data_logger, schema_links, stage="final")
         output = self.format_output(schema_links)
 
         # Use base class method to save output
         self.save_output(output, item)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output

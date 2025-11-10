@@ -1,3 +1,5 @@
+from typing import Union, Dict, List
+from os import PathLike
 import pandas as pd
 import re
 import sqlite3
@@ -434,7 +436,9 @@ Please conclude the database in the following format:
         res, judge = self.json_ext(select_json)
         return res, judge
 
-    def act(self, item, schema=None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row["question"]
         db_id = row["db_id"]
@@ -466,13 +470,20 @@ Please conclude the database in the following format:
         des = self.DES_new(self.bert_model, self.bert_model.encode(list(db_col.keys()), show_progress_bar=False),
                            list(db_col.keys()))
         cols_select, L_values = des.get_key_col_des(cols, values_noun, debug=False, topk=self.top_k, shold=0.65)
+        self.log_schema_links(data_logger, cols_select, stage="extracted.columns")
+
+        value_links = [x[1] for x in L_values]
+        self.log_schema_links(data_logger, value_links, stage="extracted.values")
+
 
         schema_links = list(set(cols_select + [x[1] for x in L_values]))
-
         output = self.format_output(schema_links)
-
+        self.log_schema_links(data_logger, output, stage="final")
         # Use base class method to save output
         file_ext = ".txt" if self.output_format == "str" else ".json"
         self.save_output(output, item, file_ext=file_ext)
+
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output

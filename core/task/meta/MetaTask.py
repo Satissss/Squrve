@@ -36,21 +36,24 @@ class MetaTask(BaseTask):
         logger.info(f"开始执行 MetaTask: {self.name} ({self.task_id}), 数据集大小: {len(self.dataset)}")
 
         def safe_act(index):
+            ins_id = actor.dataset[index]['instance_id']
+            data_logger = self._task_log.generate_data_logger(ins_id)
             try:
-                logger.debug(f"开始处理样本 {index}/{len(self.dataset)}")
-                result = actor.act(index)
-                logger.debug(f"样本 {index} 处理完成")
+                data_logger.info(f"开始处理样本 {ins_id}")
+                result = actor.act(index, data_logger=data_logger)
+                data_logger.info(f"样本 {ins_id} 处理完成")
                 return index, result
             except Exception as e:
-                error_info = f"Error occurred while executing act() on sample {index}: {e}."
-                logger.error(error_info)
-                print(error_info)
+                error_info = f"Error occurred while executing act() on sample {ins_id}: {e}."
+                data_logger.info(error_info)
                 # Log error info in dataset and task log
                 row = self.dataset[index]
                 row["error_info"] = error_info
                 self._task_log.add_error_data(row)
                 self._task_log.error(error_info)
                 return None
+            finally:
+                data_logger.save()
 
         results = {}
         logger.info(f"使用线程池执行任务，最大工作线程数: {self.max_workers}")

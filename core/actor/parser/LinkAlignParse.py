@@ -63,7 +63,9 @@ class LinkAlignParser(BaseParser):
             return external
         return None
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row["question"]
         db_size = row["db_size"]
@@ -101,11 +103,13 @@ class LinkAlignParser(BaseParser):
             schema_links.extend(parse_schema_link_from_str(result))
 
         schema_links = list(dict.fromkeys(schema_links))
-
+        self.log_schema_links(data_logger, schema_links, stage="final")
         output = self.format_output(schema_links)
 
         # Use base class method to save output
         file_ext = ".txt" if self.output_format == "str" else ".json"
         self.save_output(output, item, file_ext=file_ext)
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return output

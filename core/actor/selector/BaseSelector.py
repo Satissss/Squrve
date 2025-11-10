@@ -3,7 +3,7 @@ from typing import Union, Dict, List, Any
 from pathlib import Path
 from loguru import logger
 import time
-
+import os
 from core.actor.base import Actor
 from core.data_manage import Dataset
 from core.utils import load_dataset, save_dataset
@@ -39,9 +39,8 @@ class BaseSelector(Actor):
         elif isinstance(pred_sql, list):
             pred_sql_list = []
             for p in pred_sql:
-                p_path = Path(p) if isinstance(p, str) else p
-                if isinstance(p_path, Path) and p_path.exists():
-                    pred_sql_list.append(load_dataset(p_path))
+                if isinstance(p, str) and os.path.exists(p):
+                    pred_sql_list.append(load_dataset(Path(p)))
                 else:
                     pred_sql_list.append(str(p))
             pred_sql = pred_sql_list
@@ -115,6 +114,7 @@ class BaseSelector(Actor):
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, PathLike, List[str], List[PathLike]] = None,
+            data_logger=None,
             **kwargs
     ):
         pass

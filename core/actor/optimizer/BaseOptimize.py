@@ -103,6 +103,7 @@ class BaseOptimizer(Actor):
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, PathLike, List[str], List[PathLike]] = None,
+            data_logger=None,
             **kwargs
     ):
         pass

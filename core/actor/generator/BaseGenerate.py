@@ -14,6 +14,7 @@ class BaseGenerator(Actor):
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
         pass

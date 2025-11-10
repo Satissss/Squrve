@@ -926,9 +926,12 @@ Please generate a valid SQL query. Only return the SQL statement:"""
             item,
             schema: Union[str, Path, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
         """实现 MAC-SQL 的端到端 SQL 生成逻辑"""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"MACSQLGenerator 开始处理样本 {item}")
 
         # 验证输入
@@ -1002,6 +1005,9 @@ Please generate a valid SQL query. Only return the SQL statement:"""
                 logger.debug(f"SQL 已保存到: {save_path}")
 
             logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
+            if data_logger:
+                data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+                data_logger.info(f"{self.NAME}.act end | item={item}")
             return pred_sql
 
         except Exception as e:

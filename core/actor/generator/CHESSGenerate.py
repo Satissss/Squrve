@@ -377,9 +377,12 @@ class CHESSGenerator(BaseGenerator):
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
         """Execute the CHESS-SQL pipeline for a single item"""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"CHESSGenerator 开始处理样本 {item}")
 
         row = self.dataset[item]
@@ -479,4 +482,7 @@ class CHESSGenerator(BaseGenerator):
             logger.debug(f"SQL 已保存到: {save_path}")
 
         logger.info(f"CHESSGenerator 样本 {item} 处理完成")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql[:200]}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return pred_sql

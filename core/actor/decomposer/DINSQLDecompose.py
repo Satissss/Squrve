@@ -215,7 +215,9 @@ Label: "NESTED"'''
         instruction += "elif don't need JOIN and don't need nested queries: predict EASY\n\n"
         return instruction + schema + "\n" + self.CLASSIFICATION_PROMPT + 'Q: "' + question + '"\nschema_links: ' + schema_links + '\nA: Let\'s think step by step.'
 
-    def generate_sub_questions(self, llm_: LLM, question: str, schema_str: str) -> List[str]:
+    def generate_sub_questions(self, llm_: LLM, question: str, schema_str: str, data_logger=None) -> List[str]:
+        if data_logger:
+            data_logger.info(f"{self.NAME}.generate_sub_questions input | question={question}")
         # Step 1: Schema linking
         prompt = self.schema_linking_prompt_maker(question, schema_str)
         response = llm_.complete(prompt).text.strip()
@@ -235,7 +237,7 @@ Label: "NESTED"'''
             predicted_class = "NESTED"
 
         sub_questions = []
-        
+
         # Extract sub-questions for NESTED queries
         if "NESTED" in predicted_class:
             try:
@@ -244,8 +246,8 @@ Label: "NESTED"'''
                     sub_questions_str = classification.split('questions = ["')[1].split('"]')[0]
                     if sub_questions_str.strip() and sub_questions_str.strip() != "":
                         # Split by comma and clean up each question
-                        sub_questions = [q.strip().replace('"', '').replace("'", '') 
-                                       for q in sub_questions_str.split('", "')]
+                        sub_questions = [q.strip().replace('"', '').replace("'", '')
+                                         for q in sub_questions_str.split('", "')]
                         # Filter out empty questions
                         sub_questions = [q for q in sub_questions if q.strip()]
             except (IndexError, ValueError):
@@ -261,17 +263,22 @@ Label: "NESTED"'''
                                 sub_questions.extend([q.strip() for q in matches if q.strip()])
                 except:
                     pass
-        
+
         # If no sub-questions found but it's classified as NESTED, return empty list
         # This allows the caller to handle the case appropriately
+        if data_logger:
+            data_logger.info(f"{self.NAME}.generate_sub_questions output | sub_questions={sub_questions}")
         return sub_questions
 
     def act(
             self,
             item,
             schema: Union[str, PathLike, Dict, List] = None,
+            data_logger=None,
             **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row['question']
 
@@ -281,12 +288,16 @@ Label: "NESTED"'''
         # Use base class method to get LLM
         llm = self.get_llm()
         if llm is None:
+            if data_logger:
+                data_logger.info(f"{self.NAME}.get_llm returned None | item={item}")
             return []
 
         # Generate sub questions
-        sub_questions = self.generate_sub_questions(llm, question, schema_str)
+        sub_questions = self.generate_sub_questions(llm, question, schema_str, data_logger=data_logger)
 
         # Use base class method to save output
         self.save_output(sub_questions, item)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return sub_questions

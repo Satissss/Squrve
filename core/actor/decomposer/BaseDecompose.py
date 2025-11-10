@@ -94,6 +94,7 @@ class BaseDecomposer(Actor):
             self,
             item,
             schema: Union[str, PathLike, Dict, List] = None,
+            data_logger=None,
             **kwargs
     ):
         pass

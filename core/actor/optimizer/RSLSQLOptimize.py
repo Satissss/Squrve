@@ -475,9 +475,12 @@ You are an intelligent agent responsible for identifying the conditions in the u
             schema: Union[str, Path, Dict, List, pd.DataFrame] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, Path, List[str], List[Path]] = None,
+            data_logger=None,
             **kwargs
     ):
         logger.info(f"RSLSQLOptimizer processing item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
 
         if self.dataset is None:
             raise ValueError("Dataset is required for RSLSQLOptimizer")
@@ -499,7 +502,9 @@ You are an intelligent agent responsible for identifying the conditions in the u
 
         # Load pred_sql using base class method
         sql_list, is_single = self.load_pred_sql(pred_sql, item)
-
+        if data_logger:
+            data_logger.info(f"{self.NAME}.input_sql_count | count={len(sql_list)}")
+            
         def process_sql(sql):
             return self.optimize_single_sql(
                 sql, question, schema, db_type, schema_links, db_id, db_path, credential
@@ -519,4 +524,8 @@ You are an intelligent agent responsible for identifying the conditions in the u
         output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id", item))
 
         logger.info(f"RSLSQLOptimizer completed processing item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.optimized_sql | output={optimized_sqls}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+            
         return output

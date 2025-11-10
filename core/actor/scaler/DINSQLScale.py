@@ -227,8 +227,11 @@ The SQL query for the sub-question "{sub_question}" is '''
             schema: Union[str, Path, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             sub_questions: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ) -> List[str]:
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row['question']
         
@@ -283,8 +286,13 @@ The SQL query for the sub-question "{sub_question}" is '''
             pred_sqls = ["SELECT * FROM table LIMIT 1"]
 
         logger.info(f"DINSQLScaler: Generated {len(pred_sqls)} SQL candidates for item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.candidates | count={len(pred_sqls)}")
 
         # Save results using base class method
         self.save_results(pred_sqls, item, row.get("instance_id"))
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.pred_sqls | output={pred_sqls}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return pred_sqls

@@ -78,8 +78,11 @@ class OpenSearchSQLSelector(BaseSelector):
             schema: Union[str, Path, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, Path, List[str], List[Path]] = None,
+            data_logger=None,
             **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row['question']
         db_type = row.get('db_type', 'sqlite')
@@ -92,6 +95,9 @@ class OpenSearchSQLSelector(BaseSelector):
         pred_sql = self.load_pred_sql(pred_sql, item)
         if not pred_sql:
             return "" if is_single else []
+        if data_logger:
+            data_logger.info(f"{self.NAME}.candidates | count={len(pred_sql)}")
+            
 
         # Concurrent execution
         execution_results = []
@@ -113,5 +119,10 @@ class OpenSearchSQLSelector(BaseSelector):
 
         # Save using base class method
         best_sql = self.save_result(best_sql, item, row.get('instance_id', item))
+        if data_logger:
+            data_logger.info(f"{self.NAME}.selected_sql | sql={best_sql}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+            
+              
 
         return best_sql

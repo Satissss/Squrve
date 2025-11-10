@@ -84,7 +84,10 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
 
         return self.parse_schema_links(response)
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
+
         row = self.dataset[item]
         question = row["question"]
 
@@ -103,18 +106,23 @@ Schema_links: [classroom.building,classroom.capacity,50]'''
             # 如果没有有效的 LLM，返回空结果
             return []
 
-        # Generate schema links
+        # Generate
         schema_links = []
-        for _ in range(self.generate_num):
+        for idx in range(self.generate_num):
             links = self.generate_schema_links(llm, question, schema_context)
             schema_links.extend(links)
+            self.log_schema_links(data_logger, links, stage=f"generated schema links.{idx}")
 
         schema_links = list(dict.fromkeys(schema_links))
+        self.log_schema_links(data_logger, schema_links, stage="final")
 
         output = self.format_output(schema_links)
 
         # Use base class method to save output
         file_ext = ".txt" if self.output_format == "str" else ".json"
         self.save_output(output, item, file_ext=file_ext)
+
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output

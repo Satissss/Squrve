@@ -530,12 +530,15 @@ class ReFoRCEGenerator(BaseGenerator):
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
         """Main execution method following ReFoRCE algorithm"""
         if self.dataset is None or self.llm is None:
             raise ValueError("Dataset and LLM must be provided for ReFoRCEGenerator.")
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"ReFoRCEGenerator processing sample {item}")
         row = self.dataset[item]
         question = row['question']
@@ -650,4 +653,7 @@ class ReFoRCEGenerator(BaseGenerator):
             logger.debug(f"SQL saved to: {save_path}")
 
         logger.info(f"ReFoRCEGenerator sample {item} processed successfully")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql[:200]}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return pred_sql

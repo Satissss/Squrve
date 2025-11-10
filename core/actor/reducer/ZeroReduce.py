@@ -23,7 +23,9 @@ class ZeroReducer(BaseReducer):
         self.output_format: str = output_format
         self.save_dir: Union[str, PathLike] = save_dir
 
-    def act(self, item, schema: Union[Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[Dict, List] = None, data_logger=None, **kwargs):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         sub_schema = self.dataset.get_db_schema(item) if not schema else schema
         if not sub_schema:
             return None
@@ -44,5 +46,6 @@ class ZeroReducer(BaseReducer):
                 save_path = save_path / f"{self.name}_{instance_id}.json"
             save_dataset(sub_schema, new_data_source=save_path)
             self.dataset.setitem(item, "instance_schemas", str(save_path))
-
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return sub_schema

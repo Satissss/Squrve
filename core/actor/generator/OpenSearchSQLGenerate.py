@@ -1475,8 +1475,10 @@ Please answer according to the format below and do not output any other content.
             logger.error(f"Error generating SQL: {e}")
             return ["SELECT 1"], None  # Return fallback SQL
 
-    def act(self, item, schema=None, schema_links=None, **kwargs):
+    def act(self, item, schema=None, schema_links=None, data_logger=None, **kwargs):
         """Generates SQL for a single data sample following Generator interface."""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"OpenSearchSQLGenerator starting to process sample {item}")
 
         try:
@@ -1570,6 +1572,8 @@ Please answer according to the format below and do not output any other content.
                                    single=False)
 
             logger.info(f"Generated {len(SQLs)} candidate SQL queries")
+            if data_logger:
+                data_logger.info(f"{self.NAME}.candidates | count={len(SQLs)}")
 
             # Step 6: align_correct
             dcheck = soft_check(self.bert_model, self, self.SOFT_PROMPT, self.correct_dic, self.CORRECT_PROMPT,
@@ -1662,6 +1666,9 @@ Please answer according to the format below and do not output any other content.
 
             logger.info(f"OpenSearchSQLGenerator completed processing sample {item}")
             logger.info(f"Final predicted SQL: {pred_sql}")
+            if data_logger:
+                data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+                data_logger.info(f"{self.NAME}.act end | item={item}")
 
             return pred_sql
         except Exception as e:

@@ -99,6 +99,7 @@ class BaseScaler(Actor):
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             sub_questions: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
         pass

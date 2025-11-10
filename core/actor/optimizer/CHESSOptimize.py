@@ -376,8 +376,11 @@ SELECT column FROM table WHERE condition
             schema: Union[str, Path, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, Path, List[str], List[Path]] = None,
+            data_logger=None,
             **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"CHESSOptimizer processing item {item}")
 
         if self.dataset is None:
@@ -400,6 +403,8 @@ SELECT column FROM table WHERE condition
 
         # Load pred_sql using base class method
         sql_list, is_single = self.load_pred_sql(pred_sql, item)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.input_sql_count | count={len(sql_list)}")
 
         def process_sql(sql):
             return self._optimize_single_sql(
@@ -420,4 +425,7 @@ SELECT column FROM table WHERE condition
         output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
 
         logger.info(f"CHESSOptimizer completed processing item {item}")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.optimized_sql | output={optimized_sqls}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return output

@@ -194,15 +194,22 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
                 qa_pairs.append((sub_q, sub_sql))
         return qa_pairs
 
-    def generate_decomposition(self, llm_: LLM, query: str, desc_str: str, fk_str: str, evidence: str) -> List[
-        Tuple[str, str]]:
+    def generate_decomposition(
+            self, llm_: LLM, query: str, desc_str: str, fk_str: str, evidence: str,
+            data_logger=None
+    ) -> List[Tuple[str, str]]:
+        if data_logger:
+            data_logger.info(f"{self.NAME}.generate_decomposition input | question={query}")
         prompt = self.DECOMPOSE_TEMPLATE_BIRD.format(query=query, desc_str=desc_str, fk_str=fk_str,
                                                      evidence=evidence)
 
         response = llm_.complete(prompt).text.strip()
-        return self.parse_qa_pairs(response)
+        response = self.parse_qa_pairs(response)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.generate_sub_questions output | sub_questions={response}")
+        return response
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
         """
         Decompose complex queries into sub-questions with corresponding SQL statements.
         
@@ -210,6 +217,8 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
             List[Tuple[str, str]]: List of (sub_question, corresponding_sql) pairs.
             Note: This differs from DINSQLDecomposer which returns List[str] of sub_questions only.
         """
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         query = row.get("question", "")
         evidence = row.get("evidence", "")
@@ -226,9 +235,11 @@ Decompose the question into sub questions, considering 【Constraints】, and ge
             return []
 
         # Generate decomposition results
-        sub_questions = self.generate_decomposition(llm, query, desc_str, fk_str, evidence)
+        sub_questions = self.generate_decomposition(llm, query, desc_str, fk_str, evidence, data_logger=data_logger)
 
         # Use base class method to save output
         self.save_output(sub_questions, item, db_id=db_id)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return sub_questions

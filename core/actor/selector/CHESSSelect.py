@@ -234,9 +234,12 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             schema: Union[str, Path, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             pred_sql: Union[str, Path, List[str], List[Path]] = None,
+            data_logger=None,
             **kwargs
     ):
         """Select the best SQL from candidates using execution voting and concurrent evaluation."""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row['question']
         db_type = row.get('db_type', 'sqlite')
@@ -247,6 +250,9 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         pred_sql = self.load_pred_sql(pred_sql, item)
         if not pred_sql:
             return ""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.candidates | count={len(pred_sql)}")
+            
 
         candidates = [{"SQL": sql} for sql in pred_sql]
 
@@ -301,7 +307,9 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
 
         # Step 3: Select the best SQL
         best_sql = self._select_best_sql(candidates, execution_voting, evaluations)
-        logger.debug(f"Selected best SQL: {best_sql[:100]}...")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.selected_sql | sql={best_sql}")
+            
 
         # Step 4: Optional SQL revision based on feedback
         if self.config.enable_llm_evaluation and self.llm:
@@ -336,4 +344,8 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         # Save the result using base class method
         best_sql = self.save_result(best_sql, item, row.get("instance_id"))
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.selected_sql | sql={best_sql}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
+            
         return best_sql 

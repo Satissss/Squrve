@@ -7,5 +7,5 @@ class BaseReducer(Actor):
     OUTPUT_NAME: str = "schema"
 
     @abstractmethod
-    def act(self, item, schema: Union[Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[Dict, List] = None, data_logger=None, **kwargs):
         pass

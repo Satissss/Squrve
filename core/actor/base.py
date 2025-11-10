@@ -12,7 +12,7 @@ class Actor(ABC):
     dataset: Dataset
 
     @abstractmethod
-    def act(self, item, **kwargs):
+    def act(self, item, data_logger=None, **kwargs):
         pass
 
     @property
@@ -86,7 +86,7 @@ class ComplexActor(Actor):
         self.actors.extend(actors)
 
     @abstractmethod
-    def act(self, item, **kwargs):
+    def act(self, item, data_logger=None, **kwargs):
         pass
 
     @property

@@ -533,9 +533,12 @@ Intermediate_representation: select course.title , course.credits from classroom
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ) -> str:
         """Process a single item and generate SQL."""
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"DIN_SQLGenerator processing sample {item}")
         row = self.dataset[item]
         question = row['question']
@@ -606,6 +609,8 @@ Intermediate_representation: select course.title , course.credits from classroom
         except IndexError:
             logger.warning("Classification parsing failed, defaulting to NESTED")
             predicted_class = '"NESTED"'
+        if data_logger:
+            data_logger.info(f"{self.NAME}.classification | predicted_class={predicted_class}")
 
         # Step 3: SQL generation based on difficulty
         logger.debug("Starting SQL generation...")
@@ -647,7 +652,8 @@ Intermediate_representation: select course.title , course.credits from classroom
         # if self.sql_post_process_function:
         #     sql = self.sql_post_process_function(sql, self.dataset)
 
-        logger.debug(f"Final SQL: {sql[:100]}...")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={sql}")
 
         if self.is_save:
             instance_id = row.get("instance_id")
@@ -660,4 +666,6 @@ Intermediate_representation: select course.title , course.credits from classroom
             logger.debug(f"SQL saved to: {save_path}")
 
         logger.info(f"DIN_SQLGenerator sample {item} processed")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return sql

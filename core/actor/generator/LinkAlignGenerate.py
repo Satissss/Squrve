@@ -217,8 +217,11 @@ You need to follow below requirements:
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            data_logger=None,
             **kwargs
     ):
+        if data_logger:
+            data_logger.info(f"{self.NAME}.act start | item={item}")
         logger.info(f"LinkAlignGenerator 开始处理样本 {item}")
         row = self.dataset[item]
         question = row['question']
@@ -364,4 +367,7 @@ You need to follow below requirements:
             logger.debug(f"SQL 已保存到: {save_path}")
 
         logger.info(f"LinkAlignGenerator 样本 {item} 处理完成")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+            data_logger.info(f"{self.NAME}.act end | item={item}")
         return pred_sql

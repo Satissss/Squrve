@@ -35,7 +35,7 @@ class BaseParser(Actor):
     def process_schema(self, item, schema: Union[str, PathLike, Dict, List] = None) -> Union[str, pd.DataFrame]:
         """Process and normalize database schema from various input formats."""
         logger.debug("Processing database schema...")
-        
+
         if isinstance(schema, (str, PathLike)) and Path(schema).exists():
             schema = load_dataset(schema)
 
@@ -73,13 +73,13 @@ class BaseParser(Actor):
         """Save output to file and update dataset."""
         if not self.is_save:
             return
-            
+
         if instance_id is None:
             instance_id = self.dataset[item].get('instance_id', item)
-        
+
         save_path = Path(self.save_dir)
         save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-        
+
         filename = f"{self.NAME}_{instance_id}{file_ext}"
         save_path = save_path / filename
         save_dataset(output, new_data_source=save_path)
@@ -90,7 +90,7 @@ class BaseParser(Actor):
         """Format output based on output_format parameter."""
         if output_format is None:
             output_format = self.output_format
-            
+
         if output_format == "str":
             return str(output)
         elif output_format == "list":
@@ -98,6 +98,32 @@ class BaseParser(Actor):
         else:
             return output
 
+    def _log_schema_entry(self, data_logger, link: str, tag: str) -> None:
+        """Normalize and log a single schema link entry."""
+        if data_logger is None or link is None:
+            return
+
+        normalized = " ".join(str(link).split())
+        data_logger.info(f"{self.NAME}.schema_link.{tag} | {normalized}")
+
+    def log_schema_links(self, data_logger, links, stage: str = "final") -> None:
+        """Log schema linking outputs regardless of their structure."""
+        if data_logger is None or links is None:
+            return
+
+        if isinstance(links, dict):
+            for table, columns in links.items():
+                if isinstance(columns, list):
+                    for idx, column in enumerate(columns):
+                        self._log_schema_entry(data_logger, f"{table}.{column}", f"{stage}.{table}.{idx}")
+                else:
+                    self._log_schema_entry(data_logger, f"{table}:{columns}", f"{stage}.{table}")
+        elif isinstance(links, list):
+            for idx, link in enumerate(links):
+                self._log_schema_entry(data_logger, link, f"{stage}.{idx}")
+        else:
+            self._log_schema_entry(data_logger, links, stage)
+
     @abstractmethod
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
         pass
