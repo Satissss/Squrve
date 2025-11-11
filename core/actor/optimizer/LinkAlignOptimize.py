@@ -23,7 +23,7 @@ class LinkAlignOptimizer(BaseOptimizer):
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/optimized_sql",
             use_feedback_debug: bool = True,
-            debug_turn_n: int = 2,
+            debug_turn_n: int = 3,
             open_parallel: bool = True,
             max_workers: Optional[int] = None,
             **kwargs
@@ -229,6 +229,7 @@ For the given question, analyze and refine the erroneous SQL statement using the
             db_path: Optional[Union[str, Path]] = None,
             db_type: str = "sqlite",
             credential: Optional[Dict] = None,
+            data_logger=None
     ) -> Tuple[bool, str]:
         """Debug SQL by feedback-based execution and error analysis."""
         chat_history = []
@@ -241,12 +242,16 @@ For the given question, analyze and refine the erroneous SQL statement using the
         }
 
         for turn in range(self.debug_turn_n):
+            if data_logger:
+                data_logger.info(f"[Turn {turn + 1}] Starting SQL debugging iteration.")
             res = get_sql_exec_result(**debug_args)
             if not res:
                 raise ValueError(f"Invalid 'db_type' argument: failed to execute query on `{db_type}` database.")
 
             exe_flag, dbms_error_info = res
             if exe_flag is not None:
+                if data_logger:
+                    data_logger.info(f"[Turn {turn + 1}] SQL executed successfully. Debug process completed.")
                 return True, debug_args["sql_query"]
 
             chat_history.append((debug_args["sql_query"], dbms_error_info))
@@ -255,6 +260,10 @@ For the given question, analyze and refine the erroneous SQL statement using the
                 f"### Turn {i + 1}\n# SQL:\n{sql};\n### Error Information:\n{err}\n"
                 for i, (sql, err) in enumerate(chat_history)
             )
+            if data_logger:
+                data_logger.info(f"[Turn {turn + 1}] SQL execution failed.")
+                data_logger.info(f"[Turn {turn + 1}] SQL Query:\n{debug_args['sql_query']}")
+                data_logger.info(f"[Turn {turn + 1}] DBMS Error:\n{dbms_error_info}")
 
             prompt_template = self._get_feedback_debug_prompt(db_type)
             if not prompt_template:
@@ -269,7 +278,14 @@ For the given question, analyze and refine the erroneous SQL statement using the
 
             # Get revised SQL from LLM
             new_sql = self.llm.complete(prompt).text
+
+            if data_logger:
+                data_logger.info(f"[Turn {turn + 1}] LLM generated revised SQL:\n{new_sql}")
+
             debug_args["sql_query"] = sql_clean(new_sql)
+
+            if data_logger:
+                data_logger.info(f"[Turn {turn + 1}] End of iteration.\n{'-' * 80}")
 
         # Final attempt
         exe_flag, _ = get_sql_exec_result(**debug_args)
@@ -314,7 +330,7 @@ For the given question, analyze and refine the erroneous SQL statement using the
             
         def process_sql(sql):
             _, final_sql = self._sql_debug_by_feedback(
-                question, schema, sql, db_id, db_path, db_type, credential
+                question, schema, sql, db_id, db_path, db_type, credential, data_logger=data_logger
             )
             return final_sql
 

@@ -84,6 +84,7 @@ class BaseOptimizer(Actor):
 
         if is_single:
             save_path = save_path_base / f"{self.NAME}_{instance_id}.sql"
+            logger.info(f"Optimized SQL save path: {save_path}")
             save_dataset(optimized_sqls[0], new_data_source=save_path)
             self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
             return optimized_sqls[0]

@@ -20,7 +20,7 @@ files/schema_source
 files/datasets
 files/credential
 files/sub_questions
-
+files/optimized_sql
 API.md
 test
 
@@ -47,3 +47,5 @@ extract_schemas
 entension
 
 spider2
+
+post_spider2
