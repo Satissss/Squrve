@@ -5,13 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/prompts/CHESSPrompt.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/prompts/CHESSPrompt.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/DINSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/DINSQLScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/RSLSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/RSLSQLScale.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -585,7 +578,7 @@
       <workItem from="1762753636663" duration="1731000" />
       <workItem from="1762783835008" duration="8000" />
       <workItem from="1762826074327" duration="21713000" />
-      <workItem from="1762916774515" duration="3738000" />
+      <workItem from="1762916774515" duration="4075000" />
     </task>
     <servers />
   </component>
@@ -659,11 +652,6 @@
           <url>file://$PROJECT_DIR$/files/optimized_sql/preprocess.py</url>
           <line>11</line>
           <option name="timeStamp" value="172" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="python-line">
-          <url>file://$PROJECT_DIR$/startup_run/run.py</url>
-          <line>16</line>
-          <option name="timeStamp" value="173" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
