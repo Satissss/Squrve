@@ -6,7 +6,7 @@ import pandas as pd
 
 from core.actor.scaler.BaseScale import BaseScaler
 from core.data_manage import Dataset
-from core.utils import parse_schema_from_df
+from core.utils import parse_schema_from_df, load_dataset
 from llama_index.core.llms.llm import LLM
 
 
@@ -151,11 +151,13 @@ The SQL query for the sub-question "{sub_question}" is '''
             save_dir: Union[str, Path] = "../files/pred_sql",
             open_parallel: bool = True,
             max_workers: int = None,
+            use_external: bool = True,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.generate_num = generate_num
         self.temperature = temperature
+        self.use_external = use_external
 
     def _generate_single_sql(self, llm_: LLM, question: str, schema: str, schema_links: str, difficulty: str = "EASY", sub_questions: Union[str, List[str]] = None) -> Optional[str]:
         """Generate a single SQL candidate using DIN-SQL approach"""
@@ -221,6 +223,16 @@ The SQL query for the sub-question "{sub_question}" is '''
             logger.warning(f"Failed to generate SQL candidate: {e}")
             return None
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        external = load_dataset(external)
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
     def act(
             self,
             item,
@@ -234,6 +246,11 @@ The SQL query for the sub-question "{sub_question}" is '''
             data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
         question = row['question']
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
         
         # Load and process schema using base class method
         schema = self.process_schema(schema, item)

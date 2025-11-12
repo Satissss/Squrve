@@ -1088,6 +1088,9 @@ Question:
 Evidence:
 {HINT}
 
+Reasoning Examples:
+{REASONING_EXAMPLES}
+
 **************************
 【Answer】
 Repeating the question and hint, and generating the SQL with Recursive Divide-and-Conquer."""
@@ -1221,6 +1224,9 @@ Question:
 Evidence:
 {HINT}
 
+Reasoning Examples:
+{REASONING_EXAMPLES}
+
 **************************
 【Answer】
 Repeating the question and hint, and generating the SQL with Recursive Divide-and-Conquer."""
@@ -1256,6 +1262,9 @@ Question:
 
 Hint:
 {HINT}
+
+Reasoning Examples:
+{REASONING_EXAMPLES}
 
 Please respond with a JSON object structured as follows:
 

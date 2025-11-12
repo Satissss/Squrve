@@ -6,7 +6,7 @@ import pandas as pd
 
 from core.actor.scaler.BaseScale import BaseScaler
 from core.data_manage import Dataset
-from core.utils import parse_schema_from_df
+from core.utils import parse_schema_from_df, load_dataset
 from llama_index.core.llms.llm import LLM
 
 
@@ -65,11 +65,13 @@ Please generate a valid SQL query. Only return the SQL statement:'''
             save_dir: Union[str, Path] = "../files/pred_sql",
             open_parallel: bool = True,
             max_workers: int = None,
+            use_external: bool = True,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.generate_num = generate_num
         self.temperature = temperature
+        self.use_external = use_external
 
     def _generate_single_sql(self, llm_: LLM, question: str, schema: str, evidence: str = "", 
                            schema_links: str = "", sub_questions: str = "", use_fallback: bool = False) -> Optional[str]:
@@ -121,6 +123,16 @@ Please generate a valid SQL query. Only return the SQL statement:'''
             logger.warning(f"Failed to generate SQL candidate: {e}")
             return None
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        external = load_dataset(external)
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
     def act(
             self,
             item,
@@ -135,6 +147,11 @@ Please generate a valid SQL query. Only return the SQL statement:'''
         row = self.dataset[item]
         question = row['question']
         evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
         
         # Load and process schema using base class method
         schema = self.process_schema(schema, item)

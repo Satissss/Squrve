@@ -8,7 +8,7 @@ from core.base import Router
 from core.engine import Engine
 
 if __name__ == "__main__":
-    router = Router(config_path="startup_config.json")
+    router = Router(config_path="demo.json")
 
     engine = Engine(router)
 

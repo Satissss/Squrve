@@ -540,6 +540,7 @@ class OpenSearchSQLScaler(BaseScaler):
             temperature=0.7,
             top_k=10,
             use_few_shot=True,
+            use_external=True,
             db_path=None,
             is_save=True,
             save_dir="../files/pred_sql",
@@ -555,6 +556,7 @@ class OpenSearchSQLScaler(BaseScaler):
         self.temperature = temperature
         self.top_k = top_k
         self.use_few_shot = use_few_shot
+        self.use_external = use_external
         self.db_path = db_path or (dataset.db_path if dataset else None)
         self.tables_json_path = tables_json_path
         self.tables_info_dir = tables_info_dir
@@ -610,6 +612,16 @@ class OpenSearchSQLScaler(BaseScaler):
 
         return process_parallel() if self.open_parallel else process_serial()
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        external = load_dataset(external)
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
     def act(
             self,
             item,
@@ -624,6 +636,11 @@ class OpenSearchSQLScaler(BaseScaler):
         row = self.dataset[item]
         question = row['question']
         db_id = row.get('db_id')
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
 
         # Load and process schema using base class method
         schema = self.process_schema(schema, item)
