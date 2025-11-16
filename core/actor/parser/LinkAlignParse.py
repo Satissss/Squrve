@@ -5,7 +5,7 @@ from os import PathLike
 from pathlib import Path
 
 from core.data_manage import Dataset, single_central_process
-from core.actor.parser.BaseParse import BaseParser
+from core.actor.parser.BaseParse import BaseParser, parallel_slice_parse
 from core.LinkAlign.SchemaLinkingTool import SchemaLinkingTool
 from core.utils import (
     parse_schema_from_df,
@@ -13,6 +13,7 @@ from core.utils import (
     save_dataset,
     parse_schema_link_from_str
 )
+from loguru import logger
 
 
 class LinkAlignParser(BaseParser):
@@ -63,7 +64,9 @@ class LinkAlignParser(BaseParser):
             return external
         return None
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+    @parallel_slice_parse
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, update_dataset=True,
+            **kwargs):
         if data_logger:
             data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
@@ -108,8 +111,22 @@ class LinkAlignParser(BaseParser):
 
         # Use base class method to save output
         file_ext = ".txt" if self.output_format == "str" else ".json"
-        self.save_output(output, item, file_ext=file_ext)
+        if update_dataset:
+            self.save_output(output, item, file_ext=file_ext)
 
         if data_logger:
             data_logger.info(f"{self.NAME}.act end | item={item}")
         return output
+
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for row in results:
+            if not isinstance(row, List):
+                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
+
+            merge_result.extend(row)
+
+        return merge_result

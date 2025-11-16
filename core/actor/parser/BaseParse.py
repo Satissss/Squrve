@@ -5,9 +5,10 @@ from typing import Union, Dict, List
 from pathlib import Path
 import pandas as pd
 from loguru import logger
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.data_manage import single_central_process, Dataset, save_dataset
 from core.utils import load_dataset, parse_schema_from_df
+from core.actor.parser.parse_utils import slice_schema_df
 
 
 class BaseParser(Actor):
@@ -125,5 +126,66 @@ class BaseParser(Actor):
             self._log_schema_entry(data_logger, links, stage)
 
     @abstractmethod
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, update_dataset=True,
+            **kwargs):
         pass
+
+
+def parallel_slice_parse(func):
+    slice_size = 100  # todo adjust to a external params. needed to pass
+    max_workers = 5  # 最大线程数
+
+    def wrapper(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+        try:
+            if data_logger:
+                data_logger.info("Using parallel slice parser!")
+
+            if not hasattr(self, "merge_results"):
+                data_logger.info("The Parser has not implemented merging function! Using the original parser instead!")
+                raise AttributeError("merge_results method not found")
+
+            # get the schema and the DB size
+            schema_df = self.process_schema(item, schema)
+            sub_schema_lis = slice_schema_df(schema_df, slice_size=slice_size)
+            if data_logger:
+                data_logger.info(f"Schema Dataframe slice number is {len(sub_schema_lis)}")
+            # 使用多线程处理
+            results = [None] * len(sub_schema_lis)  # 预分配结果列表以保持顺序
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                # 提交所有任务，保存 future 和对应的索引
+                future_to_index = {
+                    executor.submit(func, self, item, sub_schema, data_logger, update_dataset=False, **kwargs): idx
+                    for idx, sub_schema in enumerate(sub_schema_lis)
+                }
+
+                # 按完成顺序处理结果，但保存到正确的位置
+                for future in as_completed(future_to_index):
+                    idx = future_to_index[future]
+                    try:
+                        output = future.result()
+                        results[idx] = output
+                        if data_logger:
+                            data_logger.info(f"Completed processing slice {idx + 1}/{len(sub_schema_lis)}")
+                    except Exception as e:
+                        if data_logger:
+                            data_logger.error(f"Error processing slice {idx}: {e}")
+                        raise
+
+            # 合并结果
+            results = self.merge_results(results)
+            file_ext = ".txt" if self.output_format == "str" else ".json"
+            self.save_output(results, item, file_ext=file_ext)
+
+            if data_logger:
+                data_logger.info("All slices processed and merged successfully!")
+                data_logger.info(f"Final parsing results: {results}!")
+            return results
+
+        except Exception as e:
+            if data_logger:
+                data_logger.info(f"Parallel slice parser failed: {e}. Used default schema instead!")
+            res = func(self, item, schema, data_logger=data_logger, **kwargs)
+            return res
+
+    return wrapper

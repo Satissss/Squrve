@@ -5,7 +5,7 @@ from typing import Union, List, Dict, Optional
 from os import PathLike
 from loguru import logger
 
-from core.actor.parser.BaseParse import BaseParser
+from core.actor.parser.BaseParse import BaseParser, parallel_slice_parse
 from core.utils import load_dataset, save_dataset
 from core.data_manage import Dataset, single_central_process
 from llama_index.core.llms.llm import LLM
@@ -103,7 +103,9 @@ class MACSQLCoTParser(BaseParser):
                 pass
         return schema_links
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+    @parallel_slice_parse
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, update_dataset=True,
+            **kwargs):
         """
         Extract relevant schema links using MAC-SQL approach.
         """
@@ -148,8 +150,22 @@ class MACSQLCoTParser(BaseParser):
         output = self.format_output(schema_links)
 
         # Use base class method to save output
-        self.save_output(output, item)
+        if update_dataset:
+            self.save_output(output, item)
         if data_logger:
             data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output
+
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for row in results:
+            if not isinstance(row, List):
+                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
+
+            merge_result.extend(row)
+
+        return merge_result

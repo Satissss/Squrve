@@ -5,7 +5,7 @@ import re
 from loguru import logger
 import pandas as pd
 from pathlib import Path
-from core.actor.parser.BaseParse import BaseParser
+from core.actor.parser.BaseParse import BaseParser, parallel_slice_parse
 from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from llama_index.core.llms.llm import LLM
 
@@ -387,11 +387,13 @@ Your main tasks are:
         response = self.llm.complete(self.SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
+    @parallel_slice_parse
     def act(
             self,
             item,
             schema: Union[str, PathLike, Dict, List, pd.DataFrame] = None,
             data_logger=None,
+            update_dataset=True,
             **kwargs
     ):
         try:
@@ -446,7 +448,8 @@ Your main tasks are:
                 schema_links = {"tables": [], "columns": []}
 
             # Use base class method to save output
-            self.save_output(schema_links, item)
+            if update_dataset:
+                self.save_output(schema_links, item)
 
             if data_logger:
                 data_logger.info(f"{self.NAME}.act end | item={item}")
@@ -457,3 +460,23 @@ Your main tasks are:
             logger.error(f"Error in RSLSQLBiDirParser.act(): {e}")
             # Return empty schema links as fallback
             return {"tables": [], "columns": []}
+
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = {}
+        for row in results:
+            if not isinstance(row, dict):
+                raise TypeError(f"Each row must be a dict, but got {type(row)}: {row}")
+            if "tables" not in merge_result:
+                merge_result["tables"] = row.get("tables", [])
+            else:
+                merge_result["tables"] += row.get("tables", [])
+
+            if "columns" not in merge_result:
+                merge_result["columns"] = row.get("columns", [])
+            else:
+                merge_result["columns"] += row.get("columns", [])
+
+        return merge_result

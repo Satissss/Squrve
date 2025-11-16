@@ -5,8 +5,16 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
+      <change beforePath="$PROJECT_DIR$/.idea/Squrve.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Squrve.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -92,7 +100,8 @@
     "Python.evaluate_schema_links.executor": "Run",
     "Python.extract_schemas.executor": "Run",
     "Python.filter.executor": "Run",
-    "Python.filter_data.executor": "Run",
+    "Python.filter_data.executor": "Debug",
+    "Python.filter_data_2.executor": "Run",
     "Python.filter_dataset.executor": "Run",
     "Python.po.executor": "Run",
     "Python.preprocess.executor": "Run",
@@ -100,7 +109,7 @@
     "Python.process.executor": "Run",
     "Python.process_data.executor": "Run",
     "Python.run (1).executor": "Run",
-    "Python.run.executor": "Debug",
+    "Python.run.executor": "Run",
     "Python.run_.executor": "Debug",
     "Python.run_2.executor": "Debug",
     "Python.run_ambidb.executor": "Run",
@@ -115,7 +124,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "WebServerToolWindowFactoryState": "false",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/project/Squrve/app",
+    "last_opened_file_path": "D:/project/Squrve",
     "node.js.detected.package.eslint": "true",
     "node.js.detected.package.tslint": "true",
     "node.js.selected.package.eslint": "(autodetect)",
@@ -580,7 +589,10 @@
       <workItem from="1762753636663" duration="1731000" />
       <workItem from="1762783835008" duration="8000" />
       <workItem from="1762826074327" duration="21713000" />
-      <workItem from="1762916774515" duration="19140000" />
+      <workItem from="1762916774515" duration="19976000" />
+      <workItem from="1762996087254" duration="3632000" />
+      <workItem from="1763014605473" duration="1507000" />
+      <workItem from="1763256519704" duration="20253000" />
     </task>
     <servers />
   </component>
@@ -651,14 +663,14 @@
           <option name="timeStamp" value="171" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
-          <url>file://$PROJECT_DIR$/startup_run/run.py</url>
-          <line>16</line>
-          <option name="timeStamp" value="176" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/app/run.py</url>
           <line>32</line>
           <option name="timeStamp" value="178" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="python-line">
+          <url>file://$PROJECT_DIR$/files/pred_sql/filter_data.py</url>
+          <line>15</line>
+          <option name="timeStamp" value="179" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
@@ -679,8 +691,8 @@
     </watches-manager>
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/Squrve$MetaTask.coverage" NAME="MetaTask Coverage Results" MODIFIED="1753413700415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/QueryFlow$data_manage.coverage" NAME="data_manage Coverage Results" MODIFIED="1746755751731" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
+    <SUITE FILE_PATH="coverage/Squrve$MetaTask.coverage" NAME="MetaTask Coverage Results" MODIFIED="1753413700415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/task/meta" />
     <SUITE FILE_PATH="coverage/Squrve$ambidb_evaluate_schema_links.coverage" NAME="ambidb_evaluate_schema_links Coverage Results" MODIFIED="1760405204194" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/entension" />
     <SUITE FILE_PATH="coverage/QueryFlow$pipeline.coverage" NAME="pipeline Coverage Results" MODIFIED="1747481083513" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/nest" />
     <SUITE FILE_PATH="coverage/Squrve$run_test.coverage" NAME="run_test Coverage Results" MODIFIED="1758370544728" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
@@ -688,14 +700,14 @@
     <SUITE FILE_PATH="coverage/QueryFlow$base.coverage" NAME="base Coverage Results" MODIFIED="1747493658085" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor" />
     <SUITE FILE_PATH="coverage/Squrve$LinkAlignReduce.coverage" NAME="LinkAlignReduce Coverage Results" MODIFIED="1751183128185" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/reducer" />
     <SUITE FILE_PATH="coverage/QueryFlow$po.coverage" NAME="po Coverage Results" MODIFIED="1747708407055" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt/plot" />
-    <SUITE FILE_PATH="coverage/Squrve$preprocess.coverage" NAME="preprocess Coverage Results" MODIFIED="1762930745397" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/optimized_sql" />
+    <SUITE FILE_PATH="coverage/Squrve$preprocess.coverage" NAME="preprocess Coverage Results" MODIFIED="1763292075122" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/optimized_sql" />
     <SUITE FILE_PATH="coverage/Squrve$process_data.coverage" NAME="process_data Coverage Results" MODIFIED="1762924829123" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/datasets" />
     <SUITE FILE_PATH="coverage/Squrve$filter_dataset.coverage" NAME="filter_dataset Coverage Results" MODIFIED="1762744134825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../Spider2/spider2-lite/evaluation_suite" />
     <SUITE FILE_PATH="coverage/Squrve$evaluate_ablation.coverage" NAME="evaluate_ablation Coverage Results" MODIFIED="1751257240348" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/Squrve$run_2.coverage" NAME="run_2 Coverage Results" MODIFIED="1760926277447" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$run_can.coverage" NAME="run_can Coverage Results" MODIFIED="1760350333807" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/entension" />
     <SUITE FILE_PATH="coverage/Squrve$test_api.coverage" NAME="test_api Coverage Results" MODIFIED="1762950755224" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
-    <SUITE FILE_PATH="coverage/Squrve$filter_data.coverage" NAME="filter_data Coverage Results" MODIFIED="1762930484105" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/optimized_sql" />
+    <SUITE FILE_PATH="coverage/Squrve$filter_data.coverage" NAME="filter_data Coverage Results" MODIFIED="1763256721356" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/pred_sql" />
     <SUITE FILE_PATH="coverage/Squrve$DAILSQLGenerate.coverage" NAME="DAILSQLGenerate Coverage Results" MODIFIED="1753363733659" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
     <SUITE FILE_PATH="coverage/Squrve$run_.coverage" NAME="run_ Coverage Results" MODIFIED="1751182436247" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/run" />
     <SUITE FILE_PATH="coverage/Squrve$QwenModel.coverage" NAME="QwenModel Coverage Results" MODIFIED="1757925033158" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
@@ -710,6 +722,7 @@
     <SUITE FILE_PATH="coverage/Squrve$LinkAlignGenerate.coverage" NAME="LinkAlignGenerate Coverage Results" MODIFIED="1754968536104" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/generator" />
     <SUITE FILE_PATH="coverage/Squrve$engine.coverage" NAME="engine Coverage Results" MODIFIED="1755053646903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
     <SUITE FILE_PATH="coverage/QueryFlow$cal_efficiency.coverage" NAME="cal_efficiency Coverage Results" MODIFIED="1747735196429" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/data_source/efficiency" />
+    <SUITE FILE_PATH="coverage/Squrve$filter_data_2.coverage" NAME="filter_data_2 Coverage Results" MODIFIED="1763283276524" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/optimized_sql" />
     <SUITE FILE_PATH="coverage/Squrve$filter.coverage" NAME="filter Coverage Results" MODIFIED="1758370277465" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment/data" />
     <SUITE FILE_PATH="coverage/QueryFlow$debug.coverage" NAME="debug Coverage Results" MODIFIED="1748359856891" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/Squrve$run_ens.coverage" NAME="run_ens Coverage Results" MODIFIED="1758632886876" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
@@ -723,7 +736,7 @@
     <SUITE FILE_PATH="coverage/QueryFlow$create.coverage" NAME="create Coverage Results" MODIFIED="1746275553960" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/reasoning_examples" />
     <SUITE FILE_PATH="coverage/Squrve$po.coverage" NAME="po Coverage Results" MODIFIED="1758336833416" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/data_source" />
     <SUITE FILE_PATH="coverage/Squrve$data_clean.coverage" NAME="data_clean Coverage Results" MODIFIED="1753605198668" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/AmbiDB" />
-    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1762946930501" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/app" />
+    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1763301355549" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/Squrve$data_manage.coverage" NAME="data_manage Coverage Results" MODIFIED="1752075101039" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
     <SUITE FILE_PATH="coverage/Squrve$DeepseekModel.coverage" NAME="DeepseekModel Coverage Results" MODIFIED="1756134196221" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/llm" />
     <SUITE FILE_PATH="coverage/Squrve$DINSQLOptimize.coverage" NAME="DINSQLOptimize Coverage Results" MODIFIED="1754464192185" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core/actor/optimizer" />

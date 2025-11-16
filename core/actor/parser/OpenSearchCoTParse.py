@@ -7,10 +7,10 @@ import os
 import chardet
 import json
 from sentence_transformers import SentenceTransformer
-from core.actor.parser.BaseParse import BaseParser
+from core.actor.parser.BaseParse import BaseParser, parallel_slice_parse
 from core.utils import load_dataset, save_dataset
 from pathlib import Path
-
+from loguru import logger
 import numpy as np
 
 
@@ -436,7 +436,9 @@ Please conclude the database in the following format:
         res, judge = self.json_ext(select_json)
         return res, judge
 
-    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):
+    @parallel_slice_parse
+    def act(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, update_dataset=True,
+            **kwargs):
         if data_logger:
             data_logger.info(f"{self.NAME}.act start | item={item}")
         row = self.dataset[item]
@@ -475,15 +477,29 @@ Please conclude the database in the following format:
         value_links = [x[1] for x in L_values]
         self.log_schema_links(data_logger, value_links, stage="extracted.values")
 
-
         schema_links = list(set(cols_select + [x[1] for x in L_values]))
         output = self.format_output(schema_links)
         self.log_schema_links(data_logger, output, stage="final")
         # Use base class method to save output
         file_ext = ".txt" if self.output_format == "str" else ".json"
-        self.save_output(output, item, file_ext=file_ext)
+
+        if update_dataset:
+            self.save_output(output, item, file_ext=file_ext)
 
         if data_logger:
             data_logger.info(f"{self.NAME}.act end | item={item}")
 
         return output
+
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for row in results:
+            if not isinstance(row, List):
+                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
+
+            merge_result.extend(row)
+
+        return merge_result
