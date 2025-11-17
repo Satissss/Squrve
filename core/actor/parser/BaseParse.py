@@ -12,6 +12,10 @@ from core.actor.parser.parse_utils import slice_schema_df
 
 
 class BaseParser(Actor):
+    # The NAME variable is defined in the implementing subclasses,
+    # and by convention it is recommended to use a name ending with *Parser.
+    # NAME: str = "*Parser"
+
     OUTPUT_NAME: str = "schema_links"
 
     def __init__(
@@ -85,7 +89,7 @@ class BaseParser(Actor):
         save_path = save_path / filename
         save_dataset(output, new_data_source=save_path)
         self.dataset.setitem(item, self.OUTPUT_NAME, str(save_path))
-        logger.debug(f"Output saved to: {str(save_path)}")
+        logger.debug(f"Output: {output}, saved to: {str(save_path)}")
 
     def format_output(self, output, output_format: str = None):
         """Format output based on output_format parameter."""

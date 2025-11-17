@@ -13,7 +13,9 @@ from core.utils import load_dataset, parse_schema_from_df
 
 class BaseDecomposer(Actor):
     """ Decompose complex queries into a series of sub-questions. """
-
+    # The NAME variable is defined in the implementing subclasses,
+    # and by convention it is recommended to use a name ending with *Decomposer.
+    # NAME: str = "*Decomposer"
     OUTPUT_NAME: str = "sub_questions"
 
     def __init__(

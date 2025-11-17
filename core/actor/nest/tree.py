@@ -1,12 +1,52 @@
 import json
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Dict
+from typing import List, Dict, Union
 
 from loguru import logger
 
-from core.actor.base import ComplexActor
+from core.actor.base import ComplexActor, Actor
 from core.data_manage import update_dataset
+
+
+def group_partition(actors: Union[Actor, List[Actor]]):
+    from core.actor.parser.BaseParse import BaseParser
+    from core.actor.scaler.BaseScale import BaseScaler
+    from core.actor.optimizer.BaseOptimize import BaseOptimizer
+    new_actors = {}
+    rtn_actors = []
+    for actor in actors:
+        if isinstance(actor, BaseParser):
+            if "parse_group" not in new_actors:
+                new_actors["parse_group"] = ParseActorGroup()
+            new_actors["parse_group"].add(actor)
+        elif isinstance(actor, BaseScaler):
+            if "scale_group" not in new_actors:
+                new_actors["scale_group"] = ScaleActorGroup()
+            new_actors["scale_group"].add(actor)
+        elif isinstance(actor, BaseOptimizer):
+            if "optimize_group" not in new_actors:
+                new_actors["optimize_group"] = OptimizeActorGroup()
+            new_actors["optimize_group"].add(actor)
+        else:
+            rtn_actors.append(actor)
+    for _, group in new_actors.items():
+        rtn_actors.append(group)
+
+    return rtn_actors
+
+
+def actor_group_partition(func):
+    def wrapper(self, item, data_logger=None, **kwargs):
+        # group the actor
+        self.actors = group_partition(self.actors)
+        if data_logger:
+            data_logger.info(f"The number of actor group is: {len(self.actors)}")
+
+        res = func(self, item, data_logger=data_logger, **kwargs)
+        return res
+
+    return wrapper
 
 
 class TreeActor(ComplexActor):
@@ -40,6 +80,7 @@ class TreeActor(ComplexActor):
         self.open_actor_parallel: bool = open_actor_parallel
         self.max_workers: int = max_workers
 
+    @actor_group_partition
     def act(self, item, **kwargs):
         logger.info(f"TreeActor 开始执行，并行模式: {self.open_actor_parallel}, 包含 {len(self.actors)} 个 actors")
         if self.open_actor_parallel:
@@ -138,17 +179,26 @@ class TreeActor(ComplexActor):
         return results
 
 
-def actor_group_by(func):
-    def wrapper(*args, **kwargs):
-        res = func(*args, **kwargs)
-        return res
-
-    return wrapper
-
-
 class ActorGroup(TreeActor):
-    def merge_results(self, results: List):
+    def group_preprocess(self, **kwargs):
         pass
+
+    def group_postprocess(self, **kwargs):
+        pass
+
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+        logger.info(results)
+        merge_result = []
+        for item in results:
+            for actor, res in item.items():
+                if isinstance(res, list):
+                    merge_result.extend(res)
+                else:
+                    merge_result.append(res)
+
+        return merge_result
 
     def act(self, item, **kwargs):
         # todo
@@ -159,6 +209,8 @@ class ActorGroup(TreeActor):
         if not dataset or not self.actors:
             warnings.warn("Both 'dataset' and 'actors' must be provided.", category=UserWarning)
             return None
+        # Begin Group Pre-Process
+        self.group_preprocess(**kwargs)
 
         logger.info(f"TreeActor 并行执行模式，最大工作线程数: {self.max_workers}")
         # Submit actor tasks to thread pool
@@ -168,7 +220,7 @@ class ActorGroup(TreeActor):
             for i, actor in enumerate(self.actors):
                 logger.info(f"提交第 {i + 1}/{len(self.actors)} 个 actor 到线程池: {actor.name}")
                 actor.dataset = update_dataset(dataset, actor.dataset)
-                futures[executor.submit(actor.act, item, update_dataset=False, **kwargs)] = actor
+                futures[executor.submit(actor.act, item, **kwargs)] = actor
 
             completed_count = 0
             for future in as_completed(futures):
@@ -195,6 +247,9 @@ class ActorGroup(TreeActor):
         self.dataset = dataset
         logger.info("数据集合并完成")
 
+        # Begin Group Post-Process
+        self.group_postprocess(**kwargs)
+
         return results
 
 
@@ -210,38 +265,16 @@ class ParseActorGroup(ActorGroup):
                 if parser == "RSLSQLBiDirParser":
                     merge_result.extend(res.get("columns", []))
                 elif isinstance(res, list):
-                    merge_result.extend(item)
+                    merge_result.extend(res)
                 else:
-                    merge_result.append(item)
+                    merge_result.append(res)
 
         return merge_result
 
 
 class ScaleActorGroup(ActorGroup):
-    def merge_results(self, results: List):
-        if not results:
-            logger.info("Input results empty!")
-
-        merge_result = []
-        for row in results:
-            if not isinstance(row, List):
-                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
-
-            merge_result.extend(row)
-
-        return merge_result
+    pass
 
 
 class OptimizeActorGroup(ActorGroup):
-    def merge_results(self, results: List):
-        if not results:
-            logger.info("Input results empty!")
-
-        merge_result = []
-        for row in results:
-            if not isinstance(row, List):
-                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
-
-            merge_result.extend(row)
-
-        return merge_result
+    pass
