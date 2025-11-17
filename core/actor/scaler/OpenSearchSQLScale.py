@@ -727,7 +727,7 @@ class OpenSearchSQLScaler(BaseScaler):
             data_logger.info(f"{self.NAME}.candidates | count={len(pred_sqls)}")
 
         # Save results using base class method
-        self.save_results(pred_sqls, item, row.get("instance_id", item))
+        self.save_output(pred_sqls, item, row.get("instance_id", item))
 
         if data_logger:
             data_logger.info(f"{self.NAME}.pred_sqls | output={pred_sqls}")

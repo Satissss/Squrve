@@ -5,16 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
-      <change beforePath="$PROJECT_DIR$/.idea/Squrve.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Squrve.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -74,66 +65,66 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.DAILSQLGenerate.executor": "Run",
-    "Python.DINSQLOptimize.executor": "Run",
-    "Python.DeepseekModel.executor": "Run",
-    "Python.GenerateTask.executor": "Run",
-    "Python.LinkAlignGenerate.executor": "Debug",
-    "Python.LinkAlignReduce.executor": "Debug",
-    "Python.MACSQLDecompose.executor": "Run",
-    "Python.MetaTask.executor": "Run",
-    "Python.QwenModel.executor": "Run",
-    "Python.XiaoJingModel.executor": "Run",
-    "Python.ZhipuModel.executor": "Run",
-    "Python.ambidb_evaluate_schema_links.executor": "Run",
-    "Python.base.executor": "Debug",
-    "Python.count_num.executor": "Run",
-    "Python.data_clean.executor": "Run",
-    "Python.data_manage.executor": "Run",
-    "Python.evaluate.executor": "Run",
-    "Python.evaluate_ablation.executor": "Debug",
-    "Python.evaluate_ablation_fixed.executor": "Run",
-    "Python.evaluate_schema_links.executor": "Run",
-    "Python.extract_schemas.executor": "Run",
-    "Python.filter.executor": "Run",
-    "Python.filter_data.executor": "Debug",
-    "Python.filter_data_2.executor": "Run",
-    "Python.filter_dataset.executor": "Run",
-    "Python.po.executor": "Run",
-    "Python.preprocess.executor": "Run",
-    "Python.pro.executor": "Run",
-    "Python.process.executor": "Run",
-    "Python.process_data.executor": "Run",
-    "Python.run (1).executor": "Run",
-    "Python.run.executor": "Run",
-    "Python.run_.executor": "Debug",
-    "Python.run_2.executor": "Debug",
-    "Python.run_ambidb.executor": "Run",
-    "Python.run_bird.executor": "Run",
-    "Python.run_can.executor": "Debug",
-    "Python.run_ens.executor": "Run",
-    "Python.run_spider_dev.executor": "Debug",
-    "Python.run_test.executor": "Run",
-    "Python.test_api.executor": "Run",
-    "Python.tree.executor": "Debug",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/project/Squrve",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.DAILSQLGenerate.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DINSQLOptimize.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DeepseekModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.GenerateTask.executor&quot;: &quot;Run&quot;,
+    &quot;Python.LinkAlignGenerate.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.LinkAlignReduce.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.MACSQLDecompose.executor&quot;: &quot;Run&quot;,
+    &quot;Python.MetaTask.executor&quot;: &quot;Run&quot;,
+    &quot;Python.QwenModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.XiaoJingModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ZhipuModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ambidb_evaluate_schema_links.executor&quot;: &quot;Run&quot;,
+    &quot;Python.base.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.count_num.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_clean.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_manage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate_ablation.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.evaluate_ablation_fixed.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate_schema_links.executor&quot;: &quot;Run&quot;,
+    &quot;Python.extract_schemas.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_data.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.filter_data_2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_dataset.executor&quot;: &quot;Run&quot;,
+    &quot;Python.po.executor&quot;: &quot;Run&quot;,
+    &quot;Python.preprocess.executor&quot;: &quot;Run&quot;,
+    &quot;Python.pro.executor&quot;: &quot;Run&quot;,
+    &quot;Python.process.executor&quot;: &quot;Run&quot;,
+    &quot;Python.process_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_ambidb.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_bird.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_can.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_ens.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_spider_dev.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_api.executor&quot;: &quot;Run&quot;,
+    &quot;Python.tree.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/project/Squrve&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\project\Squrve\app" />
@@ -150,7 +141,7 @@
       <recent name="D:\project\Squrve\assets" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.po">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -592,7 +583,8 @@
       <workItem from="1762916774515" duration="19976000" />
       <workItem from="1762996087254" duration="3632000" />
       <workItem from="1763014605473" duration="1507000" />
-      <workItem from="1763256519704" duration="20253000" />
+      <workItem from="1763256519704" duration="21623000" />
+      <workItem from="1763305385934" duration="391000" />
     </task>
     <servers />
   </component>

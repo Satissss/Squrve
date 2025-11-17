@@ -68,8 +68,10 @@ class BaseOptimizer(Actor):
 
         return sql_list, is_single
 
-    def save_results(self, optimized_sqls: List[str], is_single: bool, item: int, instance_id: str = None) -> Union[str, List[str]]:
+    def save_output(self, optimized_sqls: List[str], item: int, instance_id: str = None) -> Union[str, List[str]]:
         """Save optimized results to files and update dataset."""
+        is_single = len(optimized_sqls) == 1
+
         if not self.is_save:
             return optimized_sqls[0] if is_single else optimized_sqls
 

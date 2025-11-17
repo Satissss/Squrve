@@ -1,8 +1,8 @@
 {
   "api_key": {
-    "deepseek": "your_api_key_here",
-    "qwen": "your_api_key_here",
-    "zhipu": "your_api_key_here"
+    "deepseek": "sk-b305721c29f54facb3c3849104712519",
+    "qwen": "sk-3f43effded4d49fc934829ee24e79f1d",
+    "zhipu": "7ff727a6f39606898fa5d99a4535a972.tahGD54SmhjkZY4u"
   },
   "llm": {
     "use": "qwen",
@@ -103,10 +103,7 @@
       {
         "task_id": "complex_actor",
         "task_lis": [
-          [
-            "parse1",
-            "parse2"
-          ],
+          "parse1",
           "scale",
           "optimize",
           "select"
@@ -133,6 +130,9 @@
             "select": {
               "save_dir": "../files/pred_sql/bird_dev"
             }
+          },
+          "dataset": {
+            "random_size": 5
           }
         },
         "open_parallel": true,

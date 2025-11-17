@@ -58,15 +58,15 @@ class BaseScaler(Actor):
 
         return schema
 
-    def save_results(self, pred_sqls: List[str], item: int, instance_id: str = None) -> List[str]:
+    def save_output(self, output: List[str], item: int, instance_id: str = None) -> List[str]:
         """Save generated SQL candidates to files and update dataset."""
         if not self.is_save:
             # 即使不保存文件，也要设置 pred_sql 字段
-            if len(pred_sqls) == 1:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls[0])
+            if len(output) == 1:
+                self.dataset.setitem(item, self.OUTPUT_NAME, output[0])
             else:
-                self.dataset.setitem(item, self.OUTPUT_NAME, pred_sqls)
-            return pred_sqls
+                self.dataset.setitem(item, self.OUTPUT_NAME, output)
+            return output
 
         if instance_id is None:
             row = self.dataset[item]
@@ -79,7 +79,7 @@ class BaseScaler(Actor):
 
         # Save each SQL candidate in separate files
         sql_paths = []
-        for i, sql in enumerate(pred_sqls):
+        for i, sql in enumerate(output):
             sql_save_path = save_path / f"{self.NAME}_{instance_id}_{i}.sql"
             save_dataset(sql, new_data_source=sql_save_path)
             sql_paths.append(str(sql_save_path))
@@ -90,7 +90,7 @@ class BaseScaler(Actor):
         else:
             self.dataset.setitem(item, self.OUTPUT_NAME, sql_paths)
 
-        return pred_sqls
+        return output
 
     @abstractmethod
     def act(

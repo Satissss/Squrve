@@ -324,7 +324,7 @@ For the given question, analyze and refine the erroneous SQL statement using the
             schema_links = row.get("schema_links", "None")
 
         # Load pred_sql using base class method
-        sql_list, is_single = self.load_pred_sql(pred_sql, item)
+        sql_list, _ = self.load_pred_sql(pred_sql, item)
         if data_logger:
             data_logger.info(f"{self.NAME}.input_sql_count | count={len(sql_list)}")
             
@@ -345,7 +345,7 @@ For the given question, analyze and refine the erroneous SQL statement using the
                 optimized_sqls.append(process_sql(sql))
 
         # Save results using base class method
-        output = self.save_results(optimized_sqls, is_single, item, row.get("instance_id"))
+        output = self.save_output(optimized_sqls, item, row.get("instance_id"))
 
         logger.info(f"LinkAlignOptimizer completed processing item {item}")
         if data_logger:

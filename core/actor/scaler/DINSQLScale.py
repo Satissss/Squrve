@@ -307,7 +307,7 @@ The SQL query for the sub-question "{sub_question}" is '''
             data_logger.info(f"{self.NAME}.candidates | count={len(pred_sqls)}")
 
         # Save results using base class method
-        self.save_results(pred_sqls, item, row.get("instance_id"))
+        self.save_output(pred_sqls, item, row.get("instance_id"))
 
         if data_logger:
             data_logger.info(f"{self.NAME}.pred_sqls | output={pred_sqls}")

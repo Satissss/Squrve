@@ -1,6 +1,8 @@
 import json
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Dict
+
 from loguru import logger
 
 from core.actor.base import ComplexActor
@@ -76,7 +78,6 @@ class TreeActor(ComplexActor):
             except Exception as e:
                 error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
                 logger.error(error_msg)
-                print(error_msg)
 
         for actor in self.actors:
             dataset = update_dataset(dataset, actor.dataset, merge_dataset=True)
@@ -125,7 +126,6 @@ class TreeActor(ComplexActor):
                 except Exception as e:
                     error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
                     logger.error(error_msg)
-                    print(error_msg)
 
         # Merge datasets in the main thread
         logger.info("开始合并数据集...")
@@ -136,3 +136,112 @@ class TreeActor(ComplexActor):
         self.dataset = dataset
         logger.info("数据集合并完成")
         return results
+
+
+def actor_group_by(func):
+    def wrapper(*args, **kwargs):
+        res = func(*args, **kwargs)
+        return res
+
+    return wrapper
+
+
+class ActorGroup(TreeActor):
+    def merge_results(self, results: List):
+        pass
+
+    def act(self, item, **kwargs):
+        # todo
+        # we will add process_series method in the future, now we only support the parallel method.
+        results = {}
+        dataset = self.dataset
+
+        if not dataset or not self.actors:
+            warnings.warn("Both 'dataset' and 'actors' must be provided.", category=UserWarning)
+            return None
+
+        logger.info(f"TreeActor 并行执行模式，最大工作线程数: {self.max_workers}")
+        # Submit actor tasks to thread pool
+        futures = {}
+        rtn = []
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            for i, actor in enumerate(self.actors):
+                logger.info(f"提交第 {i + 1}/{len(self.actors)} 个 actor 到线程池: {actor.name}")
+                actor.dataset = update_dataset(dataset, actor.dataset)
+                futures[executor.submit(actor.act, item, update_dataset=False, **kwargs)] = actor
+
+            completed_count = 0
+            for future in as_completed(futures):
+                actor = futures[future]
+                completed_count += 1
+                logger.info(f"并行执行进度: {completed_count}/{len(self.actors)} - Actor {actor.name} 完成")
+                try:
+                    res = future.result()
+                    output_name = actor.output_name
+                    logger.info(f"Actor {actor.name} 并行执行完成，输出名称: {output_name}")
+
+                    rtn.append({actor.name: res})
+                except Exception as e:
+                    error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
+                    logger.error(error_msg)
+
+        # Merge datasets in the main thread
+        logger.info("开始合并数据集...")
+        rtn = self.merge_results(rtn)
+        actor.save_output(rtn, item)
+        dataset = update_dataset(dataset, actor.dataset, merge_dataset=True)
+
+        results[output_name] = rtn
+        self.dataset = dataset
+        logger.info("数据集合并完成")
+
+        return results
+
+
+class ParseActorGroup(ActorGroup):
+    def merge_results(self, results: List):
+        # Merge results generated from distinct parser methods.
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for item in results:
+            for parser, res in item.items():
+                if parser == "RSLSQLBiDirParser":
+                    merge_result.extend(res.get("columns", []))
+                elif isinstance(res, list):
+                    merge_result.extend(item)
+                else:
+                    merge_result.append(item)
+
+        return merge_result
+
+
+class ScaleActorGroup(ActorGroup):
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for row in results:
+            if not isinstance(row, List):
+                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
+
+            merge_result.extend(row)
+
+        return merge_result
+
+
+class OptimizeActorGroup(ActorGroup):
+    def merge_results(self, results: List):
+        if not results:
+            logger.info("Input results empty!")
+
+        merge_result = []
+        for row in results:
+            if not isinstance(row, List):
+                raise TypeError(f"Each row must be a list, but got {type(row)}: {row}")
+
+            merge_result.extend(row)
+
+        return merge_result
