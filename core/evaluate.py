@@ -283,7 +283,7 @@ class Evaluator:
             }
             pred_args = {"sql_query": pred_sql, **base_exec_args}
             gold_args = {"sql_query": gold_sql, **base_exec_args}
-            pred, _ = get_sql_exec_result(**pred_args)
+            pred, err = get_sql_exec_result(**pred_args)
             gold, _ = get_sql_exec_result(**gold_args)
 
             if gold is None:
@@ -291,7 +291,7 @@ class Evaluator:
                 return None
 
             if pred is None:
-                print(f"Execution Failure: Predicted SQL failed to execute for item {item}")
+                print(f"Predicted SQL Execution Failure for item {item}: {err}")
                 return 0
             score = self.compare_pandas_table(pred, gold)
 
