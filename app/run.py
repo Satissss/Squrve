@@ -2,10 +2,6 @@ import os
 import sys
 import json
 import time
-import uuid
-from pathlib import Path
-from threading import Lock
-from copy import deepcopy
 from loguru import logger
 from typing import List
 import copy
@@ -31,6 +27,7 @@ data_source = dataloader.get_data_source_index()
 schema_source = dataloader.get_schema_source_index()[0]
 
 dataset = dataloader.generate_dataset(data_source, schema_source)
+dataset.db_path = "../benchmarks/spider/database"
 
 app = Flask(__name__)
 

@@ -5,8 +5,8 @@
     "zhipu": "your_api_key_here"
   },
   "llm": {
-    "use": "deepseek",
-    "model_name": "deepseek-chat",
+    "use": "qwen",
+    "model_name": "qwen-turbo",
     "context_window": 120000,
     "max_token": 8000,
     "top_p": 0.9,
