@@ -494,7 +494,7 @@ class Selector:
             
         return True
 
-    def _prune_schema(self, db_id: str, query: str, schema_str: str, fk_str: str, evidence: str) -> Dict:
+    def _prune_schema(self, db_id: str, query: str, schema_str: str, fk_str: str, evidence: str, data_logger=None) -> Dict:
         """使用 LLM 进行模式剪枝"""
         try:
             prompt = selector_template.format(
@@ -505,7 +505,10 @@ class Selector:
                 evidence=evidence
             )
             response = self.llm.complete(prompt)
-            return parse_json(response.text)
+            response_text = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{SELECTOR_NAME}.llm_output | {response_text}")
+            return parse_json(response_text)
         except Exception as e:
             logger.error(f"模式剪枝失败: {e}")
             return {}
@@ -539,7 +542,8 @@ class Selector:
 
         if need_prune:
             logger.debug("开始模式剪枝...")
-            extracted_schema = self._prune_schema(db_id, query, desc_str, fk_str, evidence)
+            data_logger = message.get('data_logger')
+            extracted_schema = self._prune_schema(db_id, query, desc_str, fk_str, evidence, data_logger)
             message['extracted_schema'] = extracted_schema
             message['pruned'] = True
             logger.debug(f"剪枝结果: {extracted_schema}")
@@ -596,8 +600,11 @@ class Decomposer:
 
         try:
             logger.debug("开始问题分解和 SQL 生成...")
+            data_logger = message.get('data_logger')
             response = self.llm.complete(prompt)
             reply = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{DECOMPOSER_NAME}.llm_output | {reply}")
 
             # 提取最终的 SQL
             final_sql = parse_sql_from_string(reply)
@@ -670,7 +677,7 @@ class Refiner:
         row_count = exec_result.get("row_count", 0)
         return row_count == 0
 
-    def _refine_sql(self, query: str, evidence: str, desc_str: str, fk_str: str, original_sql: str, error: str) -> str:
+    def _refine_sql(self, query: str, evidence: str, desc_str: str, fk_str: str, original_sql: str, error: str, data_logger=None) -> str:
         """使用 LLM 修复 SQL"""
         try:
             prompt = refiner_template.format(
@@ -681,9 +688,10 @@ class Refiner:
                 original_sql=original_sql,
                 error=error
             )
-
             response = self.llm.complete(prompt)
             reply = response.text.strip()
+            if data_logger:
+                data_logger.info(f"{REFINER_NAME}.llm_output | {reply}")
             return parse_sql_from_string(reply)
 
         except Exception as e:
@@ -715,7 +723,17 @@ class Refiner:
 
         # 执行 SQL
         logger.debug("开始执行 SQL 验证...")
+        data_logger = message.get('data_logger')
+        if data_logger:
+            data_logger.info(f"{REFINER_NAME}.sql_execute | {final_sql}")
         exec_result = self._execute_sql(final_sql, db_type, db_path, db_id, credential)
+        if data_logger:
+            if not exec_result.get("success", False):
+                error_info = exec_result.get('error', 'Unknown error')
+                data_logger.info(f"{REFINER_NAME}.sql_error | {error_info}")
+            else:
+                row_count = exec_result.get('row_count', 0)
+                data_logger.info(f"{REFINER_NAME}.sql_result | success=True, row_count={row_count}")
 
         # 判断是否需要修复
         need_refine = self._is_need_refine(exec_result)
@@ -739,7 +757,7 @@ class Refiner:
                 # 尝试修复 SQL
                 logger.debug("开始修复 SQL...")
                 error_info = exec_result.get('error', 'Empty result set')
-                refined_sql = self._refine_sql(query, evidence, desc_str, fk_str, final_sql, error_info)
+                refined_sql = self._refine_sql(query, evidence, desc_str, fk_str, final_sql, error_info, data_logger)
 
                 message['try_times'] = try_times + 1
                 message['final_sql'] = refined_sql
@@ -975,7 +993,8 @@ Please generate a valid SQL query. Only return the SQL statement:"""
                 "schema": schema_df,
                 "extracted_schema": {},
                 "ground_truth": row.get('query', ''),
-                "send_to": SYSTEM_NAME
+                "send_to": SYSTEM_NAME,
+                "data_logger": data_logger
             }
 
             # 执行 MAC-SQL 流程
@@ -1007,7 +1026,6 @@ Please generate a valid SQL query. Only return the SQL statement:"""
             logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
             if data_logger:
                 data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
-                data_logger.info(f"{self.NAME}.act end | item={item}")
             return pred_sql
 
         except Exception as e:

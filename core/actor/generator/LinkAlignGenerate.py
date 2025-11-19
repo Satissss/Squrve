@@ -34,7 +34,7 @@ class LinkAlignGenerator(BaseGenerator):
             use_few_shot: bool = True,
             sql_post_process_function: Optional[Callable] = None,
             use_feedback_debug: bool = True,
-            debug_turn_n: int = 2,
+            debug_turn_n: int = 3,
             db_path: Optional[Union[str, PathLike]] = None,
             credential: Optional[Dict] = None,
             **kwargs
@@ -285,6 +285,8 @@ You need to follow below requirements:
                 parser = LinkAlignParser(self.dataset, self.llm) if not self.parser else self.parser
                 schema_links = parser.act(item, origin_schema)
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.schema linking output | {schema_links}")
         # Step 2: difficulty classification
         logger.debug("开始难度分类...")
         try:
@@ -323,19 +325,23 @@ You need to follow below requirements:
             print(e)
             raise e
 
+        if data_logger:
+            data_logger.info(f"{self.NAME}.predict sql output | {sql_list}")
+
         # step 4: SQL debugging by experience
-        logger.debug("开始基于经验的 SQL 调试...")
-        for idx, sql in enumerate(sql_list):
-            debugged_sql = sql_debug_by_experience(self.llm, question, schema, sql, db_type, schema_links)
-            # SQL post-process
-            if self.sql_post_process_function:
-                debugged_sql = self.sql_post_process_function(debugged_sql, self.dataset)
-            sql_list[idx] = debugged_sql
-        logger.debug("基于经验的 SQL 调试完成")
+        # logger.debug("开始基于经验的 SQL 调试...")
+        # for idx, sql in enumerate(sql_list):
+        #     debugged_sql = sql_debug_by_experience(self.llm, question, schema, sql, db_type, schema_links)
+        #     # SQL post-process
+        #     if self.sql_post_process_function:
+        #         debugged_sql = self.sql_post_process_function(debugged_sql, self.dataset)
+        #     sql_list[idx] = debugged_sql
+        # logger.debug("基于经验的 SQL 调试完成")
 
         # LinkAlign: SQL debugging by feedback
         if self.use_feedback_debug:
-            logger.debug("开始基于反馈的 SQL 调试...")
+            if data_logger:
+                data_logger.info(f"{self.NAME}: begin use_feedback_debug")
             for idx, sql in enumerate(sql_list):
                 debug_args = {
                     "question": question,
@@ -348,6 +354,8 @@ You need to follow below requirements:
                     "credential": self.credential,
                     "debug_turn_n": self.debug_turn_n
                 }
+                if data_logger:
+                    data_logger.info(f"{self.NAME}: debug arguments | {str(debug_args)}")
                 _, debugged_sql = sql_debug_by_feedback(**debug_args)
                 sql_list[idx] = debugged_sql
             logger.debug("基于反馈的 SQL 调试完成")
