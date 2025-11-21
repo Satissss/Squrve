@@ -23,6 +23,19 @@ and we look forward to collaborating with the community to advance Text-to-SQL r
 
 ![System Architecture](./assets/Overview1.png)
 
+## Why Squrve
+### Precision Performance Evaluation
+Squrve delivers comprehensive benchmarking. It evaluates end-to-end performance using the unified Execution Accuracy (EX) framework while simultaneously assessing granular components. You can accurately test schema linking (Recall, Precision, F1 via AmbiDB) and validate SQL Optimizers based on execution feedback. Benchmarking your methods is instant—no interface code changes required.
+
+### Seamless Beginner Onboarding
+Jumpstart your Text-to-SQL journey without the friction. Squrve automates the tedious work of data formatting, documentation, and Chain-of-Thought construction. This allows you to immediately experiment with diverse methods, helping you master both fundamental paradigms and the latest frontier advancements with ease.
+
+### Flexible Method Development
+Innovate without limits. Whether building end-to-end solutions or modular workflows, Squrve lets you reuse state-of-the-art "Actor" components or combine them for scalable results. Focus purely on optimizing your algorithm’s logic; Squrve automatically handles the generalization of your method to any evaluation dataset or application scenario.
+
+### Scalable Open-Source Application
+Deploy advanced methods to wide-ranging query scenarios effortlessly. Squrve requires zero code modifications—simply adjust configuration parameters to leverage top-tier open-source models. Built for real-world impact, Squrve empowers deep data analysis to drive intelligent business decisions.
+
 ## Quick Start
 
 ### 1. Environment Setup

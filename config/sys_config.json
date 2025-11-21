@@ -122,6 +122,35 @@
           "has_label": true
         }
       ]
+    },
+    {
+      "id": "OptiSQL",
+      "meta_info": "",
+      "root_path": "../benchmarks/OptiSQL",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": false,
+      "sub_data": [
+        {
+          "sub_id": "spider",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "bird",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "booksql",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
     }
   ],
   "task": {
