@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
-from typing import Union, List, Dict, Any
+from typing import Union, List, Dict, Any, Tuple
 from pathlib import Path
 import re
 from loguru import logger
@@ -11,7 +11,7 @@ import ast
 from core.actor.selector.BaseSelector import BaseSelector
 from core.data_manage import Dataset, single_central_process
 from core.utils import parse_schema_from_df, load_dataset, save_dataset
-from core.db_connect import execute_sql
+from core.db_connect import get_sql_exec_result_with_time
 
 
 @dataclass
@@ -245,6 +245,7 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get('db_id', '')
         credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
+        db_path = self._resolve_db_path(row, db_type, db_id)
 
         # Load pred_sql using base class method
         pred_sql = self.load_pred_sql(pred_sql, item)
@@ -262,21 +263,28 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             logger.debug(f"Executing {len(candidates)} SQL candidates concurrently...")
             with ThreadPoolExecutor() as executor:
                 future_to_idx = {
-                    executor.submit(self.execute_sql_safe, cand["SQL"], db_type, db_id, credential): i
+                    executor.submit(
+                        self._execute_candidate_sql,
+                        cand["SQL"],
+                        db_type,
+                        db_id,
+                        db_path,
+                        credential,
+                        data_logger
+                    ): i
                     for i, cand in enumerate(candidates)
                 }
                 for future in as_completed(future_to_idx):
                     idx = future_to_idx[future]
                     try:
-                        result = future.result()
-                        result["sql"] = candidates[idx]["SQL"]  # Add SQL to result for reference
-                        execution_results.append(result)
+                        execution_results.append(future.result())
                     except Exception as e:
                         execution_results.append({
                             "success": False,
                             "result": None,
                             "error": str(e),
-                            "sql": candidates[idx]["SQL"]
+                            "sql": candidates[idx]["SQL"],
+                            "time_cost": float("inf")
                         })
 
             # Compare execution results
@@ -351,3 +359,92 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             data_logger.info(f"{self.NAME}.act end | item={item}")
             
         return best_sql 
+
+    def _execute_candidate_sql(
+            self,
+            sql: str,
+            db_type: str,
+            db_id: str,
+            db_path: Union[str, Path, None],
+            credential: Any = None,
+            data_logger=None
+    ) -> Dict[str, Any]:
+        exec_args = self._build_exec_args(sql, db_type, db_id, db_path, credential)
+        if data_logger:
+            data_logger.info(f"{self.NAME}.exec_params | sql={sql} | params={exec_args}")
+        try:
+            elapsed, exec_result = get_sql_exec_result_with_time(db_type, **exec_args)
+        except Exception as exc:
+            logger.warning(f"{self.NAME} execution failed | sql={sql} | error={exc}")
+            if data_logger:
+                data_logger.info(f"{self.NAME}.exec_failed | sql={sql} | error={exc}")
+            return {
+                "success": False,
+                "result": None,
+                "error": str(exc),
+                "sql": sql,
+                "time_cost": float("inf")
+            }
+
+        res, err = self._normalize_exec_result(exec_result)
+        if err and data_logger:
+            data_logger.info(f"{self.NAME}.exec_error | sql={sql} | error={err}")
+
+        return {
+            "success": err is None,
+            "result": res,
+            "error": err,
+            "sql": sql,
+            "time_cost": elapsed
+        }
+
+    def _build_exec_args(
+            self,
+            sql: str,
+            db_type: str,
+            db_id: str,
+            db_path: Union[str, Path, None],
+            credential: Any = None
+    ) -> Dict[str, Any]:
+        normalized_path = str(db_path) if isinstance(db_path, Path) else db_path
+        args: Dict[str, Any] = {
+            "sql_query": sql,
+            "db_path": normalized_path,
+            "db_id": db_id
+        }
+
+        credential_path = None
+        if isinstance(credential, dict):
+            credential_path = credential.get(db_type)
+        elif credential:
+            credential_path = credential
+
+        if credential_path:
+            args["credential_path"] = credential_path
+
+        return args
+
+    def _resolve_db_path(self, row: Dict[str, Any], db_type: str, db_id: str) -> Union[str, Path, None]:
+        row_db_path = row.get("db_path")
+        dataset_db_root = getattr(self.dataset, "db_path", None)
+
+        if row_db_path:
+            return Path(row_db_path)
+        if dataset_db_root and db_type == "sqlite" and db_id:
+            return Path(dataset_db_root) / f"{db_id}.sqlite"
+        return None
+
+    @staticmethod
+    def _normalize_exec_result(exec_result: Any) -> Tuple[Any, Any]:
+        if isinstance(exec_result, tuple):
+            if len(exec_result) == 3:
+                res, err, _ = exec_result
+                return res, err
+            if len(exec_result) == 2:
+                res, err = exec_result
+                return res, err
+            if len(exec_result) >= 1:
+                return exec_result[0], None
+            return None, "Empty result tuple"
+
+        return exec_result, None
