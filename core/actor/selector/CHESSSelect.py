@@ -312,34 +312,36 @@ Return a JSON object with 'score' (0-1) and 'feedback' (string).'''
             
 
         # Step 4: Optional SQL revision based on feedback
-        if self.config.enable_llm_evaluation and self.llm:
-            # Find the evaluation for the best SQL
-            best_idx = next((i for i, cand in enumerate(candidates) if cand["SQL"] == best_sql), 0)
-            best_eval = evaluations[best_idx] if best_idx < len(evaluations) else None
-            
-            if best_eval and best_eval.get("feedback"):
-                logger.debug("Revising SQL based on feedback...")
-                # Load and parse schema for revision
-                if schema is None:
-                    instance_schema_path = row.get("instance_schemas")
-                    if instance_schema_path:
-                        schema = load_dataset(instance_schema_path)
-                    if schema is None:
-                        schema = self.dataset.get_db_schema(item)
-                    if schema is None:
-                        raise Exception("Failed to load a valid database schema for the sample!")
-
-                if isinstance(schema, dict):
-                    schema = single_central_process(schema)
-                elif isinstance(schema, list):
-                    schema = pd.DataFrame(schema)
-
-                schema_str = parse_schema_from_df(schema)
-
-                revised_sql = self._revise_sql(question, schema_str, best_sql, best_eval["feedback"])
-                if revised_sql and revised_sql != best_sql:
-                    best_sql = revised_sql
-                    logger.debug("SQL revised successfully")
+        # The Select component should focus on finding the optimal SQL,
+        # so we commented out the refine section in the original code.
+        # if self.config.enable_llm_evaluation and self.llm:
+        #     # Find the evaluation for the best SQL
+        #     best_idx = next((i for i, cand in enumerate(candidates) if cand["SQL"] == best_sql), 0)
+        #     best_eval = evaluations[best_idx] if best_idx < len(evaluations) else None
+        #
+        #     if best_eval and best_eval.get("feedback"):
+        #         logger.debug("Revising SQL based on feedback...")
+        #         # Load and parse schema for revision
+        #         if schema is None:
+        #             instance_schema_path = row.get("instance_schemas")
+        #             if instance_schema_path:
+        #                 schema = load_dataset(instance_schema_path)
+        #             if schema is None:
+        #                 schema = self.dataset.get_db_schema(item)
+        #             if schema is None:
+        #                 raise Exception("Failed to load a valid database schema for the sample!")
+        #
+        #         if isinstance(schema, dict):
+        #             schema = single_central_process(schema)
+        #         elif isinstance(schema, list):
+        #             schema = pd.DataFrame(schema)
+        #
+        #         schema_str = parse_schema_from_df(schema)
+        #
+        #         revised_sql = self._revise_sql(question, schema_str, best_sql, best_eval["feedback"])
+        #         if revised_sql and revised_sql != best_sql:
+        #             best_sql = revised_sql
+        #             logger.debug("SQL revised successfully")
 
         # Save the result using base class method
         best_sql = self.save_result(best_sql, item, row.get("instance_id"))

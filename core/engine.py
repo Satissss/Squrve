@@ -445,9 +445,9 @@ class Engine:
                     "log_save_path": meta.get("log_save_path"),
                     "is_save_dataset": meta.get("is_save_dataset"),
                     "dataset_save_path": meta.get("dataset_save_path"),
-                    "open_parallel": meta.get("open_parallel"),
-                    "max_workers": meta.get("max_workers"),
-                    "open_actor_parallel": meta.get("open_actor_parallel"),
+                    "open_parallel": meta.get("open_parallel", True),
+                    "max_workers": meta.get("max_workers", 3),
+                    "open_actor_parallel": meta.get("open_actor_parallel", True),
                     **kwargs.get("task", {}),
                     "actor_args": kwargs.get("actor")
                 }

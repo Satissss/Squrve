@@ -1,6 +1,7 @@
 import json
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from typing import List, Dict, Union
 
 from loguru import logger
@@ -186,13 +187,13 @@ class ActorGroup(TreeActor):
     def group_postprocess(self, **kwargs):
         pass
 
-    def merge_results(self, results: List):
+    def merge_results(self, item, results: List):
         if not results:
             logger.info("Input results empty!")
         logger.info(results)
         merge_result = []
-        for item in results:
-            for actor, res in item.items():
+        for row in results:
+            for actor, res in row.items():
                 if isinstance(res, list):
                     merge_result.extend(res)
                 else:
@@ -239,7 +240,7 @@ class ActorGroup(TreeActor):
 
         # Merge datasets in the main thread
         logger.info("开始合并数据集...")
-        rtn = self.merge_results(rtn)
+        rtn = self.merge_results(item, rtn)
         actor.save_output(rtn, item)
         dataset = update_dataset(dataset, actor.dataset, merge_dataset=True)
 
@@ -254,20 +255,22 @@ class ActorGroup(TreeActor):
 
 
 class ParseActorGroup(ActorGroup):
-    def merge_results(self, results: List):
+    def merge_results(self, item, results: List):
         # Merge results generated from distinct parser methods.
         if not results:
             logger.info("Input results empty!")
 
         merge_result = []
-        for item in results:
-            for parser, res in item.items():
+        for row in results:
+            for parser, res in row.items():
                 if parser == "RSLSQLBiDirParser":
                     merge_result.extend(res.get("columns", []))
                 elif isinstance(res, list):
                     merge_result.extend(res)
                 else:
                     merge_result.append(res)
+        # remove the duplicate schemas
+        merge_result = list(set(merge_result))
 
         return merge_result
 
@@ -277,4 +280,60 @@ class ScaleActorGroup(ActorGroup):
 
 
 class OptimizeActorGroup(ActorGroup):
-    pass
+    def __init__(self, use_feedback_filter=None, **kwargs):
+        super().__init__(**kwargs)
+        self.use_feedback_filter: bool = False if use_feedback_filter is None else use_feedback_filter
+
+    def get_execute_results(self, item, sql) -> bool:
+        # This method provide a binary result for sql executable
+        if not item or not sql:
+            return False
+
+        from core.db_connect import get_sql_exec_result
+
+        row = self.dataset[item]
+        db_type = row.get('db_type')
+        db_id = row.get("db_id")
+        db_path = Path(self.dataset.db_path) / (
+                db_id + ".sqlite") if self.dataset.db_path and db_type == "sqlite" else None
+        credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
+
+        debug_args = {
+            "db_type": db_type,
+            "sql_query": sql,
+            "db_path": db_path,
+            "db_id": db_id,
+            "credential_path": credential.get(db_type) if credential else None
+        }
+        res = get_sql_exec_result(**debug_args)
+        if not res:
+            return False
+        exe_flag, dbms_error_info = res
+        if exe_flag is None:
+            return False
+
+        return True
+
+    def merge_results(self, item, results: List):
+        # Merge results generated from distinct parser methods.
+        if not results:
+            logger.info("Input results empty!")
+        logger.info(results)
+        merge_result = []
+        for row in results:
+            for actor, res in row.items():
+                if isinstance(res, list):
+                    merge_result.extend(res)
+                else:
+                    merge_result.append(res)
+
+        if self.use_feedback_filter:
+            # It seems that filtering here is not very meaningful. Maybe need to optimize.
+            # So we set self.use_feedback_filter as False.
+            filter_lis = []
+            for row in merge_result:
+                if self.get_execute_results(item, row):
+                    filter_lis.append(row)
+            merge_result = filter_lis
+
+        return merge_result

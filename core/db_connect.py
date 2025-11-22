@@ -2,6 +2,7 @@ from os import PathLike
 import os
 from pathlib import Path
 from typing import Union, Dict
+import time
 import pandas as pd
 from google.cloud import bigquery
 import snowflake.connector
@@ -144,6 +145,14 @@ def get_sql_exec_result(db_type: str, **kwargs):
         return get_snowflake_sql_result(**kwargs)
 
     return None
+
+
+def get_sql_exec_result_with_time(db_type: str, **kwargs):
+    """Execute SQL while measuring elapsed time."""
+    start = time.perf_counter()
+    res = get_sql_exec_result(db_type, **kwargs)
+    elapsed = time.perf_counter() - start
+    return elapsed, res
 
 
 def execute_sql(db_type, db_path, sql, credential):
