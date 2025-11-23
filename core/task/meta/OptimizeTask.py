@@ -4,6 +4,7 @@ from os import PathLike
 from typing import Union, List, Optional
 from llama_index.core.llms.llm import LLM
 
+from core.actor.optimizer.AdaptiveOptimize import AdaptiveOptimizer
 from core.task.meta.MetaTask import MetaTask
 from core.actor.optimizer.LinkAlignOptimize import LinkAlignOptimizer
 from core.actor.optimizer.BaseOptimize import BaseOptimizer
@@ -24,7 +25,8 @@ class OptimizeTask(MetaTask):
         "CHESSOptimizer", "CHESS",
         "MACSQLOptimizer", "MACSQL",
         "RSLSQLOptimizer", "RSLSQL",
-        "OpenSearchSQLOptimizer", "OpenSearchSQL"
+        "OpenSearchSQLOptimizer", "OpenSearchSQL",
+        "AdaptiveOptimizer", "Adaptive"
     ]
 
     def __init__(
@@ -92,6 +94,10 @@ class OptimizeTask(MetaTask):
 
         elif actor_type in ("OpenSearchSQLOptimizer", "OpenSearchSQL"):
             actor = OpenSearchSQLOptimizer(**optimize_args)
+            return actor
+
+        elif actor_type in ("AdaptiveOptimizer", "Adaptive"):
+            actor = AdaptiveOptimizer(**optimize_args)
             return actor
 
         warnings.warn(f"The optimize_type `{actor_type}` is not available.", category=UserWarning)

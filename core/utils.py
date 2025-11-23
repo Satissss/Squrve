@@ -98,10 +98,10 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
                 col_type = col_type[:150]
             columns.append(f'{row["column_name"]}(Type: {col_type})')
 
-        line = f'### Table {table_name}, columns = [{", ".join(columns)}]'
+        line = f'### Table = `{table_name}`, columns = [{", ".join(columns)}]'
         output_lines.append(line)
 
-    return "\n".join(output_lines)
+    return "\n\n".join(output_lines)
 
 
 def set_node_turn_n(node: NodeWithScore, turn_n: int):

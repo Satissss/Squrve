@@ -303,7 +303,6 @@ For the given question, analyze and refine the erroneous SQL statement using the
         """Act method implementing the BaseOptimizer interface."""
         if data_logger:
             data_logger.info(f"{self.NAME}.act start | item={item}")
-        logger.info(f"LinkAlignOptimizer processing item {item}")
 
         if self.dataset is None:
             raise ValueError("Dataset is required for LinkAlignOptimizer")

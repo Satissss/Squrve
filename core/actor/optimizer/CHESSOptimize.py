@@ -381,7 +381,6 @@ SELECT column FROM table WHERE condition
     ):
         if data_logger:
             data_logger.info(f"{self.NAME}.act start | item={item}")
-        logger.info(f"CHESSOptimizer processing item {item}")
 
         if self.dataset is None:
             raise ValueError("Dataset is required for CHESSOptimizer")
