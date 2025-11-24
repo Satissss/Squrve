@@ -25,11 +25,13 @@ class AdaptiveOptimizer(BaseOptimizer):
             open_parallel: bool = True,
             max_workers: Optional[int] = None,
             quit_flag: str = "QUIT",
+            skip_logic_refine: bool = False,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
         self.debug_turn_n = debug_turn_n
         self.quit_flag = quit_flag
+        self.skip_logic_refine = skip_logic_refine
 
     @staticmethod
     def _build_exec_args(
@@ -240,19 +242,47 @@ SELECT * FROM products WHERE id IN (SELECT product_id FROM sales WHERE year = 20
                     f"[{label}]",
                     f"SQL: {sql_clean(record.get('sql', '') or '')}",
                 ]
-                err_msg = record.get("err")
-                if err_msg:
+                if record.get("status"):
+                    res_msg = record.get("res")
+                    if isinstance(res_msg, pd.DataFrame):
+                        res_msg = res_msg.head(5).to_dict(orient="records")
+                        res_msg = res_msg or "Executable with no syntax errors, but no data was found."
+                        snippet.append(f"Query results: {str(res_msg)}")
+                else:
+                    err_msg = record.get("err")
                     snippet.append(f"Error: {err_msg}")
+
                 segments.append("\n".join(snippet))
             return "\n\n".join(segments)
 
         feedback_txt = _summarize_feedback()
         cleaned_sql = sql_clean(sql)
         prompt = f"""# Instruction
-When executing SQL below, some errors occurred, please fix up SQL based on query and database info.
-Solve the task step by step if you need to. Using SQL format in the code block, and indicate script type in the code block.
-When you find an answer, verify the answer carefully. Include verifiable evidence in your response if possible.
+When executing SQL below, some errors occurred. Please fix the SQL based on the **query**, **database info**, and the **error feedback** from both the **original SQL** and the **atomic SQLs**. 
+The atomic SQLs are decomposed parts of the original SQL designed to isolate and expose specific errors. Use them to identify and resolve all issues in the original SQL.
+Analyze the original SQL error to understand the general syntax issue. Do not address logical errors or query results; other modules will handle those.
 
+# Solve the task step by step:
+
+### Phase 1: Diagnosis & Isolation
+1. **Analyze the Original Error**:
+   - Read the [ORIGINAL_SQL] error to understand the high-level syntax error.
+
+2. **Examine each atomic SQL result**:
+    - **Success:** The syntax in this specific clause is **CORRECT** for {db_type}. **DO NOT modify this part**; the error lies elsewhere.
+    - **Failure:**
+        - **Same Error:** The bug is locally isolated to this clause (e.g., a typo).
+        - **New Error:** A hidden bug (masked in the original SQL) is revealed.
+    - **Action:** You must rewrite the failing logic to comply with **{db_type}** syntax (e.g., replace unsupported functions).
+
+### Phase 2: Systematic Repair
+3. **Execute Repair:**
+   - **Dialect Translation:** STRICTLY replace incompatible syntax with **{db_type}** alternatives (e.g., for SQLite: replace `EXTRACT(YEAR...)` with `strftime('%Y'...)`).
+   - **Syntax Correction:** Fix structural errors (e.g., missing keywords, incorrect operators) identified in the error logs.
+
+4. **Final Verification:**
+   - Ensure the rewritten SQL is valid for **{db_type}** and strictly references columns defined in the **Schema**.
+   
 # Question
 {question or 'N/A'}
 
@@ -284,6 +314,8 @@ When you find an answer, verify the answer carefully. Include verifiable evidenc
 Return ONLY the final executable SQL text. Do not wrap it in code fences or add any commentary.
 """
         try:
+            if data_logger:
+                data_logger.info(prompt)
             best_sql = self.llm.complete(prompt).text.strip()
             best_sql = sql_clean(best_sql)
         except Exception as exc:
@@ -387,7 +419,7 @@ Check whether the original SQL aligns with the query intent. If the logic is cor
         refined_sql = sql
         for turn in range(self.debug_turn_n):
             # get the decomposed meta sqls and execution results.
-            feedback = self._get_meta_sql_feedback(sql, db_id, db_path, db_type, credential, data_logger)
+            feedback = self._get_meta_sql_feedback(refined_sql, db_id, db_path, db_type, credential, data_logger)
             if feedback is None or len(feedback) == 0:
                 # exit the debug turns.
                 break
@@ -402,7 +434,7 @@ Check whether the original SQL aligns with the query intent. If the logic is cor
                         db_type=db_type,
                         feedback=[row for row in feedback if row.get("status")],
                         data_logger=data_logger
-                    )
+                    ) if not self.skip_logic_refine else self.quit_flag
                     if self.quit_flag in res:
                         break
                 else:
@@ -411,7 +443,7 @@ Check whether the original SQL aligns with the query intent. If the logic is cor
                         sql=sql,
                         schema=schema,
                         db_type=db_type,
-                        feedback=[row for row in feedback if not row.get("status")],
+                        feedback=feedback,
                         data_logger=data_logger
                     )
 
@@ -468,14 +500,6 @@ Check whether the original SQL aligns with the query intent. If the logic is cor
         # Decompose SQL into multiple meta-SQL set,
         # Returns the execution results and error messages for all meta-SQLs.
         def process_sql(sql):
-            """question: str,
-            sql: str,
-            schema: str = None,
-            db_id: str = None,
-            db_path: Union[str, Path] = None,
-            db_type: str = "sqlite",
-            credential: Optional[Dict] = None,
-            data_logger=None,"""
             if db_size > 500 and schema_links:
                 filter_schema = schema_links
             else:
