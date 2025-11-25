@@ -566,7 +566,7 @@ Draft the corrected SQL.
             data_logger.info(f"{self.NAME}.act start | item={item}")
 
         if self.dataset is None:
-            raise ValueError("Dataset is required for LinkAlignOptimizer")
+            raise ValueError("Dataset is required for AdaptiveOptimizer")
 
         row = self.dataset[item]
         question = row['question']
@@ -614,7 +614,7 @@ Draft the corrected SQL.
         # Save results using base class method
         output = self.save_output(optimized_sqls, item, row.get("instance_id"))
 
-        logger.info(f"LinkAlignOptimizer completed processing item {item}")
+        logger.info(f"AdaptiveOptimizer completed processing item {item}")
         if data_logger:
             data_logger.info(f"{self.NAME}.optimized_sql | output={optimized_sqls}")
             data_logger.info(f"{self.NAME}.act end | item={item}")
