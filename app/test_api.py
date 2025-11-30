@@ -51,11 +51,11 @@ def main():
     base = f"http://127.0.0.1:8080"
 
     payload = {
-        "dev_0": [["DINSQLGenerator"]],
+        "dev_0": [["DINSQLGenerator"],["DINSQLGenerator"],["MACSQLGenerator"]],
         "dev_1": [
-            ["DINSQLGenerator"],
             ["MACSQLGenerator"],
-            ["RSLSQLGenerator"]
+            ["DINSQLGenerator"],
+            ["MACSQLGenerator"]
         ],
     }
     print(f"[3/3] Positive test: POST /api/run_batch with payload={payload}")

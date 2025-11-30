@@ -2,10 +2,13 @@ import os
 import sys
 import json
 import time
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 from typing import Any, Dict, List, Tuple
 import copy
 from flask import Flask, request, jsonify
+from pathlib import Path
 
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
@@ -13,7 +16,23 @@ sys.path.append(project_root)
 from core.base import Router
 from core.engine import Engine
 
+# 尝试导入func_timeout，如果没有则提供警告
+try:
+    from func_timeout import func_timeout, FunctionTimedOut
+
+    HAS_FUNC_TIMEOUT = True
+except ImportError:
+    HAS_FUNC_TIMEOUT = False
+    logger.warning(
+        "func_timeout not installed. Timeout control will be disabled. Install with: pip install func-timeout")
+
+from app.evaluation_helper import evaluate_sql_execution, calculate_score_from_evaluation
+
 CONFIG_DIR = "app_config.json"
+
+# 超时常量定义
+TASK_MAX_WAIT_TIME = 300  # 5分钟 = 300秒，任务执行最大等待时间
+SQL_MAX_WAIT_TIME = 60  # 60秒，SQL评估最大等待时间
 
 # Global router & engine
 # We assume the data_source and schema_source is pre_defined in config file, and support by our system benchmarks
@@ -197,22 +216,40 @@ def run_complex_actor():
 @app.post("/api/run_batch")
 def run_batch():
     """
+    批量执行任务并返回评分
+    
+    评分规则:
+    1. 任务执行阶段（TASK_MAX_WAIT_TIME=5分钟）:
+       - 超时: score = -0.5，跳过后续所有评估
+       - 在时间内完成: score += 0.5
+    
+    2. SQL评估阶段（SQL_MAX_WAIT_TIME=60秒）:
+       - 超时或无法评估: score -= 1，跳过后续所有评估
+       - SQL可执行（无语法错误）: score += 1，继续下一阶段
+       - SQL不可执行（有语法错误）: score -= 1，跳过后续所有评估
+    
+    3. SQL正确性阶段（仅当SQL可执行时才评估）:
+       - 查询结果正确: score += 1.5
+       - 查询结果错误: score -= 1.5
+    
     Example of payload:
     {
         "val_0": [[DINSQLGenerator],[DINSQLGenerator],[DINSQLGenerator],[MACSQLGenerator]],
-        "val_1": [[DINSQLGenerator],[MACSQLGenerator],[MACSQLGenerator], [RSLSQLGenerator]],
+        "val_1": [[DINSQLGenerator],[MACSQLGenerator]],
     }
     return:
     {
-        "val_0": [{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx}],
-        "val_1": [{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx}],
-    }]
+        "val_0": [3.0, 3.0, 3.0, 0],
+        "val_1": [-0.5, 0.5]
     }
     """
     payload = request.get_json(force=True, silent=True) or {}
     if not payload or not isinstance(payload, dict):
         return jsonify({"error": "instance_id and task_lis are required"}), 400
 
+    if not HAS_FUNC_TIMEOUT:
+        logger.warning("func_timeout not available, timeout control disabled")
+
     def normalize_task_signature(task_lis: List[Any]) -> Tuple[Any, ...]:
         """Convert task_lis into an immutable, comparable structure."""
 
@@ -222,36 +259,36 @@ def run_batch():
             if isinstance(item, (list, tuple)):
                 return ("list", tuple(_normalize(sub_item) for sub_item in item))
             try:
-                serialized = json.dumps(item, ensure_ascii=False, sort_keys=True)
+                return ("val", json.dumps(item, ensure_ascii=False, sort_keys=True))
             except (TypeError, ValueError):
-                serialized = repr(item)
-            return ("val", serialized)
+                return ("val", repr(item))
 
         return tuple(_normalize(entry) for entry in task_lis)
 
+    # 构建执行计划
     instance_plan: Dict[str, List[Tuple[str, Tuple[Any, ...]]]] = {}
     signature_to_task: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
     exec_plan: List[str] = []
 
-    def cleanup_created_tasks(restore_callbacks: bool = False):
+    def cleanup_tasks(restore_callbacks: bool = False):
+        """清理创建的任务"""
         for info in signature_to_task.values():
             if restore_callbacks and "original_callback" in info:
-                original_cb = info["original_callback"]
-                if original_cb is not None:
+                if original_cb := info["original_callback"]:
                     info["task"].call_back = original_cb
-            cpx_id = info.get("cpx_task_id")
-            if cpx_id:
+            if cpx_id := info.get("cpx_task_id"):
                 engine.tasks.pop(cpx_id, None)
 
+    # 解析payload并初始化任务
     for instance_id, task_group in payload.items():
         if not isinstance(task_group, list):
-            cleanup_created_tasks()
+            cleanup_tasks()
             return jsonify({"error": f"task_lis for `{instance_id}` must be a list"}), 400
 
         instance_plan[instance_id] = []
         for index, task_lis in enumerate(task_group):
             if not isinstance(task_lis, list) or not task_lis:
-                cleanup_created_tasks()
+                cleanup_tasks()
                 return jsonify(
                     {"error": f"task_lis at position {index} for `{instance_id}` must be a non-empty list"}
                 ), 400
@@ -265,7 +302,7 @@ def run_batch():
             cpx_task, cpx_task_id = init_complex_tasks(copy.deepcopy(task_lis), instance_id)
             if cpx_task is None:
                 engine.tasks.pop(cpx_task_id, None)
-                cleanup_created_tasks()
+                cleanup_tasks()
                 return jsonify({"error": f"failed to initialize task_lis `{index}` for `{instance_id}`"}), 400
 
             signature_to_task[signature] = {
@@ -277,222 +314,138 @@ def run_batch():
     if not exec_plan:
         return jsonify({instance_id: [] for instance_id in instance_plan})
 
-    duration_recorder: Dict[str, float] = {}
+    logger.info(f"run_batch received {len(payload)} instances, executing {len(exec_plan)} unique task groups.")
 
-    def make_callback(task_id: str, original_cb):
-        def _callback(task, *cb_args, **cb_kwargs):
-            run_time = cb_kwargs.get("run_time")
-            if run_time is not None:
-                duration_recorder[task_id] = run_time
-            if original_cb:
-                return original_cb(task, *cb_args, **cb_kwargs)
-            return None
+    # 记录每个任务的执行状态
+    task_execution_status: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
 
-        return _callback
+    def execute_single_task(cpx_task):
+        """执行单个任务"""
+        cpx_task.run()
+        cpx_task.end()
 
-    for info in signature_to_task.values():
-        task_obj = info["task"]
-        original_cb = getattr(task_obj, "call_back", None)
-        info["original_callback"] = original_cb
-        task_obj.call_back = make_callback(info["cpx_task_id"], original_cb)
+    def evaluate_sql(cpx_task):
+        """评估SQL并返回结果"""
+        if not cpx_task.dataset or len(cpx_task.dataset) == 0:
+            return None, "No dataset available for evaluation"
 
-    engine.exec_process = exec_plan
-    execution_error = None
-    try:
-        logger.info(f"run_batch received {len(payload)} instances, executing {len(exec_plan)} unique task groups.")
-        engine.execute()
-    except Exception as exc:
-        execution_error = exc
-        logger.exception("Batch execution failed: {}", exc)
-    finally:
-        cleanup_created_tasks(restore_callbacks=True)
+        row = cpx_task.dataset[0]
+        eval_result = evaluate_sql_execution(
+            pred_sql=row.get("pred_sql", ""),
+            gold_sql=row.get("query", ""),
+            db_id=row.get("db_id", ""),
+            db_type=row.get("db_type", "sqlite"),
+            db_path=dataset.db_path,
+            db_credential=dataset.credential
+        )
+        return eval_result, None
 
-    if execution_error:
-        return jsonify({"error": "batch execution failed", "detail": str(execution_error)}), 500
+    # 并行执行任务并评分（每个任务独立超时控制）
+    result_cache: Dict[Tuple[str, Tuple[Any, ...]], float] = {}
+    result_cache_lock = threading.Lock()
 
-    result_cache: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
-    for signature, info in signature_to_task.items():
+    def process_single_signature(signature, info):
+        """处理单个signature的任务执行和评估"""
         cpx_task = info["task"]
-        eval_res = cpx_task.eval(force=True) or {}
-        execute_accuracy = None
-        exec_metric = eval_res.get("execute_accuracy")
-        if isinstance(exec_metric, dict):
-            execute_accuracy = exec_metric.get("avg")
+        cpx_task_id = info["cpx_task_id"]
+        score = 0.0
 
-        duration_val = duration_recorder.get(info["cpx_task_id"])
+        # 1. 执行任务（带超时控制）
+        task_timeout = False
         try:
-            duration_seconds = float(duration_val) if duration_val is not None else 0.0
-        except (TypeError, ValueError):
-            duration_seconds = 0.0
-
-        result_cache[signature] = {
-            "duration_seconds": duration_seconds,
-            "execute_accuracy": execute_accuracy
-        }
-
-    final_response: Dict[str, List[Dict[str, Any]]] = {}
-    for instance_id, signatures in instance_plan.items():
-        results = []
-        for signature in signatures:
-            result = result_cache.get(signature)
-            if result is None:
-                results.append({"duration_seconds": None, "execute_accuracy": None})
+            if HAS_FUNC_TIMEOUT:
+                try:
+                    func_timeout(TASK_MAX_WAIT_TIME, execute_single_task, args=(cpx_task,))
+                except FunctionTimedOut:
+                    task_timeout = True
+                    logger.warning(f"Task {cpx_task_id} exceeded {TASK_MAX_WAIT_TIME}s timeout")
             else:
-                results.append(dict(result))
-        final_response[instance_id] = results
+                execute_single_task(cpx_task)
+        except Exception as exc:
+            logger.exception(f"Task {cpx_task_id} execution failed: {exc}")
+            task_timeout = True  # 执行失败也当作超时处理
 
-    return jsonify(final_response)
+        # 2. 任务超时，分数为-0.5，跳过评估
+        if task_timeout:
+            with result_cache_lock:
+                result_cache[signature] = -0.5
+            return
 
+        # 3. 任务完成，基础分 +0.5
+        score = 0.5
 
-def run_batch_debug(payload):
-    """
-    Example of payload:
-    {
-        "val_0": [[DINSQLGenerator],[DINSQLGenerator],[DINSQLGenerator],[MACSQLGenerator]],
-        "val_1": [[DINSQLGenerator],[MACSQLGenerator],[MACSQLGenerator], [RSLSQLGenerator]],
-    }
-    return:
-    {
-        "val_0": [{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx}],
-        "val_1": [{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx},{"duration_seconds": xx ,"execute_accuracy": xx}],
-    }]
-    }
-    """
-    payload = payload or {}
-    if not payload or not isinstance(payload, dict):
-        return jsonify({"error": "instance_id and task_lis are required"}), 400
+        # 4. SQL评估（带超时控制）
+        eval_timeout = False
+        eval_result = None
+        eval_error = None
 
-    def normalize_task_signature(task_lis: List[Any]) -> Tuple[Any, ...]:
-        """Convert task_lis into an immutable, comparable structure."""
+        try:
+            if HAS_FUNC_TIMEOUT:
+                try:
+                    eval_result, eval_error = func_timeout(SQL_MAX_WAIT_TIME, evaluate_sql, args=(cpx_task,))
+                except FunctionTimedOut:
+                    eval_timeout = True
+                    logger.warning(f"SQL evaluation for task {cpx_task_id} exceeded {SQL_MAX_WAIT_TIME}s timeout")
+            else:
+                eval_result, eval_error = evaluate_sql(cpx_task)
+        except Exception as exc:
+            eval_error = str(exc)
+            logger.exception(f"SQL evaluation error for task {cpx_task_id}: {exc}")
 
-        def _normalize(item: Any):
-            if isinstance(item, str):
-                return ("str", item)
-            if isinstance(item, (list, tuple)):
-                return ("list", tuple(_normalize(sub_item) for sub_item in item))
+        # 5. 评估超时或失败，score -= 1
+        if eval_timeout or eval_error or eval_result is None:
+            with result_cache_lock:
+                result_cache[signature] = score - 1
+            return
+
+        # 6. SQL不可执行，score -= 1
+        if not eval_result.can_execute:
+            with result_cache_lock:
+                result_cache[signature] = score - 1
+            return
+
+        # 7. SQL可执行，score += 1
+        score += 1
+
+        # 8. 正确性评估
+        score += 1.5 if eval_result.is_correct else -1.5
+        with result_cache_lock:
+            result_cache[signature] = score
+
+    # 使用线程池并行执行所有任务
+    max_workers = min(len(signature_to_task), os.cpu_count() or 4)
+    logger.info(f"Starting parallel execution with {max_workers} workers for {len(signature_to_task)} tasks")
+    
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # 提交所有任务
+        futures = {
+            executor.submit(process_single_signature, signature, info): signature
+            for signature, info in signature_to_task.items()
+        }
+        
+        # 等待所有任务完成
+        for future in as_completed(futures):
+            signature = futures[future]
             try:
-                serialized = json.dumps(item, ensure_ascii=False, sort_keys=True)
-            except (TypeError, ValueError):
-                serialized = repr(item)
-            return ("val", serialized)
+                future.result()  # 获取结果（如果有异常会在这里抛出）
+            except Exception as exc:
+                logger.exception(f"Unexpected error processing signature {signature}: {exc}")
+                # 如果发生意外错误，确保该signature有个默认分数
+                with result_cache_lock:
+                    if signature not in result_cache:
+                        result_cache[signature] = -0.5
 
-        return tuple(_normalize(entry) for entry in task_lis)
-
-    instance_plan: Dict[str, List[Tuple[str, Tuple[Any, ...]]]] = {}
-    signature_to_task: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
-    exec_plan: List[str] = []
-
-    def cleanup_created_tasks(restore_callbacks: bool = False):
-        for info in signature_to_task.values():
-            if restore_callbacks and "original_callback" in info:
-                original_cb = info["original_callback"]
-                if original_cb is not None:
-                    info["task"].call_back = original_cb
-            cpx_id = info.get("cpx_task_id")
-            if cpx_id:
-                engine.tasks.pop(cpx_id, None)
-
-    for instance_id, task_group in payload.items():
-        if not isinstance(task_group, list):
-            cleanup_created_tasks()
-            return jsonify({"error": f"task_lis for `{instance_id}` must be a list"}), 400
-
-        instance_plan[instance_id] = []
-        for index, task_lis in enumerate(task_group):
-            if not isinstance(task_lis, list) or not task_lis:
-                cleanup_created_tasks()
-                return jsonify(
-                    {"error": f"task_lis at position {index} for `{instance_id}` must be a non-empty list"}
-                ), 400
-
-            signature = (instance_id, normalize_task_signature(task_lis))
-            instance_plan[instance_id].append(signature)
-
-            if signature in signature_to_task:
-                continue
-
-            cpx_task, cpx_task_id = init_complex_tasks(copy.deepcopy(task_lis), instance_id)
-            if cpx_task is None:
-                engine.tasks.pop(cpx_task_id, None)
-                cleanup_created_tasks()
-                return jsonify({"error": f"failed to initialize task_lis `{index}` for `{instance_id}`"}), 400
-
-            signature_to_task[signature] = {
-                "task": cpx_task,
-                "cpx_task_id": cpx_task_id,
-            }
-            exec_plan.append(cpx_task_id)
-
-    if not exec_plan:
-        return jsonify({instance_id: [] for instance_id in instance_plan})
-
-    duration_recorder: Dict[str, float] = {}
-
-    def make_callback(task_id: str, original_cb):
-        def _callback(task, *cb_args, **cb_kwargs):
-            run_time = cb_kwargs.get("run_time")
-            if run_time is not None:
-                duration_recorder[task_id] = run_time
-            if original_cb:
-                return original_cb(task, *cb_args, **cb_kwargs)
-            return None
-
-        return _callback
-
-    for info in signature_to_task.values():
-        task_obj = info["task"]
-        original_cb = getattr(task_obj, "call_back", None)
-        info["original_callback"] = original_cb
-        task_obj.call_back = make_callback(info["cpx_task_id"], original_cb)
-
-    exec_plan.append("~p")  # add `~p` label to enable parallel.
-    engine.exec_process = exec_plan
-    execution_error = None
+    # 清理任务
     try:
-        logger.info(f"run_batch received {len(payload)} instances, executing {len(exec_plan)} unique task groups.")
-        engine.execute()
+        cleanup_tasks()
     except Exception as exc:
-        execution_error = exc
-        logger.exception("Batch execution failed: {}", exc)
-    finally:
-        cleanup_created_tasks(restore_callbacks=True)
+        logger.warning(f"Error during cleanup: {exc}")
 
-    if execution_error:
-        return jsonify({"error": "batch execution failed", "detail": str(execution_error)}), 500
-
-    result_cache: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
-    for signature, info in signature_to_task.items():
-        cpx_task = info["task"]
-        eval_res = cpx_task.eval(force=True) or {}
-        execute_accuracy = None
-        exec_metric = eval_res.get("execute_accuracy")
-        if isinstance(exec_metric, dict):
-            execute_accuracy = exec_metric.get("avg")
-
-        duration_val = duration_recorder.get(info["cpx_task_id"])
-        try:
-            duration_seconds = float(duration_val) if duration_val is not None else 0.0
-        except (TypeError, ValueError):
-            duration_seconds = 0.0
-
-        result_cache[signature] = {
-            "duration_seconds": duration_seconds,
-            "execute_accuracy": execute_accuracy
-        }
-
-    final_response: Dict[str, List[Dict[str, Any]]] = {}
-    for instance_id, signatures in instance_plan.items():
-        results = []
-        for signature in signatures:
-            result = result_cache.get(signature)
-            if result is None:
-                results.append({"duration_seconds": None, "execute_accuracy": None})
-            else:
-                results.append(dict(result))
-        final_response[instance_id] = results
-
-    print(final_response)
-    return jsonify(final_response)
+    # 构建最终响应
+    return jsonify({
+        instance_id: [result_cache.get(sig, -0.5) for sig in signatures]
+        for instance_id, signatures in instance_plan.items()
+    })
 
 
 @app.get("/healthz")
