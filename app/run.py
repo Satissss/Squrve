@@ -232,6 +232,10 @@ def run_batch():
        - 查询结果正确: score += 1.5
        - 查询结果错误: score -= 1.5
     
+    4. 时间奖励阶段（仅当SQL正确时才计算）:
+       - score += 0.5 * (SQL_MAX_WAIT_TIME - eval_time) / SQL_MAX_WAIT_TIME
+       - 评估越快，额外奖励越高（最多+0.5分）
+    
     Example of payload:
     {
         "val_0": [[DINSQLGenerator],[DINSQLGenerator],[DINSQLGenerator],[MACSQLGenerator]],
@@ -378,6 +382,7 @@ def run_batch():
         eval_timeout = False
         eval_result = None
         eval_error = None
+        eval_start_time = time.time()
 
         try:
             if HAS_FUNC_TIMEOUT:
@@ -391,6 +396,8 @@ def run_batch():
         except Exception as exc:
             eval_error = str(exc)
             logger.exception(f"SQL evaluation error for task {cpx_task_id}: {exc}")
+        
+        eval_time = time.time() - eval_start_time
 
         # 5. 评估超时或失败，score -= 1
         if eval_timeout or eval_error or eval_result is None:
@@ -408,7 +415,12 @@ def run_batch():
         score += 1
 
         # 8. 正确性评估
-        score += 1.5 if eval_result.is_correct else -1.5
+        if eval_result.is_correct:
+            score += 1.5
+            # 额外的时间奖励：评估越快，奖励越高
+            score += 0.5 * (SQL_MAX_WAIT_TIME - eval_time) / SQL_MAX_WAIT_TIME
+        else:
+            score -= 1.5
         with result_cache_lock:
             result_cache[signature] = score
 
