@@ -11,10 +11,12 @@ import ast
 
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, single_central_process
+from core.db_connect import get_sql_exec_result
 from core.utils import (
     parse_schema_from_df,
     load_dataset,
-    save_dataset
+    save_dataset,
+    sql_clean
 )
 from core.actor.prompts.CHESSPrompt import (
     template_generate_candidate_one,
@@ -40,12 +42,12 @@ class CHESSConfig:
     # Candidate Generator settings
     cg_engine: str = "gpt-4o-mini"
     cg_temperature: float = 0.5
-    cg_sampling_count: int = 4
+    cg_sampling_count: int = 3
 
     # Unit Tester settings
     ut_engine: str = "gpt-4o-mini"
     ut_temperature: float = 0.8
-    ut_unit_test_count: int = 5
+    ut_unit_test_count: int = 1
 
     # Schema Selector settings (optional)
     use_schema_selector: bool = False
@@ -192,7 +194,69 @@ class CHESSGenerator(BaseGenerator):
             logger.warning(f"Failed to select schema: {e}")
             return schema
 
-    def _generate_candidate_sql(self, question: str, schema: str, evidence: str = "") -> List[Dict[str, Any]]:
+    def _execute_and_validate_sql(
+            self,
+            sql: str,
+            db_type: str,
+            db_path: Optional[Union[str, Path]] = None,
+            db_id: Optional[str] = None,
+            credential: Optional[Dict] = None
+    ) -> Dict[str, Any]:
+        """Execute SQL and return validation result"""
+        if not sql:
+            return {"status": "EMPTY", "result": None, "error": "Empty SQL"}
+        
+        exec_args = {
+            "db_type": db_type,
+            "sql_query": sql_clean(sql),
+            "db_path": db_path,
+            "db_id": db_id
+        }
+        
+        # Add credential
+        if isinstance(credential, dict) and db_type in credential:
+            exec_args["credential_path"] = credential.get(db_type)
+        else:
+            exec_args["credential_path"] = credential
+        
+        try:
+            exec_result = get_sql_exec_result(**exec_args)
+            
+            # Parse result
+            if isinstance(exec_result, tuple):
+                if len(exec_result) == 3:
+                    res, err, _ = exec_result
+                elif len(exec_result) == 2:
+                    res, err = exec_result
+                else:
+                    res = exec_result
+                    err = None
+            else:
+                res = exec_result
+                err = None
+            
+            # Determine status
+            if err is not None:
+                return {"status": "ERROR", "result": res, "error": str(err)}
+            elif res is None or (isinstance(res, pd.DataFrame) and res.empty):
+                return {"status": "EMPTY_RESULT", "result": res, "error": "Empty result"}
+            else:
+                return {"status": "SUCCESS", "result": res, "error": None}
+                
+        except Exception as e:
+            logger.warning(f"Failed to execute SQL: {e}")
+            return {"status": "ERROR", "result": None, "error": str(e)}
+
+    def _generate_candidate_sql(
+            self,
+            question: str,
+            schema: str,
+            evidence: str = "",
+            db_type: str = "sqlite",
+            db_path: Optional[Union[str, Path]] = None,
+            db_id: Optional[str] = None,
+            credential: Optional[Dict] = None
+    ) -> List[Dict[str, Any]]:
         """Generate candidate SQL queries using multiple baseline-style templates if available."""
 
         # Use diversified baseline templates
@@ -214,7 +278,8 @@ class CHESSGenerator(BaseGenerator):
                     template_params = {
                         "DATABASE_SCHEMA": schema,
                         "QUESTION": question,
-                        "HINT": evidence
+                        "HINT": evidence,
+                        "REASONING_EXAMPLES": ""
                     }
                     
                     # Add EXAMPLES placeholder for template_generate_candidate_retrieval
@@ -229,20 +294,35 @@ class CHESSGenerator(BaseGenerator):
                     sql_match = re.search(r'<FINAL_ANSWER>(.*?)</FINAL_ANSWER>', response, re.DOTALL)
                     if sql_match:
                         sql = sql_match.group(1).strip()
+                        
+                        # Execute and validate SQL
+                        exec_result = self._execute_and_validate_sql(sql, db_type, db_path, db_id, credential)
+                        
                         candidates.append({
                             "SQL": sql,
                             "chain_of_thought_reasoning": response,
-                            "confidence": 0.8
+                            "confidence": 0.8,
+                            "execution_status": exec_result["status"],
+                            "execution_result": exec_result["result"],
+                            "execution_error": exec_result["error"]
                         })
                     else:
                         # Fallback: try to extract first SELECT line
                         lines = response.split('\n')
                         for line in lines:
                             if line.strip().upper().startswith('SELECT'):
+                                sql = line.strip()
+                                
+                                # Execute and validate SQL
+                                exec_result = self._execute_and_validate_sql(sql, db_type, db_path, db_id, credential)
+                                
                                 candidates.append({
-                                    "SQL": line.strip(),
+                                    "SQL": sql,
                                     "chain_of_thought_reasoning": response,
-                                    "confidence": 0.6
+                                    "confidence": 0.6,
+                                    "execution_status": exec_result["status"],
+                                    "execution_result": exec_result["result"],
+                                    "execution_error": exec_result["error"]
                                 })
                                 break
 
@@ -252,8 +332,15 @@ class CHESSGenerator(BaseGenerator):
 
         return candidates
 
-    def _revise_sql(self, question: str, schema: str, sql: str, feedback: str = "") -> str:
-        """Revise SQL query based on feedback"""
+    def _revise_sql(
+            self,
+            question: str,
+            schema: str,
+            sql: str,
+            execution_error: str = "",
+            evidence: str = ""
+    ) -> str:
+        """Revise SQL query based on execution feedback"""
 
         # Use baseline revise template
         template = template_revise_one()
@@ -262,9 +349,9 @@ class CHESSGenerator(BaseGenerator):
             prompt = template.format(
                 DATABASE_SCHEMA=schema,
                 QUESTION=question,
-                HINT=feedback,  # Use HINT instead of FEEDBACK
-                QUERY=sql,      # Use QUERY instead of SQL
-                RESULT=feedback  # Use RESULT instead of FEEDBACK
+                HINT=evidence,
+                QUERY=sql,
+                RESULT=execution_error if execution_error else "[]"
             )
 
             response = self.llm.complete(prompt, temperature=self.config.ut_temperature).text
@@ -314,13 +401,31 @@ class CHESSGenerator(BaseGenerator):
             logger.warning(f"Failed to generate unit tests: {e}")
             return []
 
-    def _evaluate_sql(self, question: str, sql: str, unit_tests: List[str]) -> Dict[str, Any]:
-        """Evaluate SQL query using unit tests"""
+    def _evaluate_sql(
+            self,
+            question: str,
+            sql: str,
+            unit_tests: List[str],
+            execution_status: str = None,
+            execution_error: str = None
+    ) -> Dict[str, Any]:
+        """Evaluate SQL query using execution results and unit tests"""
+
+        # First check execution status - if it failed or returned empty, penalize heavily
+        if execution_status == "ERROR":
+            return {"score": 0.0, "feedback": execution_error or "Execution error"}
+        elif execution_status == "EMPTY_RESULT":
+            return {"score": 0.2, "feedback": "Query returned empty result"}
+        elif execution_status == "SUCCESS":
+            # If execution succeeded, give high base score
+            base_score = 0.8
+        else:
+            base_score = 0.5
 
         if not unit_tests:
-            return {"score": 0.5, "feedback": "No unit tests available"}
+            return {"score": base_score, "feedback": "No unit tests available"}
 
-        # Use baseline evaluate template
+        # Use baseline evaluate template for additional validation
         template = template_evaluate()
 
         try:
@@ -344,12 +449,17 @@ class CHESSGenerator(BaseGenerator):
                     result = json.loads(json_str)
                 except Exception:
                     result = eval(json_str)
-                return result if isinstance(result, dict) else {"score": 0.5, "feedback": "Invalid evaluation result"}
-            return {"score": 0.5, "feedback": "Could not parse evaluation result"}
+                if isinstance(result, dict):
+                    # Combine execution success with unit test score
+                    unit_test_score = result.get("score", 0.5)
+                    final_score = (base_score + unit_test_score) / 2
+                    return {"score": final_score, "feedback": result.get("feedback", "")}
+            
+            return {"score": base_score, "feedback": "Could not parse evaluation result"}
 
         except Exception as e:
             logger.warning(f"Failed to evaluate SQL: {e}")
-            return {"score": 0.5, "feedback": f"Evaluation failed: {e}"}
+            return {"score": base_score, "feedback": f"Unit test evaluation failed: {e}"}
 
     def _select_best_sql(self, candidates: List[Dict[str, Any]], evaluations: List[Dict[str, Any]]) -> str:
         """Select the best SQL query based on evaluations"""
@@ -430,27 +540,46 @@ class CHESSGenerator(BaseGenerator):
         context = self._retrieve_context(question, schema, keywords)
         logger.debug(f"提取关键词: {keywords[:10]}...")
 
-        # Step 3: Candidate Generation (CG)
+        # Prepare database connection parameters
+        db_path = None
+        if hasattr(self.dataset, 'db_path') and self.dataset.db_path and db_id:
+            db_path = Path(self.dataset.db_path) / f"{db_id}.sqlite"
+        
+        credential = self.dataset.credential if hasattr(self.dataset, 'credential') else None
+
+        # Step 3: Candidate Generation (CG) with execution validation
         logger.debug("开始候选SQL生成...")
         # Build lightweight hints to mimic baseline CoT aggregation
         built_evidence = self._build_evidence(question, context, keywords, evidence)
-        candidates = self._generate_candidate_sql(question, context, built_evidence)
+        candidates = self._generate_candidate_sql(
+            question, context, built_evidence, db_type, db_path, db_id, credential
+        )
         logger.debug(f"生成 {len(candidates)} 个候选SQL")
 
         if not candidates:
             logger.warning("没有生成任何候选SQL")
             pred_sql = ""
         else:
-            # Step 4: Unit Testing (UT)
+            # Step 4: Unit Testing (UT) - only for successfully executed queries
             logger.debug("开始单元测试生成...")
-            unit_tests = self._generate_unit_tests(question, candidates[0]["SQL"])
+            successful_candidates = [c for c in candidates if c.get("execution_status") == "SUCCESS"]
+            if successful_candidates:
+                unit_tests = self._generate_unit_tests(question, successful_candidates[0]["SQL"])
+            else:
+                unit_tests = []
             logger.debug(f"生成 {len(unit_tests)} 个单元测试")
 
-            # Step 5: Evaluation
+            # Step 5: Evaluation with execution results
             logger.debug("开始SQL评估...")
             evaluations = []
             for candidate in candidates:
-                evaluation = self._evaluate_sql(question, candidate["SQL"], unit_tests)
+                evaluation = self._evaluate_sql(
+                    question,
+                    candidate["SQL"],
+                    unit_tests,
+                    candidate.get("execution_status"),
+                    candidate.get("execution_error")
+                )
                 evaluations.append(evaluation)
             logger.debug("SQL评估完成")
 
@@ -458,13 +587,33 @@ class CHESSGenerator(BaseGenerator):
             pred_sql = self._select_best_sql(candidates, evaluations)
             logger.debug(f"选择最佳SQL: {pred_sql[:100]}...")
 
-            # Step 7: Optional SQL revision based on feedback
-            if evaluations and evaluations[0].get("feedback"):
-                logger.debug("开始SQL修订...")
-                revised_sql = self._revise_sql(question, context, pred_sql, evaluations[0]["feedback"])
+            # Step 7: SQL revision based on execution feedback for failed queries
+            best_candidate_idx = 0
+            for i, candidate in enumerate(candidates):
+                if candidate["SQL"] == pred_sql:
+                    best_candidate_idx = i
+                    break
+            
+            best_candidate = candidates[best_candidate_idx]
+            if best_candidate.get("execution_status") in ["ERROR", "EMPTY_RESULT"]:
+                logger.debug("开始SQL修订（基于执行错误）...")
+                revised_sql = self._revise_sql(
+                    question,
+                    context,
+                    pred_sql,
+                    best_candidate.get("execution_error", ""),
+                    evidence
+                )
                 if revised_sql and revised_sql != pred_sql:
-                    pred_sql = revised_sql
-                    logger.debug("SQL修订完成")
+                    # Validate revised SQL
+                    revised_result = self._execute_and_validate_sql(
+                        revised_sql, db_type, db_path, db_id, credential
+                    )
+                    if revised_result["status"] == "SUCCESS":
+                        pred_sql = revised_sql
+                        logger.debug("SQL修订成功")
+                    else:
+                        logger.debug("修订后的SQL仍有问题，保留原SQL")
 
         # SQL post-process
         if self.sql_post_process_function and pred_sql:

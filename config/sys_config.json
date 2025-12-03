@@ -151,6 +151,29 @@
           "has_label": true
         }
       ]
+    },
+    {
+      "id": "SquRL",
+      "meta_info": "",
+      "root_path": "../benchmarks/SquRL",
+      "db_type": "sqlite",
+      "has_sub": true,
+      "external": false,
+      "database": true,
+      "sub_data": [
+        {
+          "sub_id": "sft",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "rsl",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        }
+      ]
     }
   ],
   "task": {
