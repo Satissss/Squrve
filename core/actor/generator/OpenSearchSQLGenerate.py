@@ -1638,31 +1638,12 @@ Please answer according to the format below and do not output any other content.
             if not pred_sql.startswith("SELECT"):
                 pred_sql = "SELECT 1"
 
-            # Save results following the same pattern as LinkAlignGenerator
-            if self.is_save:
-                try:
-                    instance_id = row.get("instance_id", item)
-                    save_path = Path(self.save_dir)
-                    save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
-                                                                                       'dataset_index') and self.dataset.dataset_index else save_path
-                    save_path = save_path / f"{self.name}_{instance_id}.sql"
+            # Ensure we have valid SQL to save
+            if not pred_sql or not pred_sql.strip():
+                pred_sql = "SELECT 1"
+                logger.warning(f"Using fallback SQL for item {item}")
 
-                    # Ensure the directory exists
-                    save_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    # Ensure we have valid SQL to save
-                    if pred_sql and pred_sql.strip():
-                        save_dataset(pred_sql, new_data_source=save_path)
-                        self.dataset.setitem(item, "pred_sql", str(save_path))
-                        logger.debug(f"SQL saved to: {save_path}")
-                    else:
-                        # Save fallback SQL if pred_sql is still empty
-                        fallback_sql = "SELECT 1"
-                        save_dataset(fallback_sql, new_data_source=save_path)
-                        self.dataset.setitem(item, "pred_sql", str(save_path))
-                        logger.warning(f"Saved fallback SQL to: {save_path}")
-                except Exception as e:
-                    logger.error(f"Error saving SQL: {e}")
+            pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
 
             logger.info(f"OpenSearchSQLGenerator completed processing sample {item}")
             logger.info(f"Final predicted SQL: {pred_sql}")
@@ -1676,23 +1657,7 @@ Please answer according to the format below and do not output any other content.
 
             # Provide a fallback SQL in case of errors
             fallback_sql = "SELECT 1"
-
-            if self.is_save:
-                try:
-                    instance_id = row.get("instance_id", item) if 'row' in locals() else item
-                    save_path = Path(self.save_dir)
-                    save_path = save_path / str(self.dataset.dataset_index) if hasattr(self.dataset,
-                                                                                       'dataset_index') and self.dataset.dataset_index else save_path
-                    save_path = save_path / f"{self.name}_{instance_id}.sql"
-
-                    # Ensure the directory exists
-                    save_path.parent.mkdir(parents=True, exist_ok=True)
-
-                    save_dataset(fallback_sql, new_data_source=save_path)
-                    if 'row' in locals():
-                        self.dataset.setitem(item, "pred_sql", str(save_path))
-                    logger.warning(f"Saved fallback SQL due to error: {save_path}")
-                except Exception as save_error:
-                    logger.error(f"Error saving fallback SQL: {save_error}")
+            instance_id = row.get("instance_id", item) if 'row' in locals() else item
+            fallback_sql = self.save_output(fallback_sql, item, instance_id)
 
             return fallback_sql  # Return fallback instead of raising exception

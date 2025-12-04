@@ -2,10 +2,12 @@ from typing import Union, List, Dict, Any, Tuple
 from os import PathLike
 from pathlib import Path
 from loguru import logger
+import pandas as pd
 
 from core.actor.selector.BaseSelector import BaseSelector
 from core.data_manage import Dataset
 from core.db_connect import get_sql_exec_result_with_time
+from core.utils import compare_pandas_table
 
 
 class FastExecSelector(BaseSelector):
@@ -82,10 +84,22 @@ class FastExecSelector(BaseSelector):
             logger.warning(f"{self.NAME} | no successful executions for item {item}")
             return ""
 
-        successful_runs.sort(key=lambda r: r["time_cost"])
-        best_sql = successful_runs[0]["sql"]
+        # Group by execution result, select the fastest SQL from the most frequent result group
+        result_groups = self._group_by_result(successful_runs)
+        max_count = max(len(group) for group in result_groups)
+        
+        # If all groups have the same count, fallback to the fastest SQL overall
+        if len(result_groups) == len(successful_runs):
+            best_run = min(successful_runs, key=lambda r: r["time_cost"])
+        else:
+            # Find the most frequent result group(s)
+            most_frequent_groups = [group for group in result_groups if len(group) == max_count]
+            # Select the fastest SQL from the first most frequent group
+            best_run = min(most_frequent_groups[0], key=lambda r: r["time_cost"])
+        
+        best_sql = best_run["sql"]
         if data_logger:
-            data_logger.info(f"{self.NAME}.best_candidate | details={successful_runs[0]}")
+            data_logger.info(f"{self.NAME}.best_candidate | details={best_run} | group_size={max_count}")
 
         best_sql = self.save_result(best_sql, item, row.get("instance_id"))
 
@@ -132,4 +146,31 @@ class FastExecSelector(BaseSelector):
             return None, "Empty result tuple"
 
         return exec_result, None
+
+    @staticmethod
+    def _group_by_result(successful_runs: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+        """Group SQL runs by their execution results using DataFrame comparison."""
+        groups = []
+        for run in successful_runs:
+            result = run["result"]
+            placed = False
+            
+            for group in groups:
+                group_result = group[0]["result"]
+                # Compare DataFrames using compare_pandas_table utility
+                if isinstance(result, pd.DataFrame) and isinstance(group_result, pd.DataFrame):
+                    if compare_pandas_table(result, group_result, ignore_order=True) == 1:
+                        group.append(run)
+                        placed = True
+                        break
+                # Fallback to direct comparison for non-DataFrame results
+                elif result == group_result or (pd.isna(result) and pd.isna(group_result)):
+                    group.append(run)
+                    placed = True
+                    break
+            
+            if not placed:
+                groups.append([run])
+        
+        return groups
 

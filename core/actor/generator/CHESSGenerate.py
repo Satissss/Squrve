@@ -619,16 +619,7 @@ class CHESSGenerator(BaseGenerator):
         if self.sql_post_process_function and pred_sql:
             pred_sql = self.sql_post_process_function(pred_sql, self.dataset)
 
-        # Save results
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.name}_{instance_id}.sql"
-
-            save_dataset(pred_sql, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
-            logger.debug(f"SQL 已保存到: {save_path}")
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
 
         logger.info(f"CHESSGenerator 样本 {item} 处理完成")
         if data_logger:

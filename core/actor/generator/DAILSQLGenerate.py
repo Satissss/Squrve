@@ -2041,9 +2041,7 @@ class DAILSQLGenerate(BaseGenerator):
             # Post-process SQL with database type information
             sql = self._post_process_sql(res_text, db_type)
 
-            # Save result if required
-            if self.is_save:
-                self._save_result(sql, row, item)
+            sql = self.save_output(sql, item, row.get("instance_id"))
 
             logger.debug(f"生成的 SQL: {sql[:100]}...")
             logger.info(f"DAILSQLGenerator 样本 {item} 处理完成")
@@ -2305,18 +2303,6 @@ SELECT """
             logger.warning(f"加载外部知识失败: {e}")
         return None
 
-    def _save_result(self, sql, row, item):
-        """Save the generated SQL result"""
-        instance_id = row.get("instance_id", item)
-        save_path = Path(self.save_dir)
-        if self.dataset and self.dataset.dataset_index:
-            save_path = save_path / str(self.dataset.dataset_index)
-        save_path = save_path / f"{self.NAME}_{instance_id}.sql"
-        save_path.parent.mkdir(parents=True, exist_ok=True)
-        save_dataset(sql, new_data_source=save_path)
-        if self.dataset:
-            self.dataset.setitem(item, "pred_sql", str(save_path))
-        logger.debug(f"SQL 已保存到: {save_path}")
 
     def _build_dataset_adapter(self):
         """Build a dataset adapter for DAIL-SQL prompt system"""

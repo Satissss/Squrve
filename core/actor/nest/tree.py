@@ -7,6 +7,7 @@ from typing import List, Dict, Union
 from loguru import logger
 
 from core.actor.base import ComplexActor, Actor
+from core.actor.generator import BaseGenerator
 from core.data_manage import update_dataset
 
 
@@ -190,7 +191,7 @@ class ActorGroup(TreeActor):
     def merge_results(self, item, results: List):
         if not results:
             logger.info("Input results empty!")
-        logger.info(results)
+
         merge_result = []
         for row in results:
             for actor, res in row.items():
@@ -199,6 +200,7 @@ class ActorGroup(TreeActor):
                 else:
                     merge_result.append(res)
 
+        logger.info(merge_result)
         return merge_result
 
     def act(self, item, **kwargs):
@@ -252,6 +254,10 @@ class ActorGroup(TreeActor):
         self.group_postprocess(**kwargs)
 
         return results
+
+
+class GenerateActorGroup(ActorGroup):
+    pass
 
 
 class ParseActorGroup(ActorGroup):

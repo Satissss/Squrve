@@ -933,14 +933,7 @@ class RSLSQLGenerator(BaseGenerator):
             logger.error(f"Error in self correction: {e}")
             pred_sql = selected_sql
 
-        if self.is_save:
-            instance_id = row.get("instance_id", item)
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.sql"
-
-            save_dataset(pred_sql, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
 
         if data_logger:
             data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")

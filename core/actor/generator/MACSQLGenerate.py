@@ -1011,16 +1011,7 @@ Please generate a valid SQL query. Only return the SQL statement:"""
 
             logger.debug(f"最终生成的 SQL: {pred_sql[:100]}...")
 
-            # 保存结果
-            if self.is_save:
-                instance_id = row.get("instance_id")
-                save_path = Path(self.save_dir)
-                save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-                save_path = save_path / f"{self.name}_{instance_id}.sql"
-
-                save_dataset(pred_sql, new_data_source=save_path)
-                self.dataset.setitem(item, "pred_sql", str(save_path))
-                logger.debug(f"SQL saved to: {save_path}")
+            pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
 
             logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
             if data_logger:

@@ -641,16 +641,7 @@ class ReFoRCEGenerator(BaseGenerator):
 
         logger.debug(f"Final SQL: {pred_sql[:100]}...")
 
-        # Save results if enabled
-        if self.is_save:
-            instance_id = row.get("instance_id", str(item))
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.NAME}_{instance_id}.sql"
-
-            save_dataset(pred_sql, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
-            logger.debug(f"SQL saved to: {save_path}")
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id", str(item)))
 
         logger.info(f"ReFoRCEGenerator sample {item} processed successfully")
         if data_logger:

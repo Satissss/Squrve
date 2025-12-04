@@ -655,15 +655,7 @@ Intermediate_representation: select course.title , course.credits from classroom
         if data_logger:
             data_logger.info(f"{self.NAME}.final_sql | sql={sql}")
 
-        if self.is_save:
-            instance_id = row.get("instance_id")
-            save_path = Path(self.save_dir)
-            save_path = save_path / str(self.dataset.dataset_index) if self.dataset.dataset_index else save_path
-            save_path = save_path / f"{self.name}_{instance_id}.sql"
-
-            save_dataset(sql, new_data_source=save_path)
-            self.dataset.setitem(item, "pred_sql", str(save_path))
-            logger.debug(f"SQL saved to: {save_path}")
+        sql = self.save_output(sql, item, row.get("instance_id"))
 
         logger.info(f"DIN_SQLGenerator sample {item} processed")
         if data_logger:
