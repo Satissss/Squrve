@@ -76,7 +76,8 @@ class QwenModel(CustomLLM):
             temperature=self.temperature,
             top_p=self.top_p,
             stream=self.is_stream,
-            timeout=self.time_out
+            timeout=self.time_out,
+            extra_body={"enable_thinking": True},
         )
         if not self.is_stream:
             completion_response = response.choices[0].message.content
