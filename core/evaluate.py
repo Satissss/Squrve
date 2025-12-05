@@ -6,6 +6,7 @@ from typing import List, Union, Dict
 
 import pandas as pd
 from torch.fx.experimental.recording import shape_env_check_state_equal
+from func_timeout import func_timeout, FunctionTimedOut
 
 from core.data_manage import Dataset, load_dataset
 from core.db_connect import get_sql_exec_result
@@ -80,13 +81,16 @@ class Evaluator:
 
             for ind in range(total_items):
                 try:
-                    res = self.eval(ind, type_)
+                    res = func_timeout(60, self.eval, args=(ind, type_))
                     if res is None:
                         print(f"Warning: Evaluation result is None for item {ind} in {type_}")
                         continue
                     res_lis.append([ind, res])
                     acc_res += res
                     valid_num += 1
+                except FunctionTimedOut:
+                    print(f"Timeout: Skipping item {ind} in {type_} (exceeded 60 seconds)")
+                    continue
                 except Exception as e:
                     print(f"Error evaluating item {ind} for {type_}: {e}")
                     continue
