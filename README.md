@@ -42,7 +42,7 @@ Deploy advanced methods to wide-ranging query scenarios effortlessly. Squrve req
 
 Ensure your Python environment meets the following requirements:
 
-- Python 3.8+
+- Python 3.11+
 - Required dependencies (see requirements.txt)
 
 ```bash

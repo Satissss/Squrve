@@ -45,7 +45,8 @@ class PipelineActor(ComplexActor):
                 res = actor.act(item, **results)
                 output_name = actor.output_name
                 logger.info(f"Actor {actor.name} 执行完成，输出名称: {output_name}")
-
+                # todo The method of updating result parameters may depend on the specific Actor type.
+                #  Under the current strategy, subsequent outputs with the same name will overwrite the previous ones.
                 if output_name == "TreeOutput" and isinstance(res, dict):
                     results.update(res)
                 else:

@@ -6,7 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/llm/QwenModel.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/llm/QwenModel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/nest/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/nest/pipeline.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -69,84 +69,84 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_MARK_IGNORED_FILES_AS_EXCLUDED": "true",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "Python.AdaptiveOptimize.executor": "Run",
-    "Python.DAILSQLGenerate.executor": "Run",
-    "Python.DINSQLOptimize.executor": "Run",
-    "Python.DeepseekModel.executor": "Run",
-    "Python.GenerateTask.executor": "Run",
-    "Python.LinkAlignGenerate.executor": "Debug",
-    "Python.LinkAlignReduce.executor": "Debug",
-    "Python.MACSQLDecompose.executor": "Run",
-    "Python.MetaTask.executor": "Run",
-    "Python.QwenModel.executor": "Run",
-    "Python.XiaoJingModel.executor": "Run",
-    "Python.ZhipuModel.executor": "Run",
-    "Python.ambidb_evaluate_schema_links.executor": "Run",
-    "Python.analysis_error_samples.executor": "Run",
-    "Python.base.executor": "Debug",
-    "Python.build_logic_testing_dataset.executor": "Run",
-    "Python.build_optimize_datasets.executor": "Run",
-    "Python.construct_data.executor": "Run",
-    "Python.count_num.executor": "Run",
-    "Python.data_clean.executor": "Run",
-    "Python.data_manage.executor": "Run",
-    "Python.data_select.executor": "Run",
-    "Python.error_analysis.executor": "Run",
-    "Python.evaluate.executor": "Run",
-    "Python.evaluate_ablation.executor": "Debug",
-    "Python.evaluate_ablation_fixed.executor": "Run",
-    "Python.evaluate_schema_links.executor": "Run",
-    "Python.examine_error.executor": "Run",
-    "Python.extract_schemas.executor": "Run",
-    "Python.filter.executor": "Run",
-    "Python.filter_data.executor": "Run",
-    "Python.filter_data_2.executor": "Run",
-    "Python.filter_dataset.executor": "Run",
-    "Python.filter_failed_sample.executor": "Run",
-    "Python.gen_error_sample.executor": "Run",
-    "Python.load_data.executor": "Run",
-    "Python.merge.executor": "Run",
-    "Python.po.executor": "Run",
-    "Python.preprocess.executor": "Run",
-    "Python.preprocess_data.executor": "Run",
-    "Python.print_actors.executor": "Run",
-    "Python.print_data.executor": "Run",
-    "Python.pro.executor": "Run",
-    "Python.process.executor": "Run",
-    "Python.process_data.executor": "Run",
-    "Python.rollout_data.executor": "Run",
-    "Python.run (1).executor": "Run",
-    "Python.run.executor": "Run",
-    "Python.run_.executor": "Debug",
-    "Python.run_2.executor": "Debug",
-    "Python.run_ambidb.executor": "Run",
-    "Python.run_bird.executor": "Run",
-    "Python.run_can.executor": "Debug",
-    "Python.run_ens.executor": "Run",
-    "Python.run_logic.executor": "Run",
-    "Python.run_spider_dev.executor": "Debug",
-    "Python.run_test.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.test_api.executor": "Run",
-    "Python.tree.executor": "Debug",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "WebServerToolWindowFactoryState": "false",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "D:/project/Squrve/experiment",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_MARK_IGNORED_FILES_AS_EXCLUDED&quot;: &quot;true&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;Python.AdaptiveOptimize.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DAILSQLGenerate.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DINSQLOptimize.executor&quot;: &quot;Run&quot;,
+    &quot;Python.DeepseekModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.GenerateTask.executor&quot;: &quot;Run&quot;,
+    &quot;Python.LinkAlignGenerate.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.LinkAlignReduce.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.MACSQLDecompose.executor&quot;: &quot;Run&quot;,
+    &quot;Python.MetaTask.executor&quot;: &quot;Run&quot;,
+    &quot;Python.QwenModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.XiaoJingModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ZhipuModel.executor&quot;: &quot;Run&quot;,
+    &quot;Python.ambidb_evaluate_schema_links.executor&quot;: &quot;Run&quot;,
+    &quot;Python.analysis_error_samples.executor&quot;: &quot;Run&quot;,
+    &quot;Python.base.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.build_logic_testing_dataset.executor&quot;: &quot;Run&quot;,
+    &quot;Python.build_optimize_datasets.executor&quot;: &quot;Run&quot;,
+    &quot;Python.construct_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.count_num.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_clean.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_manage.executor&quot;: &quot;Run&quot;,
+    &quot;Python.data_select.executor&quot;: &quot;Run&quot;,
+    &quot;Python.error_analysis.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate_ablation.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.evaluate_ablation_fixed.executor&quot;: &quot;Run&quot;,
+    &quot;Python.evaluate_schema_links.executor&quot;: &quot;Run&quot;,
+    &quot;Python.examine_error.executor&quot;: &quot;Run&quot;,
+    &quot;Python.extract_schemas.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_data_2.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_dataset.executor&quot;: &quot;Run&quot;,
+    &quot;Python.filter_failed_sample.executor&quot;: &quot;Run&quot;,
+    &quot;Python.gen_error_sample.executor&quot;: &quot;Run&quot;,
+    &quot;Python.load_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.merge.executor&quot;: &quot;Run&quot;,
+    &quot;Python.po.executor&quot;: &quot;Run&quot;,
+    &quot;Python.preprocess.executor&quot;: &quot;Run&quot;,
+    &quot;Python.preprocess_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.print_actors.executor&quot;: &quot;Run&quot;,
+    &quot;Python.print_data.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.pro.executor&quot;: &quot;Run&quot;,
+    &quot;Python.process.executor&quot;: &quot;Run&quot;,
+    &quot;Python.process_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.rollout_data.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_2.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_ambidb.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_bird.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_can.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_ens.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_logic.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run_spider_dev.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.run_test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test_api.executor&quot;: &quot;Run&quot;,
+    &quot;Python.tree.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/project/Squrve&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="D:\project\Squrve\experiment" />
@@ -156,14 +156,14 @@
       <recent name="D:\project\Squrve\startup_run" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="D:\project\Squrve\squrl\history_data" />
       <recent name="D:\project\Squrve\booksql\results" />
       <recent name="D:\project\Squrve\booksql\error_generator" />
       <recent name="D:\project\Squrve\booksql\construct_error_samples" />
       <recent name="D:\project\Squrve\files\pred_sql\booksql" />
-      <recent name="D:\project\Squrve\benchmarks\OptiSQL\bird" />
     </key>
   </component>
-  <component name="RunManager">
+  <component name="RunManager" selected="Python.po">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -628,7 +628,9 @@
       <workItem from="1764724726313" duration="25246000" />
       <workItem from="1764816645475" duration="5878000" />
       <workItem from="1764835547006" duration="28791000" />
-      <workItem from="1764913115272" duration="7300000" />
+      <workItem from="1764913115272" duration="32571000" />
+      <workItem from="1765072738824" duration="11141000" />
+      <workItem from="1765108844760" duration="2554000" />
     </task>
     <servers />
   </component>
@@ -703,6 +705,11 @@
           <line>87</line>
           <option name="timeStamp" value="176" />
         </line-breakpoint>
+        <line-breakpoint enabled="true" type="python-line">
+          <url>file://$PROJECT_DIR$/squrl/data/print_data.py</url>
+          <line>19</line>
+          <option name="timeStamp" value="180" />
+        </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
         <breakpoint type="python-line" />
@@ -734,9 +741,9 @@
     <SUITE FILE_PATH="coverage/Squrve$preprocess.coverage" NAME="preprocess Coverage Results" MODIFIED="1764643574058" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/SquRL" />
     <SUITE FILE_PATH="coverage/Squrve$process_data.coverage" NAME="process_data Coverage Results" MODIFIED="1763814550537" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/datasets" />
     <SUITE FILE_PATH="coverage/Squrve$filter_dataset.coverage" NAME="filter_dataset Coverage Results" MODIFIED="1762744134825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../Spider2/spider2-lite/evaluation_suite" />
-    <SUITE FILE_PATH="coverage/Squrve$print_data.coverage" NAME="print_data Coverage Results" MODIFIED="1764780087123" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl/data" />
+    <SUITE FILE_PATH="coverage/Squrve$print_data.coverage" NAME="print_data Coverage Results" MODIFIED="1765026421841" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl/data" />
     <SUITE FILE_PATH="coverage/Squrve$examine_error.coverage" NAME="examine_error Coverage Results" MODIFIED="1764083759100" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/booksql" />
-    <SUITE FILE_PATH="coverage/Squrve$construct_data.coverage" NAME="construct_data Coverage Results" MODIFIED="1764780000995" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl" />
+    <SUITE FILE_PATH="coverage/Squrve$construct_data.coverage" NAME="construct_data Coverage Results" MODIFIED="1765026193877" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl" />
     <SUITE FILE_PATH="coverage/Squrve$evaluate_ablation.coverage" NAME="evaluate_ablation Coverage Results" MODIFIED="1751257240348" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/Squrve$run_2.coverage" NAME="run_2 Coverage Results" MODIFIED="1760926277447" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$run_can.coverage" NAME="run_can Coverage Results" MODIFIED="1760350333807" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/entension" />
@@ -778,7 +785,7 @@
     <SUITE FILE_PATH="coverage/QueryFlow$create.coverage" NAME="create Coverage Results" MODIFIED="1746275553960" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/reasoning_examples" />
     <SUITE FILE_PATH="coverage/Squrve$po.coverage" NAME="po Coverage Results" MODIFIED="1758336833416" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/files/data_source" />
     <SUITE FILE_PATH="coverage/Squrve$data_clean.coverage" NAME="data_clean Coverage Results" MODIFIED="1753605198668" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/benchmarks/AmbiDB" />
-    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1764922731072" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/post_spider2" />
+    <SUITE FILE_PATH="coverage/Squrve$run.coverage" NAME="run Coverage Results" MODIFIED="1764935530507" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$filter_failed_sample.coverage" NAME="filter_failed_sample Coverage Results" MODIFIED="1763718242383" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/booksql" />
     <SUITE FILE_PATH="coverage/Squrve$run_logic.coverage" NAME="run_logic Coverage Results" MODIFIED="1764123894935" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/booksql" />
     <SUITE FILE_PATH="coverage/Squrve$data_manage.coverage" NAME="data_manage Coverage Results" MODIFIED="1752075101039" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/core" />
