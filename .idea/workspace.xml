@@ -6,7 +6,8 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/nest/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/nest/pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -163,7 +164,7 @@
       <recent name="D:\project\Squrve\files\pred_sql\booksql" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.po">
+  <component name="RunManager">
     <configuration name="debug" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Squrve" />
       <option name="ENV_FILES" value="" />
@@ -630,7 +631,7 @@
       <workItem from="1764835547006" duration="28791000" />
       <workItem from="1764913115272" duration="32571000" />
       <workItem from="1765072738824" duration="11141000" />
-      <workItem from="1765108844760" duration="2554000" />
+      <workItem from="1765108844760" duration="14074000" />
     </task>
     <servers />
   </component>
@@ -709,6 +710,10 @@
           <url>file://$PROJECT_DIR$/squrl/data/print_data.py</url>
           <line>19</line>
           <option name="timeStamp" value="180" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="python-line">
+          <url>file://$PROJECT_DIR$/core/actor/scaler/BaseScale.py</url>
+          <option name="timeStamp" value="181" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>

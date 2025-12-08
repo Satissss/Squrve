@@ -1,15 +1,28 @@
 from os import PathLike
-from typing import Union, Dict, List
+from typing import Union, Dict, List, Any
 from pathlib import Path
 
 from core.actor.base import Actor
-from core.data_manage import save_dataset
+from core.data_manage import save_dataset, Dataset
 from abc import abstractmethod
 from loguru import logger
 
 
 class BaseGenerator(Actor):
     OUTPUT_NAME: str = "pred_sql"
+
+    def __init__(
+            self,
+            dataset: Dataset = None,
+            llm: Any = None,
+            is_save: bool = True,
+            save_dir: Union[str, Path] = "../files/pred_sql",
+            **kwargs
+    ):
+        self.dataset = dataset
+        self.llm = llm
+        self.is_save = is_save
+        self.save_dir = save_dir
 
     @abstractmethod
     def act(
@@ -18,12 +31,9 @@ class BaseGenerator(Actor):
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
             data_logger=None,
-            is_save: bool = True,
-            save_dir: Union[str, PathLike] = "../files/pred_sql",
             **kwargs
     ):
-        self.is_save = is_save
-        self.save_dir = save_dir
+        pass
 
     def save_output(self, sql: str, item, instance_id: str = None) -> str:
         """
