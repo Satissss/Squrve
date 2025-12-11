@@ -145,7 +145,7 @@ The SQL query for the sub-question "{sub_question}" is '''
             self,
             dataset: Optional[Dataset] = None,
             llm: Union[LLM, List[LLM]] = None,
-            generate_num: int = 10,
+            generate_num: int = 5,
             temperature: float = 0.7,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/pred_sql",

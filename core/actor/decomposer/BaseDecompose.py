@@ -4,7 +4,7 @@ import pandas as pd
 from typing import Union, Dict, List
 from loguru import logger
 
-from core.actor.base import Actor
+from core.actor.base import Actor, MergeStrategy
 from abc import abstractmethod
 
 from core.data_manage import single_central_process, Dataset, save_dataset
@@ -16,7 +16,8 @@ class BaseDecomposer(Actor):
     # The NAME variable is defined in the implementing subclasses,
     # and by convention it is recommended to use a name ending with *Decomposer.
     # NAME: str = "*Decomposer"
-    OUTPUT_NAME: str = "sub_questions"
+    OUTPUT_NAME = "sub_questions"
+    STRATEGY = MergeStrategy.EXTEND.value
 
     def __init__(
             self,

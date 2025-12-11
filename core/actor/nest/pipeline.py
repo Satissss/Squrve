@@ -2,7 +2,7 @@ import warnings
 import traceback
 from loguru import logger
 
-from core.actor.base import ComplexActor
+from core.actor.base import ComplexActor, MergeStrategy, MergeFunction
 from core.data_manage import update_dataset
 
 
@@ -38,32 +38,31 @@ class PipelineActor(ComplexActor):
         res = None
 
         for i, actor in enumerate(self.actors):
-            logger.info(f"执行第 {i+1}/{len(self.actors)} 个 actor: {actor.name}")
+            logger.info(f"执行第 {i + 1}/{len(self.actors)} 个 actor: {actor.name}")
             actor.dataset = update_dataset(dataset, actor.dataset)
 
             try:
                 res = actor.act(item, **results)
                 output_name = actor.output_name
                 logger.info(f"Actor {actor.name} 执行完成，输出名称: {output_name}")
-                # todo The method of updating result parameters may depend on the specific Actor type.
-                #  Under the current strategy, subsequent outputs with the same name will overwrite the previous ones.
                 if output_name == "TreeOutput" and isinstance(res, dict):
                     results.update(res)
                 else:
-                    results[output_name] = res
+                    merge_func = MergeFunction.get_method(actor.strategy)
+                    merge_func(results, output_name, res)
 
                 dataset = actor.dataset
 
             except Exception as e:
                 error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
                 logger.error(error_msg)
-                
+
                 # Check for meta tensor error and provide specific guidance
                 if "meta tensor" in str(e).lower() and "to_empty" in str(e).lower():
                     error_msg += "\n\nThis is a PyTorch meta tensor error. The issue has been fixed in the latest code. "
                     error_msg += "If you're still seeing this error, please ensure you're using the updated version "
                     error_msg += "of the embedding model initialization code."
-                
+
                 print(error_msg)
                 print(f"Full traceback: {traceback.format_exc()}")
 

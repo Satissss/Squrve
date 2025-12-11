@@ -4,7 +4,7 @@ from pathlib import Path
 from loguru import logger
 import time
 import os
-from core.actor.base import Actor
+from core.actor.base import Actor, MergeStrategy
 from core.data_manage import Dataset
 from core.utils import load_dataset, save_dataset
 from core.db_connect import execute_sql
@@ -12,7 +12,8 @@ from abc import abstractmethod
 
 
 class BaseSelector(Actor):
-    OUTPUT_NAME: str = "pred_sql"
+    OUTPUT_NAME = "pred_sql"
+    STRATEGY = MergeStrategy.OVERWRITE.value
 
     def __init__(
             self,

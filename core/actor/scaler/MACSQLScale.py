@@ -59,7 +59,7 @@ Please generate a valid SQL query. Only return the SQL statement:'''
             self,
             dataset: Optional[Dataset] = None,
             llm: Union[LLM, List[LLM]] = None,
-            generate_num: int = 8,
+            generate_num: int = 5,
             temperature: float = 0.6,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/pred_sql",

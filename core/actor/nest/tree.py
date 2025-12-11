@@ -6,7 +6,7 @@ from typing import List, Dict, Union
 
 from loguru import logger
 
-from core.actor.base import ComplexActor, Actor
+from core.actor.base import ComplexActor, Actor, MergeStrategy, MergeFunction
 from core.actor.generator import BaseGenerator
 from core.data_manage import update_dataset
 
@@ -70,7 +70,7 @@ class TreeActor(ComplexActor):
     """
 
     NAME = "TreeActor"
-    OUTPUT_NAME: str = "TreeOutput"  # Dynamically determine
+    OUTPUT_NAME = "TreeOutput"  # Dynamically determine
 
     def __init__(
             self,
@@ -93,9 +93,9 @@ class TreeActor(ComplexActor):
         return res
 
     def process_series(self, item, **kwargs):
-        results = {}
-
+        results = kwargs
         dataset = self.dataset
+
         if not dataset or not self.actors:
             warnings.warn("Both 'dataset' and 'actors' must be provided.", category=UserWarning)
             return None
@@ -111,13 +111,9 @@ class TreeActor(ComplexActor):
                 if output_name == "TreeOutput" and isinstance(res, dict):
                     results.update(res)
                 else:
-                    if output_name in results:
-                        if isinstance(results[output_name], list):
-                            results[output_name] = [*results[output_name], str(res)]
-                        else:
-                            results[output_name] = [str(results[output_name]), str(res)]
-                    else:
-                        results[output_name] = res
+                    merge_func = MergeFunction.get_method(actor.strategy)
+                    merge_func(results, output_name, res)
+
             except Exception as e:
                 error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
                 logger.error(error_msg)
@@ -129,7 +125,7 @@ class TreeActor(ComplexActor):
         return results
 
     def process_parallel(self, item, **kwargs):
-        results = {}
+        results = kwargs
         dataset = self.dataset
 
         if not dataset or not self.actors:
@@ -158,13 +154,8 @@ class TreeActor(ComplexActor):
                     if output_name == "TreeOutput" and isinstance(res, dict):
                         results.update(res)
                     else:
-                        if output_name in results:
-                            if isinstance(results[output_name], list):
-                                results[output_name] = [*results[output_name], str(res)]
-                            else:
-                                results[output_name] = [str(results[output_name]), str(res)]
-                        else:
-                            results[output_name] = res
+                        merge_func = MergeFunction.get_method(actor.strategy)
+                        merge_func(results, output_name, res)
 
                 except Exception as e:
                     error_msg = f"Error occurred while executing actor '{actor.name}': {e}"
@@ -257,7 +248,8 @@ class ActorGroup(TreeActor):
 
 
 class GenerateActorGroup(ActorGroup):
-    pass
+    OUTPUT_NAME = "pred_sql"
+    STRATEGY = MergeStrategy.EXTEND.value
 
 
 class ParseActorGroup(ActorGroup):
@@ -282,7 +274,8 @@ class ParseActorGroup(ActorGroup):
 
 
 class ScaleActorGroup(ActorGroup):
-    pass
+    OUTPUT_NAME = "pred_sql"
+    STRATEGY = MergeStrategy.EXTEND.value
 
 
 class OptimizeActorGroup(ActorGroup):
@@ -321,7 +314,7 @@ class OptimizeActorGroup(ActorGroup):
         return True
 
     def merge_results(self, item, results: List):
-        # Merge results generated from distinct parser methods.
+        # Merge results generated from distinct optimizer methods.
         if not results:
             logger.info("Input results empty!")
         logger.info(results)

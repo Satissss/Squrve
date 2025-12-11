@@ -3,12 +3,14 @@ from abc import ABC, abstractmethod
 from typing import List, Union, Optional
 
 from core.data_manage import Dataset
+from enum import Enum
+from loguru import logger
 
 
 class Actor(ABC):
     NAME: str
     OUTPUT_NAME: str
-
+    STRATEGY: str
     dataset: Dataset
 
     @abstractmethod
@@ -25,6 +27,12 @@ class Actor(ABC):
     def output_name(self):
         if hasattr(self, "OUTPUT_NAME"):
             return self.OUTPUT_NAME
+        return None
+
+    @property
+    def strategy(self):
+        if hasattr(self, "STRATEGY"):
+            return self.STRATEGY
         return None
 
     def copy_instance(self):
@@ -92,3 +100,59 @@ class ComplexActor(Actor):
     @property
     def is_empty(self):
         return len(self.actors) == 0
+
+
+class MergeStrategy(Enum):
+    OVERWRITE = "overwrite"
+    APPEND = "append"
+    EXTEND = "extend"
+
+
+class MergeFunction:
+    @classmethod
+    def get_method(cls, strategy):
+        if strategy == MergeStrategy.OVERWRITE.value:
+            return MergeFunction.overwrite
+        elif strategy == MergeStrategy.APPEND.value:
+            return MergeFunction.append
+        elif strategy == MergeStrategy.EXTEND.value:
+            return MergeFunction.extend
+        else:
+            raise ValueError(f"Unknown merge strategy {strategy}")
+
+    @staticmethod
+    def overwrite(results, key, val):
+        if not isinstance(results, dict):
+            raise TypeError("results must be a dict!")
+        results[key] = val
+
+    @staticmethod
+    def append(results, key, val):
+        if not isinstance(results, dict):
+            raise TypeError("results must be a dict!")
+
+        if key in results:
+            if isinstance(results[key], list):
+                results[key] = results[key].append(val)
+            else:
+                results[key] = [results[key], val]
+        else:
+            results[key] = val
+        return results
+
+    @staticmethod
+    def extend(results, key, val):
+        if not isinstance(results, dict):
+            raise TypeError("results must be a dict!")
+        if not isinstance(val, list):
+            logger.info("val must be a list!")
+            return MergeFunction.append(results, key, val)
+
+        if key in results:
+            if isinstance(results[key], list):
+                results[key] = results[key].extend(val)
+            else:
+                results[key] = [str(results[key]), *val]
+        else:
+            results[key] = val
+        return results

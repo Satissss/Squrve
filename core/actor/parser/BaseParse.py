@@ -1,4 +1,4 @@
-from core.actor.base import Actor
+from core.actor.base import Actor, MergeStrategy
 from abc import abstractmethod
 from os import PathLike
 from typing import Union, Dict, List
@@ -17,6 +17,7 @@ class BaseParser(Actor):
     # NAME: str = "*Parser"
 
     OUTPUT_NAME: str = "schema_links"
+    STRATEGY = MergeStrategy.OVERWRITE.value
 
     def __init__(
             self,
