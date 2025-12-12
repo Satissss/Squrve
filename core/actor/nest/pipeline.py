@@ -40,10 +40,9 @@ class PipelineActor(ComplexActor):
         for i, actor in enumerate(self.actors):
             logger.info(f"执行第 {i + 1}/{len(self.actors)} 个 actor: {actor.name}")
             actor.dataset = update_dataset(dataset, actor.dataset)
-
+            output_name = actor.output_name
             try:
                 res = actor.act(item, **results)
-                output_name = actor.output_name
                 logger.info(f"Actor {actor.name} 执行完成，输出名称: {output_name}")
                 if output_name == "TreeOutput" and isinstance(res, dict):
                     results.update(res)
