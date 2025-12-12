@@ -94,10 +94,23 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
     for table_name, group in grouped:
         columns = []
         for _, row in group.iterrows():
+            info_dict = dict()
+            info_list = []
             col_type = row["column_types"]
-            if isinstance(col_type, str) and len(col_type) > 150:
-                col_type = col_type[:150]
-            columns.append(f'{row["column_name"]}(Type: {col_type})')
+            col_descriptions = row.get("column_descriptions")
+            # Add Column Type Information
+            col_type = col_type[:150] if isinstance(col_type, str) and len(col_type) > 150 else col_type
+            info_dict["Type"] = col_type
+            # Add Column Description
+            if col_descriptions:
+                col_descriptions = col_descriptions[:150] if len(col_descriptions) > 150 else col_descriptions
+                info_dict["Description"] = col_descriptions
+
+            col_info = f'{row["column_name"]}'
+            for key, val in info_dict.items():
+                info_list.append(f"{key}: {val}")
+            col_info += "(" + ", ".join(info_list) + ")"
+            columns.append(col_info)
 
         line = f'### Table = `{table_name}`, columns = [{", ".join(columns)}]'
         output_lines.append(line)
