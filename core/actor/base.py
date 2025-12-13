@@ -133,7 +133,7 @@ class MergeFunction:
 
         if key in results:
             if isinstance(results[key], list):
-                results[key] = results[key].append(val)
+                results[key].append(val)
             else:
                 results[key] = [results[key], val]
         else:
@@ -150,7 +150,7 @@ class MergeFunction:
 
         if key in results:
             if isinstance(results[key], list):
-                results[key] = results[key].extend(val)
+                results[key].extend(val)
             else:
                 results[key] = [str(results[key]), *val]
         else:
