@@ -6,10 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/nest/tree.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/nest/tree.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/files/domain/finance.json" beforeDir="false" afterPath="$PROJECT_DIR$/files/domain/finance.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -638,7 +635,7 @@
       <workItem from="1765371057939" duration="9433000" />
       <workItem from="1765418007291" duration="21505000" />
       <workItem from="1765508145410" duration="24213000" />
-      <workItem from="1765558949648" duration="8217000" />
+      <workItem from="1765558949648" duration="13823000" />
     </task>
     <servers />
   </component>

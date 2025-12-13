@@ -244,7 +244,10 @@ class ActorGroup(TreeActor):
         # Begin Group Post-Process
         self.group_postprocess(**kwargs)
 
-        return results
+        if self.output_name == "TreeOutput":
+            return results
+
+        return rtn
 
 
 class GenerateActorGroup(ActorGroup):
