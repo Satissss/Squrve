@@ -3,6 +3,13 @@ import warnings
 from pathlib import Path
 from typing import Union, Dict, List, Optional
 
+# Import unified path resolution
+from core.path_utils import get_project_root
+
+
+def _get_project_root():
+    """Get the project root directory (Squrve root) - use unified function"""
+    return get_project_root()
 
 class Router:
     """
@@ -16,8 +23,9 @@ class Router:
     such as the DataLoader (for loading datasets and database schemas) and Engine (for managing the core execution flow).
     """
 
-    _sys_config_path = "../config/sys_config.json"
-    _demo_config_path = "../config/demo_config.json"
+    _project_root = _get_project_root()
+    _sys_config_path = str(_project_root / "config" / "sys_config.json")
+    _demo_config_path = str(_project_root / "config" / "demo_config.json")
 
     """ CONFIG """
     _config: dict
