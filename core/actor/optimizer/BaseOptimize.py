@@ -65,7 +65,10 @@ class BaseOptimizer(Actor):
         sql_list = [pred_sql] if is_single else pred_sql
 
         # Load SQL from paths if necessary
-        sql_list = [load_dataset(p) if isinstance(p, (str, Path)) and Path(p).exists() else p for p in sql_list]
+        try:
+            sql_list = [load_dataset(p) if isinstance(p, (str, Path)) and Path(p).exists() else p for p in sql_list]
+        except Exception as e:
+            logger.info(f"Error when loading pred_sql: {e}. Treat sql_list storing the generated sqls.")
 
         return sql_list, is_single
 

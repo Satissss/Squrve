@@ -11,19 +11,9 @@ from loguru import logger
 class BaseGenerator(Actor):
     OUTPUT_NAME = "pred_sql"
     STRATEGY = MergeStrategy.APPEND.value
-    
-    def __init__(
-            self,
-            dataset: Dataset = None,
-            llm: Any = None,
-            is_save: bool = True,
-            save_dir: Union[str, Path] = "../files/pred_sql",
-            **kwargs
-    ):
-        self.dataset = dataset
-        self.llm = llm
-        self.is_save = is_save
-        self.save_dir = save_dir
+
+    is_save: bool
+    save_dir: str
 
     @abstractmethod
     def act(

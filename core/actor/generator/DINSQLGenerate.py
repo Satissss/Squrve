@@ -452,7 +452,7 @@ Intermediate_representation: select course.title , course.credits from classroom
 
     def schema_linking_prompt_maker(self, question: str, schema: str) -> str:
         instruction = "# Find the schema_links for generating SQL queries for each question based on the database schema and Foreign keys.\n"
-        return instruction + self.SCHEMA_LINKING_PROMPT + schema + 'Q: "' + question + '"\nA: Let\'s think step by step.'
+        return instruction + self.SCHEMA_LINKING_PROMPT + "\n" + schema + '\nQ: "' + question + '"\nA: Let\'s think step by step.'
 
     def classification_prompt_maker(self, question: str, schema: str, schema_links: Union[str, List]) -> str:
         instruction = "# For the given question, classify it as EASY, NON-NESTED, or NESTED based on nested queries and JOIN.\n"
@@ -527,6 +527,7 @@ Intermediate_representation: select course.title , course.credits from classroom
                 else:
                     logger.error("Max retries exceeded for LLM debug.")
                     raise
+        return None
 
     def act(
             self,

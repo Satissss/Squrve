@@ -30,6 +30,7 @@ import warnings
 import random
 from loguru import logger
 
+
 class Dataset:
     """
     Dataset encapsulates the core dataset and corresponding database schema for a single task startup_run.
@@ -1598,27 +1599,73 @@ def transform_name(table_name, col_name):
 
 
 def single_central_process(row: Dict):
+    """
+    Process database schema information and extract column details with foreign/primary keys.
+    
+    Args:
+        row: Dictionary containing database schema information
+        
+    Returns:
+        List of column information dictionaries
+    """
     column_info_lis = []
     db_id = row["db_id"]
     db_type = row["db_type"]
     tables = row["table_names_original"]
-    columns = [col for col in row["column_names_original"] if col[0] != -1]
+    column_names_original = row["column_names_original"]
+    
+    # Check if the first column is the special "*" marker at index -1
+    has_star_column = column_names_original and column_names_original[0][0] == -1
+    index_offset = 1 if has_star_column else 0
+    
+    # Extract actual columns (excluding the "*" marker if present)
+    columns = [col for col in column_names_original if col[0] != -1]
     types = row["column_types"]
-
-    descriptions = row.get("column_descriptions", [])  # [Opt.]
-    pro_infos = row.get("table_to_projDataset", {})  # [Opt.]
-
+    descriptions = row.get("column_descriptions", [])
+    pro_infos = row.get("table_to_projDataset", {})
+    
+    # Build column info list
     for ind, (table_ind, col_name) in enumerate(columns):
         column_info_lis.append({
             "db_id": db_id,
             "db_type": db_type,
             "table_name": tables[table_ind],
             "column_name": col_name,
-            "column_types": types[ind],
-            "column_descriptions": descriptions[ind][1] if descriptions and ind < len(descriptions) else "",
-            "table_to_projDataset": pro_infos[tables[table_ind]] if pro_infos else ""
+            "column_types": types[ind + index_offset],  # Adjust for star column
+            "column_descriptions": descriptions[ind + index_offset][1] if descriptions and (ind + index_offset) < len(descriptions) else "",
+            "table_to_projDataset": pro_infos.get(tables[table_ind], ""),
+            "primary_key": False,  # Use consistent boolean type
+            "foreign_key": "",
         })
-
+    
+    # Parse Primary Keys
+    primary_keys = row.get("primary_keys", [])
+    if primary_keys:
+        for pk_index in primary_keys:
+            # Adjust index if star column exists
+            adjusted_index = pk_index - index_offset
+            if 0 <= adjusted_index < len(column_info_lis):
+                column_info_lis[adjusted_index]["primary_key"] = True
+    
+    # Parse Foreign Keys
+    foreign_keys = row.get("foreign_keys", [])
+    if foreign_keys:
+        for foreign_key in foreign_keys:
+            # Validate foreign key format
+            if not isinstance(foreign_key, (list, tuple)) or len(foreign_key) != 2:
+                continue
+            
+            col1, col2 = foreign_key
+            # Adjust indices if star column exists
+            adjusted_col1 = col1 - index_offset
+            adjusted_col2 = col2 - index_offset
+            
+            # Ensure indices are valid
+            if 0 <= adjusted_col1 < len(column_info_lis) and 0 <= adjusted_col2 < len(column_info_lis):
+                ref_table = column_info_lis[adjusted_col2]['table_name']
+                ref_column = column_info_lis[adjusted_col2]['column_name']
+                column_info_lis[adjusted_col1]["foreign_key"] += f"[{ref_table}({ref_column})]"
+    
     return column_info_lis
 
 

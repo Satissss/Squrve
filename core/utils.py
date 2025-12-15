@@ -1,3 +1,5 @@
+import re
+
 from llama_index.core.schema import NodeWithScore
 from typing import List, Dict, Union, Any
 from os import PathLike
@@ -90,13 +92,18 @@ def parse_schemas_from_nodes(
 def parse_schema_from_df(df: pd.DataFrame) -> str:
     grouped = df.groupby('table_name')
     output_lines = []
+    primary_key_lines = []
+    foreign_key_lines = []
 
     for table_name, group in grouped:
         columns = []
+        primary_keys = []
+
         for _, row in group.iterrows():
             info_dict = dict()
             info_list = []
             col_type = row["column_types"]
+            col_name = row["column_name"]
             col_descriptions = row.get("column_descriptions")
             # Add Column Type Information
             col_type = col_type[:150] if isinstance(col_type, str) and len(col_type) > 150 else col_type
@@ -106,16 +113,40 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
                 col_descriptions = col_descriptions[:150] if len(col_descriptions) > 150 else col_descriptions
                 info_dict["Description"] = col_descriptions
 
-            col_info = f'{row["column_name"]}'
+            col_info = f'{col_name}'
             for key, val in info_dict.items():
                 info_list.append(f"{key}: {val}")
             col_info += "(" + ", ".join(info_list) + ")"
             columns.append(col_info)
 
+            # add primary key & foreign key info
+            primary_key = row.get("primary_key", False)
+            if primary_key:
+                primary_keys.append(f"`{col_name}`")
+
+            foreign_key = row.get("foreign_key", "")
+            if foreign_key:
+                keys = re.findall(r"\[(.*?)\]", foreign_key)
+                for key in keys:
+                    foreign_key_lines.append(f"{table_name}({col_name}) references {key}")
+
         line = f'### Table = `{table_name}`, columns = [{", ".join(columns)}]'
         output_lines.append(line)
 
-    return "\n\n".join(output_lines)
+        # Add primary key line for this table
+        if primary_keys:
+            primary_key_lines.append(f"{table_name}({', '.join(primary_keys)})")
+
+    result = "\n\n".join(output_lines)
+    result += "\n"
+
+    if primary_key_lines:
+        result += "\n### Primary Keys:\n" + ", ".join(primary_key_lines) + "\n"
+
+    if foreign_key_lines:
+        result += "\n### Foreign Keys:\n" + ", ".join(foreign_key_lines) + "\n"
+
+    return result
 
 
 def set_node_turn_n(node: NodeWithScore, turn_n: int):
