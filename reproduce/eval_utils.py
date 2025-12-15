@@ -121,28 +121,3 @@ def evaluate(save_lis, config_path: str):
     logger.info(f"Final score: {final_score:.4f}")
     return final_score
 
-
-def main(dataset_name, method):
-    identifier = f"{dataset_name}-{method}"
-    config_path = f"{identifier}.json"
-
-    router, save_lis = load_router(config_path, identifier)
-
-    engine = Engine(router)
-
-    # 执行任务
-    print("执行自定义任务中...")
-    engine.execute()
-
-    # 评估结果
-    print("评估结果中...")
-    evaluate(save_lis, config_path)
-
-
-if __name__ == "__main__":
-    # main("spider", "dinsql")
-    evaluate([
-        "../files/datasets/spider-macsql/task_1.json",
-        "../files/datasets/spider-macsql/task_2.json",
-        "../files/datasets/spider-macsql/task_3.json"
-    ], "spider-macsql.json")

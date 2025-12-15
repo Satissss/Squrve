@@ -1,5 +1,5 @@
 from core.engine import Engine
-from reproduce.wrapper import load_router, evaluate
+from reproduce.eval_utils import load_router, evaluate
 
 
 def main(dataset_name, method):
