@@ -27,6 +27,7 @@ class Router:
 
     """ LLM """
     _use: str
+    _base_url: str | None
     _model_name: str
     _context_window: int
     _max_token: int
@@ -119,6 +120,7 @@ class Router:
             config_path: Optional[str] = None,
             api_key: Optional[dict] = None,
             use: str = "qwen",
+            base_url: str | None = None,
             model_name: str = "qwen-turbo",
             context_window: int = 120000,
             max_token: int = 8000,
@@ -174,6 +176,7 @@ class Router:
 
         """ LLM """
         self._use = use
+        self._base_url = base_url
         self._model_name = model_name
         self._context_window = context_window
         self._max_token = max_token
@@ -362,6 +365,7 @@ class Router:
 
     def init_llm_config(self, llm_: Dict):
         self._use = llm_.get("use", self._use)
+        self._base_url = llm_.get("base_url", self._base_url)
         self._model_name = llm_.get("model_name", self._model_name)
         self._context_window = llm_.get("context_window", self._context_window)
         self._max_token = llm_.get("max_token", self._max_token)
@@ -499,6 +503,10 @@ class Router:
     @property
     def model_name(self):
         return self._model_name
+
+    @property
+    def base_url(self):
+        return self._base_url
 
     @property
     def context_window(self):
