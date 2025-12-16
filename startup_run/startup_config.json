@@ -6,7 +6,7 @@
   },
   "llm": {
     "use": "qwen",
-    "model_name": "qwen-turbo",
+    "model_name": "qwen-plus-2025-09-11",
     "context_window": 120000,
     "max_token": 8000,
     "top_p": 0.9,
@@ -48,7 +48,7 @@
           }
         },
         "open_parallel": true,
-        "max_workers": 10
+        "max_workers": 5
       }
     ]
   },

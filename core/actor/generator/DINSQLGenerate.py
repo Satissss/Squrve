@@ -11,7 +11,7 @@ from core.data_manage import Dataset, single_central_process
 from core.utils import (
     parse_schema_from_df,
     load_dataset,
-    save_dataset
+    save_dataset, sql_clean
 )
 
 
@@ -644,6 +644,7 @@ Intermediate_representation: select course.title , course.credits from classroom
         try:
             debug_prompt = self.debug_prompt_maker(question, schema, sql)
             sql = self.llm_debug(debug_prompt)
+            sql = sql_clean(sql)
             logger.debug("SQL debugging completed")
         except Exception as e:
             logger.error(f"SQL debugging failed: {e}")

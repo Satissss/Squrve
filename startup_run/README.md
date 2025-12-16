@@ -50,7 +50,7 @@ Information for each individual sample execution will then be displayed:
 ![img.png](../assets/run_single.png)
 
 After all sample tests finish, evaluation results and task statistics are printed as follows:
-![img.png](../assets/img.png)
+![img.png](../assets/console_ouput.png)
 
 
 ### 4. Output Results
