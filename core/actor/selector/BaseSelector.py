@@ -31,29 +31,21 @@ class BaseSelector(Actor):
     def load_pred_sql(self, pred_sql: Union[str, Path, List[str], List[Path]], item: int = None) -> List[str]:
         """Load and normalize pred_sql from various input formats."""
         if pred_sql is None:
-            pred_sql = self.dataset[item].get('pred_sql', [])
+            row = self.dataset[item]
+            pred_sql = row.get(self.OUTPUT_NAME)
+            if pred_sql is None:
+                raise ValueError("pred_sql is required for optimization")
 
-        if isinstance(pred_sql, (str, Path)):
-            pred_sql_path = Path(pred_sql)
-            pred_sql = [load_dataset(pred_sql_path) if pred_sql_path.exists() else str(pred_sql)]
+        is_single = not isinstance(pred_sql, list)
+        sql_list = [pred_sql] if is_single else pred_sql
 
-        elif isinstance(pred_sql, list):
-            pred_sql_list = []
-            for p in pred_sql:
-                if isinstance(p, str) and os.path.exists(p):
-                    pred_sql_list.append(load_dataset(Path(p)))
-                else:
-                    pred_sql_list.append(str(p))
-            pred_sql = pred_sql_list
+        # Load SQL from paths if necessary
+        try:
+            sql_list = [load_dataset(p) if isinstance(p, (str, Path)) and Path(p).exists() else p for p in sql_list]
+        except Exception as e:
+            logger.info(f"Error when loading pred_sql: {e}. Treat sql_list storing the generated sqls.")
 
-        else:
-            raise ValueError("Invalid pred_sql type")
-
-        if not pred_sql:
-            logger.warning("No pred_sql provided")
-            return []
-
-        return pred_sql
+        return sql_list
 
     def execute_sql_safe(self, sql: str, db_type: str, db_path: str, credential: Any = None) -> Dict[str, Any]:
         """Safely execute SQL and return result with error handling."""

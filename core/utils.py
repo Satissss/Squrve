@@ -121,11 +121,11 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
 
             # add primary key & foreign key info
             primary_key = row.get("primary_key", False)
-            if primary_key:
+            if primary_key and isinstance(primary_key, str):
                 primary_keys.append(f"`{col_name}`")
 
             foreign_key = row.get("foreign_key", "")
-            if foreign_key:
+            if foreign_key and isinstance(foreign_key, str):
                 keys = re.findall(r"\[(.*?)\]", foreign_key)
                 for key in keys:
                     foreign_key_lines.append(f"{table_name}({col_name}) references {key}")
