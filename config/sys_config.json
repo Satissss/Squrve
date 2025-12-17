@@ -149,6 +149,12 @@
           "use_local_database": true,
           "use_local_external": false,
           "has_label": true
+        },
+        {
+          "sub_id": "finsql",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
         }
       ]
     },

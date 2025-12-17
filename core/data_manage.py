@@ -1641,11 +1641,14 @@ def single_central_process(row: Dict):
     # Parse Primary Keys
     primary_keys = row.get("primary_keys", [])
     if primary_keys:
-        for pk_index in primary_keys:
-            # Adjust index if star column exists
-            adjusted_index = pk_index - index_offset
-            if 0 <= adjusted_index < len(column_info_lis):
-                column_info_lis[adjusted_index]["primary_key"] = True
+        for key in primary_keys:
+            if not isinstance(key, list):
+                key = [key]
+            for pk_index in key:
+                # Adjust index if star column exists
+                adjusted_index = pk_index - index_offset
+                if 0 <= adjusted_index < len(column_info_lis):
+                    column_info_lis[adjusted_index]["primary_key"] = True
     
     # Parse Foreign Keys
     foreign_keys = row.get("foreign_keys", [])

@@ -109,7 +109,7 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
             col_type = col_type[:150] if isinstance(col_type, str) and len(col_type) > 150 else col_type
             info_dict["Type"] = col_type
             # Add Column Description
-            if col_descriptions:
+            if col_descriptions and isinstance(col_descriptions, str):
                 col_descriptions = col_descriptions[:150] if len(col_descriptions) > 150 else col_descriptions
                 info_dict["Description"] = col_descriptions
 
