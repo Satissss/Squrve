@@ -25,6 +25,7 @@ class OpenaiModel(CustomLLM):
 
     def __init__(self,
                  api_key: str,
+                 base_url: str | None,
                  model_name: str = None,
                  max_token: int = None,
                  context_window: int = None,
@@ -32,12 +33,11 @@ class OpenaiModel(CustomLLM):
                  top_p: float = None,
                  time_out: float = None,
                  stream: bool = None,
-                 base_url: str = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.client = OpenAI(
             api_key=api_key,
-            base_url=base_url or self.BASE_URL,
+            base_url=base_url if base_url else self.BASE_URL,
         )
         self.api_key = api_key
         self.model_name = self.model_name if not model_name else model_name

@@ -616,6 +616,7 @@ class DataLoader:
         try:
             init_args = {
                 "api_key": self.router.api_key,
+                "base_url": self.router.base_url,
                 "model_name": self.router.model_name,
                 "context_window": self.router.context_window,
                 "max_token": self.router.max_token,
@@ -659,6 +660,7 @@ class DataLoader:
     def load_llm_by_args(
             use: str,
             api_key: str,
+            base_url: str | None,
             model_name: str,
             context_window: int = 120000,
             max_token: int = 4000,
@@ -671,6 +673,7 @@ class DataLoader:
         try:
             init_args = {
                 "api_key": api_key,
+                "base_url": base_url,
                 "model_name": model_name,
                 "context_window": context_window,
                 "max_token": max_token,
