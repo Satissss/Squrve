@@ -1,3 +1,9 @@
+import sys
+import os
+
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(project_root)
+
 from core.engine import Engine
 from reproduce.eval_utils import load_router, evaluate
 
@@ -20,4 +26,4 @@ def main(dataset_name, method):
 
 
 if __name__ == "__main__":
-    main("spider", "macsql")
+    main("spider", "dinsql")

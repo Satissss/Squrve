@@ -1,0 +1,66 @@
+{
+  "api_key": {
+    "deepseek": "your_api_key_here",
+    "qwen": "your_api_key_here",
+    "zhipu": "your_api_key_here"
+  },
+  "llm": {
+    "use": "qwen",
+    "model_name": "qwen-plus-2025-09-11",
+    "context_window": 120000,
+    "max_token": 8000,
+    "top_p": 0.9,
+    "temperature": 0,
+    "time_out": 300.0
+  },
+  "text_embed": {
+    "embed_model_name": "D:/model/embed/bge_large_en_v15"
+  },
+  "dataset": {
+    "data_source": "spider:dev:",
+    "data_source_dir": "../files/data_source",
+    "need_few_shot": false,
+    "need_external": false
+  },
+  "database": {
+    "skip_schema_init": false,
+    "schema_source": "spider:dev",
+    "multi_database": false,
+    "vector_store": "../vector_store",
+    "schema_source_dir": "../files/schema_source",
+    "need_build_index": false
+  },
+  "task": {
+    "task_meta": [
+      {
+        "task_id": "generate",
+        "task_type": "GenerateTask",
+        "data_source": "spider:dev:",
+        "schema_source": "spider:dev",
+        "dataset_save_path": "../files/datasets/spider_din.json",
+        "is_save_dataset": true,
+        "eval_type": [
+          "execute_accuracy"
+        ],
+        "meta": {
+          "task": {
+            "generate_type": "RSLSQLGenerator"
+          },
+          "actor": {
+            "save_dir": "../files/pred_sql/spider_dev"
+          }
+        },
+        "open_parallel": true,
+        "max_workers": 2
+      }
+    ]
+  },
+  "dataset_save_dir": "../files/datasets/",
+  "sql_save_dir": "../files/pred_sql/",
+  "generate_num":3,
+  "engine": {
+    "exec_process": [
+      "generate"
+    ]
+  }
+}

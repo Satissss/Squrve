@@ -61,7 +61,7 @@ class Evaluator:
 
         return []
 
-    def eval_all(self):
+    def eval_all(self, verbose: bool = True):
         dataset = self.dataset
         eval_type = self.eval_type
         if not dataset or not eval_type:
@@ -77,7 +77,8 @@ class Evaluator:
 
             valid_num, res_lis, acc_res = 0, [], 0
             total_items = len(self.dataset)
-            print(f"Evaluating {type_} for {total_items} items...")
+            if verbose:
+                print(f"Evaluating {type_} for {total_items} items...")
 
             for ind in range(total_items):
                 try:
@@ -94,8 +95,8 @@ class Evaluator:
                 except Exception as e:
                     print(f"Error evaluating item {ind} for {type_}: {e}")
                     continue
-
-            print(f"Completed {type_}: {valid_num}/{total_items} valid results")
+            if verbose:
+                print(f"Completed {type_}: {valid_num}/{total_items} valid results")
 
             # 防止除零错误，当没有有效结果时设置默认值
             if valid_num == 0:
@@ -106,7 +107,7 @@ class Evaluator:
                     "total_items": total_items,
                     "warning": f"No valid evaluation results found for {type_}. All {total_items} items failed evaluation."
                 }
-                print(f"Warning: No valid results for {type_}, setting average to 0.0")
+                warnings.warn(f"Warning: No valid results for {type_}, setting average to 0.0")
             else:
                 avg_result = acc_res / valid_num
                 eval_results[type_] = {
@@ -115,7 +116,8 @@ class Evaluator:
                     "valid_num": valid_num,
                     "total_items": total_items
                 }
-                print(f"Average for {type_}: {avg_result:.4f}")
+                if verbose:
+                    print(f"Average for {type_}: {avg_result:.4f}")
 
         self.eval_results.update(eval_results)
         return eval_results

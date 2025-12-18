@@ -82,7 +82,7 @@ def _calculate_final_score(
         sub_dataset._dataset = data_row
 
         evaluator = Evaluator(dataset=sub_dataset, eval_type=eval_type)
-        results = evaluator.eval_all()
+        results = evaluator.eval_all(verbose=False)
 
         for key, value in results.items():
             if value.get("valid_num", 0) > 0:
@@ -90,7 +90,11 @@ def _calculate_final_score(
             if value.get("avg", 0) != 0:
                 pass_count += 1
 
-    return pass_count / valid_count if valid_count > 0 else 0.0
+    final_score = pass_count / valid_count if valid_count > 0 else 0.0
+    print(f"Completed {eval_type}: {valid_count}/{len(data_lists[0])} valid results")
+    print(f"Average for {eval_type}: {final_score:.4f}")
+
+    return final_score
 
 
 def _load_dataset_from_engine(config_path: str):
@@ -118,6 +122,6 @@ def evaluate(save_lis, config_path: str):
     dataset = _load_dataset_from_engine(config_path)
     final_score = _calculate_final_score(dataset, data_lists)
 
-    logger.info(f"Final score: {final_score:.4f}")
+    # logger.info(f"Final score: {final_score:.4f}")
     return final_score
 
