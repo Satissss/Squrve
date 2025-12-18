@@ -8,7 +8,7 @@ import pandas as pd
 import json
 import ast
 
-from core.actor.selector.BaseSelector import BaseSelector
+from core.actor.selector.BaseSelect import BaseSelector
 from core.data_manage import Dataset, single_central_process
 from core.utils import parse_schema_from_df, load_dataset, save_dataset
 from core.db_connect import get_sql_exec_result_with_time

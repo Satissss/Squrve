@@ -3,11 +3,12 @@ from os import PathLike
 from typing import Union, List, Optional
 from llama_index.core.llms.llm import LLM
 
-from core.actor.selector.FastExecSelector import FastExecSelector
+from core.actor.selector.FastExecSelect import FastExecSelector
 from core.task.meta.MetaTask import MetaTask
-from core.actor.selector.BaseSelector import BaseSelector
+from core.actor.selector.BaseSelect import BaseSelector
 from core.actor.selector.CHESSSelect import CHESSSelector
 from core.actor.selector.OpenSearchSQLSelect import OpenSearchSQLSelector
+from core.actor.selector.ChaseSelect import ChaseSelector
 
 
 class SelectTask(MetaTask):
@@ -80,6 +81,10 @@ class SelectTask(MetaTask):
 
         elif actor_type in ("FastExecSelector", "FastExec"):
             actor = FastExecSelector(**select_args)
+            return actor
+
+        elif actor_type in ("ChaseSelector", "Chase"):
+            actor = ChaseSelector(**select_args)
             return actor
 
         warnings.warn(f"The select_type `{actor_type}` is not available.", category=UserWarning)

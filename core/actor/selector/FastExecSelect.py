@@ -4,7 +4,7 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 
-from core.actor.selector.BaseSelector import BaseSelector
+from core.actor.selector.BaseSelect import BaseSelector
 from core.data_manage import Dataset
 from core.db_connect import get_sql_exec_result_with_time
 from core.utils import compare_pandas_table

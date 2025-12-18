@@ -2,7 +2,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Union, List, Dict, Any
 from pathlib import Path
 
-from core.actor.selector.BaseSelector import BaseSelector
+from core.actor.selector.BaseSelect import BaseSelector
 from core.data_manage import Dataset
 
 
