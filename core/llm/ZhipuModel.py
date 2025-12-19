@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Optional
 from llama_index.core.llms import (
     CustomLLM,
     CompletionResponse,
@@ -25,14 +25,14 @@ class ZhipuModel(CustomLLM):
 
     def __init__(self,
                  api_key: str,
-                 base_url: str = None,
-                 model_name: str = None,
-                 max_token: int = None,
-                 context_window: int = None,
-                 temperature: float = None,
-                 top_p: float = None,
-                 time_out: float = None,
-                 stream: bool = None,
+                 base_url: Optional[str] = None,
+                 model_name: Optional[str] = None,
+                 max_token: Optional[int] = None,
+                 context_window: Optional[int] = None,
+                 temperature: Optional[float] = None,
+                 top_p: Optional[float] = None,
+                 time_out: Optional[float] = None,
+                 stream: Optional[bool] = None,
                  **kwargs):
         super().__init__(**kwargs)
         self.client = OpenAI(

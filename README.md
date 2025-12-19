@@ -56,6 +56,10 @@ pip install -r requirements.txt
 unzip benchmarks.zip -d .
 ```
 
+If you encounter issues downloading benchmark.zip, an alternative is available at the backup Hugging Face repository: 
+
+https://huggingface.co/datasets/satissss/Squrve-Benchmarks
+
 ### 2. Configure API Keys
 
 Edit the configuration file to add your API keys:

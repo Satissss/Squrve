@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Optional
 from llama_index.core.llms import (
     CustomLLM,
     CompletionResponse,
@@ -24,13 +24,13 @@ class DeepseekModel(CustomLLM):
 
     def __init__(self,
                  api_key: str,
-                 base_url: str | None,
-                 model_name: str = None,
-                 context_window: int = None,
-                 max_token: int = None,
-                 temperature: float = None,
-                 top_p: float = None,
-                 time_out: float = None,
+                 base_url: Optional[str] = None,
+                 model_name: Optional[str] = None,
+                 context_window: Optional[int] = None,
+                 max_token: Optional[int] = None,
+                 temperature: Optional[float] = None,
+                 top_p: Optional[float] = None,
+                 time_out: Optional[float] = None,
                  **kwargs):
         super().__init__(**kwargs)  # 调用父类构造函数
         self.client = OpenAI(
