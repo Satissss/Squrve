@@ -25,9 +25,11 @@ class ChaseSelector(BaseSelector):
             llm: Any = None,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/pred_sql",
+            retry_num: int = 3,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, **kwargs)
+        self.retry_num = retry_num
 
     def _compare_sql_pair(self, question, schema, sql1, sql2) -> bool:
         """
@@ -69,9 +71,8 @@ Just output the correct answer "A" or "B".
             # Prepare prompt with question and schema
             prompt = prompt_template.replace("{DATABASE_SCHEMA}", str(schema)).replace("{QUESTION}", question)
             prompt = prompt.replace("{CANDIDATE_A_QUERY}", sql1['sql']).replace("{CANDIDATE_B_QUERY}", sql2['sql'])
-            
+
             # Convert results to string representation
-            res1, res2 = "", ""
             if isinstance(sql1['result'], pd.DataFrame):
                 if not sql1['result'].empty:
                     res1 = str(sql1['result'].head(10).to_dict(orient="records"))
@@ -79,7 +80,7 @@ Just output the correct answer "A" or "B".
                     res1 = "Empty result (no rows returned)"
             else:
                 res1 = str(sql1['result']) if sql1['result'] is not None else "None"
-                
+
             if isinstance(sql2['result'], pd.DataFrame):
                 if not sql2['result'].empty:
                     res2 = str(sql2['result'].head(10).to_dict(orient="records"))
@@ -87,7 +88,7 @@ Just output the correct answer "A" or "B".
                     res2 = "Empty result (no rows returned)"
             else:
                 res2 = str(sql2['result']) if sql2['result'] is not None else "None"
-            
+
             prompt = prompt.replace("{CANDIDATE_A_RESULT}", res1).replace("{CANDIDATE_B_RESULT}", res2)
 
             # Get LLM response
@@ -120,19 +121,33 @@ Just output the correct answer "A" or "B".
         # Handle single candidate case
         if len(sqls) == 1:
             return sqls[0]['sql'], sqls[0]['score']
-        
+
         # Build all pairs for comparison
         pairs = []
         for ind, sql1 in enumerate(sqls):
             for sql2 in sqls[ind + 1:]:
                 pairs.append((sql1, sql2))
-        
+
         # Use ThreadPoolExecutor for parallel comparison
         def compare_pair(pair):
             sql1, sql2 = pair
-            res = self._compare_sql_pair(question, schema, sql1, sql2)
+            if len(sqls) > 3 and sql1['count'] > 1 and sql2['count'] > 1:
+                # This supplements the original select method in Chase-SQL.
+                # We assume that when a question is highly challenging
+                # and the candidate answers are difficult to distinguish,
+                # a majority voting strategy is introduced.
+                res_dict = {"true": 0, "false": 0}
+                for _ in range(max_workers):
+                    temp_res = self._compare_sql_pair(question, schema, sql1, sql2)
+                    if temp_res is True:
+                        res_dict["true"] += 1
+                    elif temp_res is False:
+                        res_dict["false"] += 1
+                res = res_dict['true'] > res_dict['false']
+            else:
+                res = self._compare_sql_pair(question, schema, sql1, sql2)
             return (sql1['index'], sql2['index'], res, sql1['count'], sql2['count'])
-        
+
         # Execute comparisons in parallel with max_workers threads
         comparison_results = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -143,7 +158,7 @@ Just output the correct answer "A" or "B".
                     comparison_results.append(result)
                 except Exception as exc:
                     logger.warning(f"Comparison failed with exception: {exc}")
-        
+
         # Update scores based on comparison results
         for idx1, idx2, res, count1, count2 in comparison_results:
             if res is None:
@@ -152,11 +167,11 @@ Just output the correct answer "A" or "B".
                 sqls[idx1]['score'] += count2
             else:  # sql2 is correct
                 sqls[idx2]['score'] += count1
-        
+
         # Select the SQL with highest score
         sqls.sort(key=lambda x: x['score'], reverse=True)
         best_sql = sqls[0]
-        
+
         return best_sql['sql'], best_sql['score']
 
     def act(
@@ -237,7 +252,7 @@ Just output the correct answer "A" or "B".
 
         # Group by execution result, select the fastest SQL from the most frequent result group
         result_groups = self._group_by_result(successful_runs)
-        
+
         if not result_groups:
             logger.warning(f"{self.NAME} | no result groups for item {item}")
             return ""
