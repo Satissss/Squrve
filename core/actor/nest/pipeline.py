@@ -67,6 +67,6 @@ class PipelineActor(ComplexActor):
 
         self.OUTPUT_NAME = output_name
         self.dataset = dataset
-        logger.info(f"PipelineActor 执行完成，最终输出名称: {output_name}")
+        logger.info(f"PipelineActor 执行完成，最终输出名称: {output_name}，输出结果：{res}")
 
         return res

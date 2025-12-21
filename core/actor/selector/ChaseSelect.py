@@ -26,10 +26,12 @@ class ChaseSelector(BaseSelector):
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/pred_sql",
             retry_num: int = 3,
+            force_voting: bool = True,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, **kwargs)
         self.retry_num = retry_num
+        self.force_voting = force_voting
 
     def _compare_sql_pair(self, question, schema, sql1, sql2) -> bool:
         """
@@ -131,7 +133,7 @@ Just output the correct answer "A" or "B".
         # Use ThreadPoolExecutor for parallel comparison
         def compare_pair(pair):
             sql1, sql2 = pair
-            if len(sqls) > 3 and sql1['count'] > 1 and sql2['count'] > 1:
+            if self.force_voting or len(sqls) > 3 and sql1['count'] > 1 and sql2['count'] > 1:
                 # This supplements the original select method in Chase-SQL.
                 # We assume that when a question is highly challenging
                 # and the candidate answers are difficult to distinguish,
