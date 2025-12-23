@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from core.actor.selector.BaseSelect import BaseSelector
 from core.data_manage import Dataset
 from core.db_connect import get_sql_exec_result_with_time
-from core.utils import compare_pandas_table, load_dataset
+from core.utils import compare_pandas_table, load_dataset, parse_json_from_str
 
 
 class ChaseSelector(BaseSelector):
@@ -46,28 +46,37 @@ class ChaseSelector(BaseSelector):
         Returns:
             True if sql1 is correct, False if sql2 is correct, None if uncertain
         """
-        prompt_template = """Instruction:
-Given the DB info and question, there are two candidate queries. There is correct one and incorrect one,
-compare the two candidate answers, analyze the differences of the query and the result. Based on the
-original question and the provided database info, choose the correct one.
-**************************
-Database Schema
-{DATABASE_SCHEMA}
-**************************
-Question:
-{QUESTION}
-**************************
-Candidate A
-{CANDIDATE_A_QUERY}
-Execution result
-{CANDIDATE_A_RESULT}
-**************************
-Candidate B
-{CANDIDATE_B_QUERY}
-Execution result
-{CANDIDATE_B_RESULT}
+        prompt_template = """### Role
+You are an expert Database Administrator and SQL Auditor. Your task is to evaluate two candidate SQL queries and determine which one accurately answers the user's question based on the provided Database Schema.
 
-Just output the correct answer "A" or "B".
+### Database Schema
+{DATABASE_SCHEMA}
+
+### Question
+{QUESTION}
+
+### Candidate A
+**Query:** {CANDIDATE_A_QUERY}
+**Execution Result:** {CANDIDATE_A_RESULT}
+
+---
+
+### Candidate B
+**Query:** {CANDIDATE_B_QUERY}
+**Execution Result:** {CANDIDATE_B_RESULT}
+
+---
+### Instructions for Analysis
+1. **Semantic Alignment:** Compare the natural language intent of the question with the relational logic of the SQL. Does the query capture the core entity being asked for, including all implicit conditions?
+2. **Relational Path Integrity:** Analyze the navigation between tables. Does the query utilize the correct paths (joins/subqueries) to link the data, and does it respect the hierarchical or associative relationships defined in the schema?
+3. **Result Consistency:** Evaluate the "Execution Result" against the expected output format. Does the resulting data structure (columns, types, and values) provide a direct and complete answer to the user's request?
+
+### Output Requirement
+Return the result strictly in JSON format:
+{
+  "result": "A or B",
+  "reason": "A concise explanation identifying the specific logical flaw in the incorrect query and why the chosen one is superior."
+}
         """
         try:
             # Prepare prompt with question and schema
@@ -95,6 +104,8 @@ Just output the correct answer "A" or "B".
 
             # Get LLM response
             res = self.llm.complete(prompt).text
+            res = parse_json_from_str(res)
+            res = res.get("result", "")
             if "A" in res and "B" not in res:
                 return True
             elif "B" in res and "A" not in res:

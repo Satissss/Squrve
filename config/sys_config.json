@@ -42,6 +42,18 @@
           "use_local_database": false,
           "use_local_external": false,
           "has_label": true
+        },
+        {
+          "sub_id": "test",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "train",
+          "use_local_database": false,
+          "use_local_external": false,
+          "has_label": true
         }
       ]
     },
@@ -56,6 +68,12 @@
       "sub_data": [
         {
           "sub_id": "dev",
+          "use_local_database": true,
+          "use_local_external": false,
+          "has_label": true
+        },
+        {
+          "sub_id": "train",
           "use_local_database": true,
           "use_local_external": false,
           "has_label": true
@@ -117,64 +135,6 @@
         },
         {
           "sub_id": "val",
-          "use_local_database": false,
-          "use_local_external": false,
-          "has_label": true
-        }
-      ]
-    },
-    {
-      "id": "OptiSQL",
-      "meta_info": "",
-      "root_path": "../benchmarks/OptiSQL",
-      "db_type": "sqlite",
-      "has_sub": true,
-      "external": false,
-      "database": false,
-      "sub_data": [
-        {
-          "sub_id": "spider",
-          "use_local_database": true,
-          "use_local_external": false,
-          "has_label": true
-        },
-        {
-          "sub_id": "bird",
-          "use_local_database": true,
-          "use_local_external": false,
-          "has_label": true
-        },
-        {
-          "sub_id": "booksql",
-          "use_local_database": true,
-          "use_local_external": false,
-          "has_label": true
-        },
-        {
-          "sub_id": "finsql",
-          "use_local_database": true,
-          "use_local_external": false,
-          "has_label": true
-        }
-      ]
-    },
-    {
-      "id": "SquRL",
-      "meta_info": "",
-      "root_path": "../benchmarks/SquRL",
-      "db_type": "sqlite",
-      "has_sub": true,
-      "external": false,
-      "database": true,
-      "sub_data": [
-        {
-          "sub_id": "sft",
-          "use_local_database": false,
-          "use_local_external": false,
-          "has_label": true
-        },
-        {
-          "sub_id": "rl",
           "use_local_database": false,
           "use_local_external": false,
           "has_label": true

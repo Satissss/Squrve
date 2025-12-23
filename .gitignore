@@ -22,6 +22,9 @@ files/credential
 files/sub_questions
 files/optimized_sql
 files/FinSQL
+files/selected_sql
+
+config/sys_config_old.json
 API.md
 test
 

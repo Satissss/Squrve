@@ -1613,20 +1613,20 @@ def single_central_process(row: Dict):
     """
     column_info_lis = []
     db_id = row["db_id"]
-    db_type = row["db_type"]
+    db_type = row.get("db_type", "sqlite")
     tables = row["table_names_original"]
     column_names_original = row["column_names_original"]
-    
+
     # Check if the first column is the special "*" marker at index -1
     has_star_column = column_names_original and column_names_original[0][0] == -1
     index_offset = 1 if has_star_column else 0
-    
+
     # Extract actual columns (excluding the "*" marker if present)
     columns = [col for col in column_names_original if col[0] != -1]
     types = row["column_types"]
     descriptions = row.get("column_descriptions", [])
     pro_infos = row.get("table_to_projDataset", {})
-    
+
     # Build column info list
     for ind, (table_ind, col_name) in enumerate(columns):
         column_info_lis.append({
@@ -1640,7 +1640,7 @@ def single_central_process(row: Dict):
             "primary_key": False,  # Use consistent boolean type
             "foreign_key": "",
         })
-    
+
     # Parse Primary Keys
     primary_keys = row.get("primary_keys", [])
     if primary_keys:
@@ -1652,7 +1652,7 @@ def single_central_process(row: Dict):
                 adjusted_index = pk_index - index_offset
                 if 0 <= adjusted_index < len(column_info_lis):
                     column_info_lis[adjusted_index]["primary_key"] = True
-    
+
     # Parse Foreign Keys
     foreign_keys = row.get("foreign_keys", [])
     if foreign_keys:
@@ -1660,12 +1660,12 @@ def single_central_process(row: Dict):
             # Validate foreign key format
             if not isinstance(foreign_key, (list, tuple)) or len(foreign_key) != 2:
                 continue
-            
+
             col1, col2 = foreign_key
             # Adjust indices if star column exists
             adjusted_col1 = col1 - index_offset
             adjusted_col2 = col2 - index_offset
-            
+
             # Ensure indices are valid
             if 0 <= adjusted_col1 < len(column_info_lis) and 0 <= adjusted_col2 < len(column_info_lis):
                 ref_table = column_info_lis[adjusted_col2]['table_name']
