@@ -142,6 +142,15 @@
       ]
     },
     {
+      "id": "spider_dk",
+      "meta_info": "",
+      "root_path": "../benchmarks/spider_dk",
+      "db_type": "sqlite",
+      "has_sub": false,
+      "external": false,
+      "database": true
+    },
+    {
       "id": "FinSQL",
       "meta_info": "",
       "root_path": "../benchmarks/FinSQL",

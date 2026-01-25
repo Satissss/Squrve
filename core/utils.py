@@ -121,7 +121,7 @@ def parse_schema_from_df(df: pd.DataFrame) -> str:
 
             # add primary key & foreign key info
             primary_key = row.get("primary_key", False)
-            if primary_key and isinstance(primary_key, str):
+            if primary_key and isinstance(primary_key, bool):
                 primary_keys.append(f"`{col_name}`")
 
             foreign_key = row.get("foreign_key", "")
