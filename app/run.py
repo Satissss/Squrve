@@ -3,6 +3,7 @@ import sys
 import json
 import time
 import threading
+import random
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from loguru import logger
 from typing import Any, Dict, List, Tuple
@@ -28,11 +29,26 @@ except ImportError:
 
 from app.evaluation_helper import evaluate_sql_execution, calculate_score_from_evaluation
 
+USE_LLM_EVALUATION = False
+if USE_LLM_EVALUATION:
+    from evaluation_helper import evaluate_sql_by_llm
+    with open("data/ground_truth_res.json", "r", encoding="utf-8") as f:
+        ground_truth_res = json.load(f)
+    available_instance_ids = list(ground_truth_res.keys())
+    print(f"### Available instance ids:\n {available_instance_ids}")
+else:
+    ground_truth_res = None
+    available_instance_ids = None
+
+
 CONFIG_DIR = "app_config.json"
 
 # 超时常量定义
-TASK_MAX_WAIT_TIME = 300  # 5分钟 = 300秒，任务执行最大等待时间
-SQL_MAX_WAIT_TIME = 60  # 60秒，SQL评估最大等待时间
+TASK_MAX_WAIT_TIME = 1200  # 5分钟 = 300秒，任务执行最大等待时间
+SQL_MAX_WAIT_TIME = 150  # 60秒，SQL评估最大等待时间
+
+# LLM评估概率（可调节的超参数）
+LLM_EVALUATION_PROBABILITY = -1  # 30%的概率使用LLM评估
 
 # Global router & engine
 # We assume the data_source and schema_source is pre_defined in config file, and support by our system benchmarks
@@ -47,7 +63,8 @@ data_source = dataloader.get_data_source_index()
 schema_source = dataloader.get_schema_source_index()[0]
 
 dataset = dataloader.generate_dataset(data_source, schema_source)
-dataset.db_path = "../benchmarks/spider/database"
+# dataset.db_path = "../benchmarks/MergeRL/database"
+dataset.db_path = "../benchmarks/FinalRL/database"
 
 app = Flask(__name__)
 
@@ -247,7 +264,9 @@ def run_batch():
         "val_1": [-0.5, 0.5]
     }
     """
+    
     payload = request.get_json(force=True, silent=True) or {}
+    print(payload)
     if not payload or not isinstance(payload, dict):
         return jsonify({"error": "instance_id and task_lis are required"}), 400
 
@@ -273,6 +292,8 @@ def run_batch():
     instance_plan: Dict[str, List[Tuple[str, Tuple[Any, ...]]]] = {}
     signature_to_task: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
     exec_plan: List[str] = []
+    result_cache: Dict[Tuple[str, Tuple[Any, ...]], float] = {}
+    result_cache_lock = threading.Lock()
 
     def cleanup_tasks(restore_callbacks: bool = False):
         """清理创建的任务"""
@@ -296,29 +317,64 @@ def run_batch():
                 return jsonify(
                     {"error": f"task_lis at position {index} for `{instance_id}` must be a non-empty list"}
                 ), 400
-
+            # if isinstance(task_lis, list) and len(task_lis) > 0:
+            #     last_item = task_lis[-1]
+            #     if isinstance(last_item, str):
+            #         # 如果是字符串且以selector结尾，直接替换
+            #         if last_item.lower().endswith("selector"):
+            #             task_lis[-1] = "ChaseSelector"
+            #     elif isinstance(last_item, list):
+            #         if len(last_item) == 1 and isinstance(last_item[0], str) and last_item[0].lower().endswith("selector"):
+            #             task_lis[-1][0] = "ChaseSelector"
             signature = (instance_id, normalize_task_signature(task_lis))
             instance_plan[instance_id].append(signature)
 
             if signature in signature_to_task:
                 continue
 
-            cpx_task, cpx_task_id = init_complex_tasks(copy.deepcopy(task_lis), instance_id)
-            if cpx_task is None:
-                engine.tasks.pop(cpx_task_id, None)
-                cleanup_tasks()
-                return jsonify({"error": f"failed to initialize task_lis `{index}` for `{instance_id}`"}), 400
-
-            signature_to_task[signature] = {
-                "task": cpx_task,
-                "cpx_task_id": cpx_task_id,
-            }
-            exec_plan.append(cpx_task_id)
+            # 尝试初始化任务，如果失败则设置分数为 -0.5 并跳过
+            try:
+                cpx_task, cpx_task_id = init_complex_tasks(copy.deepcopy(task_lis), instance_id)
+                if cpx_task is None:
+                    logger.warning(f"Failed to initialize task_lis `{index}` for `{instance_id}`: returned None")
+                    with result_cache_lock:
+                        result_cache[signature] = -0.5
+                    engine.tasks.pop(cpx_task_id, None)
+                    continue
+                
+                signature_to_task[signature] = {
+                    "task": cpx_task,
+                    "cpx_task_id": cpx_task_id,
+                    "original_task_lis": task_lis,  # 保存原始task_lis用于LLM评估
+                    "instance_id": instance_id,  # 保存instance_id
+                }
+                exec_plan.append(cpx_task_id)
+            except Exception as exc:
+                logger.exception(f"Failed to initialize task_lis `{index}` for `{instance_id}`: {exc}")
+                with result_cache_lock:
+                    result_cache[signature] = -0.5
+                continue
 
     if not exec_plan:
         return jsonify({instance_id: [] for instance_id in instance_plan})
 
     logger.info(f"run_batch received {len(payload)} instances, executing {len(exec_plan)} unique task groups.")
+
+    # 决定每个instance_id是否使用LLM评估（30%概率）
+    use_llm_eval_for_instance: Dict[str, bool] = {}
+    if USE_LLM_EVALUATION:
+        for instance_id in instance_plan.keys():
+            # 只有当instance_id在available_instance_ids中时才可能使用LLM评估
+            if available_instance_ids and instance_id in available_instance_ids:
+                use_llm_eval = random.random() < LLM_EVALUATION_PROBABILITY
+                use_llm_eval_for_instance[instance_id] = use_llm_eval
+                if use_llm_eval:
+                    logger.info(f"Instance {instance_id} will use LLM evaluation")
+            else:
+                use_llm_eval_for_instance[instance_id] = False
+    else:
+        for instance_id in instance_plan.keys():
+            use_llm_eval_for_instance[instance_id] = False
 
     # 记录每个任务的执行状态
     task_execution_status: Dict[Tuple[str, Tuple[Any, ...]], Dict[str, Any]] = {}
@@ -345,21 +401,42 @@ def run_batch():
         return eval_result, None
 
     # 并行执行任务并评分（每个任务独立超时控制）
-    result_cache: Dict[Tuple[str, Tuple[Any, ...]], float] = {}
-    result_cache_lock = threading.Lock()
-
     def process_single_signature(signature, info):
         """处理单个signature的任务执行和评估"""
         cpx_task = info["task"]
         cpx_task_id = info["cpx_task_id"]
+        instance_id = info["instance_id"]
+        original_task_lis = info["original_task_lis"]
         score = 0.0
 
+        # 检查是否使用LLM评估
+        if use_llm_eval_for_instance.get(instance_id, False):
+            logger.info(f"Using LLM evaluation for {cpx_task_id} (instance: {instance_id})")
+            try:
+                # 调用LLM评估
+                llm_success, llm_score = evaluate_sql_by_llm(instance_id, original_task_lis)
+                
+                if llm_success:
+                    # LLM评估成功，直接使用返回的score
+                    logger.info(f"LLM evaluation succeeded for {cpx_task_id}, score: {llm_score}")
+                    with result_cache_lock:
+                        result_cache[signature] = llm_score
+                    return
+                else:
+                    # LLM评估返回False，继续执行原来的流程
+                    logger.info(f"LLM evaluation returned False for {cpx_task_id}, falling back to standard evaluation")
+            except Exception as exc:
+                logger.exception(f"LLM evaluation error for {cpx_task_id}: {exc}, falling back to standard evaluation")
+                # 发生异常，继续执行原来的流程
+
+        # 标准评估流程
         # 1. 执行任务（带超时控制）
         task_timeout = False
+        task_start_time = time.time()
         try:
             if HAS_FUNC_TIMEOUT:
                 try:
-                    func_timeout(TASK_MAX_WAIT_TIME, execute_single_task, args=(cpx_task,))
+                    func_timeout(1500, execute_single_task, args=(cpx_task,))
                 except FunctionTimedOut:
                     task_timeout = True
                     logger.warning(f"Task {cpx_task_id} exceeded {TASK_MAX_WAIT_TIME}s timeout")
@@ -368,7 +445,7 @@ def run_batch():
         except Exception as exc:
             logger.exception(f"Task {cpx_task_id} execution failed: {exc}")
             task_timeout = True  # 执行失败也当作超时处理
-
+        task_time = time.time() - task_start_time
         # 2. 任务超时，分数为-0.5，跳过评估
         if task_timeout:
             with result_cache_lock:
@@ -418,7 +495,7 @@ def run_batch():
         if eval_result.is_correct:
             score += 1.5
             # 额外的时间奖励：评估越快，奖励越高
-            score += 0.5 * (SQL_MAX_WAIT_TIME - eval_time) / SQL_MAX_WAIT_TIME
+            score += 0.5 * max((TASK_MAX_WAIT_TIME - task_time) / TASK_MAX_WAIT_TIME, 0)
         else:
             score -= 1.5
         with result_cache_lock:
@@ -452,12 +529,14 @@ def run_batch():
         cleanup_tasks()
     except Exception as exc:
         logger.warning(f"Error during cleanup: {exc}")
-
-    # 构建最终响应
-    return jsonify({
+    
+    res = {
         instance_id: [result_cache.get(sig, -0.5) for sig in signatures]
         for instance_id, signatures in instance_plan.items()
-    })
+    }
+    print(res)
+    # 构建最终响应
+    return jsonify(res)
 
 
 @app.get("/healthz")
@@ -466,4 +545,4 @@ def healthz():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "8080")), debug=False)
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", "6517")), debug=False)

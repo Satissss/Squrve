@@ -12,6 +12,21 @@ from core.data_manage import load_dataset
 from core.db_connect import get_sql_exec_result
 
 
+USE_LLM_EVALUATION = True
+
+if USE_LLM_EVALUATION:
+    from core.llm.QwenModel import QwenModel
+    from core.utils import parse_json_from_str
+    import json
+
+    llm = QwenModel(model_name="qwen-plus", api_key="...")
+    with open("data/ground_truth_res.json", "r", encoding="utf-8") as f:
+        ground_truth_res = json.load(f)
+else:
+    llm = None
+    ground_truth_res = None
+
+
 class SQLEvaluationResult:
     """SQL评估结果"""
     
@@ -213,3 +228,125 @@ def calculate_score_from_evaluation(eval_result: SQLEvaluationResult) -> Tuple[f
     
     return score, details
 
+
+
+EVALUATION_CRITERION = """1. The Principle of Search Space Decoupling
+### Abstract Description: The pipeline must strictly separate the identification of schema elements (Parsing) from the synthesis of logic (Generation).
+
+### Why it Improves Success: Attempting to generate SQL directly from a massive, raw schema leads to "hallucinated" columns. Decoupling ensures that the Generator only operates on a "high-confidence" subset of the database, minimizing logical noise.
+
+### Evaluation Guidance: Does the pipeline always execute a Parse actor (or a parallel set of them) before any Generate or Scale actors are called?
+
+2. The Principle of Methodological Consensus (Diversity)
+### Abstract Description: When facing high complexity or ambiguity, the pipeline should deploy a "committee" of parallel actors with distinct internal logic (e.g., CoT-based vs. multi-agent).
+
+### Why it Improves Success: No single LLM methodology is universal; what one model misses in a multi-table join, another may capture through iterative refinement. Parallelism maximizes the "Recall" of the correct SQL candidate.
+
+### Evaluation Guidance: For "Complex" or "Vague" tasks, does the pipeline utilize a nested list of three or more diverse Generate and Scale actors?
+
+3. The Principle of Sequential Refinement (The Optimizer Chain)
+### Abstract Description: Optimization should not be a single event but a cumulative process where different "Optimizers" tackle specific error types (syntax vs. logical grounding) in sequence.
+
+### Why it Improves Success: Chaining optimizers (e.g., RSLSQLOptimizer followed by CHESSOptimizer) allows the system to fix syntax errors first and then use the successful execution to verify more nuanced domain logic.
+
+### Evaluation Guidance: Does the pipeline contain a sequence of multiple Optimize actors after the initial generation phase?
+
+4. The Principle of Empirical Selection (Precision Shift)
+### Abstract Description: After maximizing recall through parallel generation, the pipeline must transition to a high-precision state using an execution-based filter.
+
+### Why it Improves Success: A pipeline is only as good as its final choice. Using a Select actor that evaluates runtime performance (e.g., execution time or result consistency) ensures that the system outputs the most "provably correct" candidate.
+
+### Evaluation Guidance: Does the pipeline terminate with a Select actor (like FastExecSelector) to prune failed or suboptimal candidates from the final output?
+
+5. The Principle of Structural Elasticity
+### Abstract Description: The "depth" (number of sequential steps) and "width" (number of parallel actors) must scale linearly with the complexity and colloquialism of the input.
+
+### Why it Improves Success: Simple queries are prone to over-engineering errors, while complex queries fail in "shallow" pipelines. Optimal success requires a longer chain (Parse → Generate → Optimize → Scale → Select) for complex/multi-turn tasks.
+
+### Evaluation Guidance: Is the pipeline's length and parallelism proportional to the "Complexity Level" and "Question Style" provided in the task?
+
+6. The Principle of Architectural Integrity (Type Compatibility)
+### Abstract Description: Success is mathematically impossible if the "Informational Flow" is broken; every actor's output must perfectly satisfy the next actor's input requirements.
+
+### Why it Improves Success: Even the most advanced LLM fails if it receives mismatched context (e.g., sending raw schema to an optimizer that expects a predicted SQL string). Format and type alignment are the absolute constraints for execution.
+
+### Evaluation Guidance: Can you trace a continuous flow of data types (e.g., schema → schema_links → pred_sql) through the entire proposed list?
+"""
+
+def load_prompt_args(instance_id: str):
+    ground_truth = ground_truth_res[instance_id]
+    input_prompt = ground_truth['prompt']
+    baseline_actor = ground_truth['parsed_seq']
+    return input_prompt, baseline_actor
+
+
+def evaluate_sql_by_llm(
+    instance_id: str,
+    pred_actor_seq: list
+):
+    available_ins_lis = list(ground_truth_res.keys())
+    if instance_id not in available_ins_lis:
+        return False, 0.0
+    
+    prompt_template = """# Role: Expert SQL Pipeline Auditor
+You are an expert system architect specializing in Text-to-SQL Actor pipelines. Your task is to evaluate a **Predicted Actor Sequence** against a **Baseline Actor Sequence** for a specific SQL generation task.
+
+# Evaluation Criteria(Success Principles):
+You must judge the sequences based on the following 6 principles:
+CRITERION
+
+# Input Prompt:
+INPUT_PROMPT
+
+# Baseline Actor Sequence:
+BASELINE_ACTOR_SEQUENCE
+
+# Predicted Actor Sequence:
+PREDICTED_ACTOR_SEQUENCE
+
+# Comparison Task & Decision Logic
+1. Analyze the **Input Prompt** for complexity and schema size.
+2. Compare the **Predicted Sequence** to the **Baseline** using the Success Principles. 
+3. Determine the result based on these specific rules:
+   - **BETTER**: The Predicted Sequence more effectively adheres to the Principles (e.g., better schema pruning, higher parallel diversity, or improved error-correction).
+   - **BETTER (Uncertainty/Tie-Breaker)**: If the sequences are identical, or if you are not significantly certain that the Predicted Sequence is worse, you **must** output `BETTER`.
+   - **NOT_BETTER (Clear Inferiority)**: The Predicted Sequence introduces type errors, removes essential parsing for large schemas, or lacks a required selector for parallel branches.
+   - **NOT_BETTER (Efficiency Violation)**: The Predicted Sequence is **NOT_BETTER** if it introduces excessive or unnecessary Actors that do not contribute to the success probability of the specific task (Over-engineering). Quality must be balanced with structural efficiency.
+
+# Confidence Score Logic
+- Assign a score from **0.0 to 1.0**.
+- **Constraint**: If your judgment is `NOT_BETTER`, your confidence score must be **≥ 0.3**. If your confidence is lower than 0.3, it indicates high uncertainty; in such cases, you must default the judgment to `BETTER` (and adjust the score accordingly to reflect that new judgment).
+
+# Output Format
+Provide the final evaluation in a valid JSON object strictly following this structure:
+{
+  "reasoning": "A brief explanation focusing on why the predicted sequence is better (or worse) based on principles and efficiency.",
+  "judgment": "BETTER" or "NOT_BETTER",
+  "confidence_score": float
+}
+    """
+    try:
+        input_prompt, baseline_actor = load_prompt_args(instance_id)
+        prompt = prompt_template.replace("CRITERION", EVALUATION_CRITERION)
+        prompt = prompt.replace("INPUT_PROMPT", input_prompt)
+        prompt = prompt.replace("BASELINE_ACTOR_SEQUENCE", str(baseline_actor))
+        prompt = prompt.replace("PREDICTED_ACTOR_SEQUENCE", str(pred_actor_seq))
+
+        response = llm.complete(prompt).text.strip()
+        response = parse_json_from_str(response)
+        score = float(response['confidence_score'])
+        judgment = response['judgment']
+        
+        if score is None or judgment not in ['BETTER', 'NOT_BETTER']:
+            return False, -0.5
+
+        if judgment == "BETTER":
+            final_score = 3 + 0.5 * score
+            return True, final_score
+        else:
+            final_score = -0.5 * score
+            return True, final_score
+
+    except Exception as e:
+        logger.error(f"Error in evaluate_sql_by_llm: {e}")
+        return False, -0.5
