@@ -20,8 +20,9 @@ class QwenModel(CustomLLM):
     top_p: float = 0.8
     time_out: float = 300.0
     client: Any = None
-    is_stream: bool = True
+    is_stream: bool = False
     input_token: int = 0
+    total_token: int = 0
 
     def __init__(self,
                  api_key: str,
@@ -46,7 +47,7 @@ class QwenModel(CustomLLM):
         self.max_tokens = self.max_tokens if not max_token else max_token
         self.context_window = self.context_window if not context_window else context_window
         self.time_out = self.time_out if not time_out else time_out
-        self.is_stream = stream if stream else self.is_stream
+        self.is_stream = stream if stream is not None else self.is_stream
 
     def reinit_client(self):
         self.client = OpenAI(
@@ -83,6 +84,7 @@ class QwenModel(CustomLLM):
         if not self.is_stream:
             completion_response = response.choices[0].message.content
             self.input_token += response.usage.prompt_tokens
+            self.total_token += response.usage.total_tokens
         else:
             completion_response = ""
             for chunk in response:
