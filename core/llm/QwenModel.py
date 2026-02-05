@@ -20,7 +20,7 @@ class QwenModel(CustomLLM):
     top_p: float = 0.8
     time_out: float = 300.0
     client: Any = None
-    is_stream: bool = False
+    is_stream: bool = True
     input_token: int = 0
     total_token: int = 0
 
