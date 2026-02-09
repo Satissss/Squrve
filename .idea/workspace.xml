@@ -6,11 +6,10 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/meta/DecomposeTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/DecomposeTask.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/meta/GenerateTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/GenerateTask.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/task/meta/SelectTask.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/task/meta/SelectTask.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/startup_run/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/startup_run/run.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/parse_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/parse_utils.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -817,7 +816,7 @@
       <workItem from="1770307145741" duration="2037000" />
       <workItem from="1770366121029" duration="98000" />
       <workItem from="1770554787196" duration="50000" />
-      <workItem from="1770602993163" duration="1840000" />
+      <workItem from="1770602993163" duration="4589000" />
     </task>
     <servers />
   </component>
@@ -904,27 +903,27 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>487</line>
+          <line>495</line>
           <option name="timeStamp" value="197" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>620</line>
+          <line>630</line>
           <option name="timeStamp" value="198" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>260</line>
+          <line>265</line>
           <option name="timeStamp" value="199" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>286</line>
+          <line>291</line>
           <option name="timeStamp" value="200" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>522</line>
+          <line>530</line>
           <option name="timeStamp" value="202" />
         </line-breakpoint>
       </breakpoints>

@@ -1,5 +1,6 @@
 import pandas as pd
 import math
+from typing import Union, List, Dict
 
 
 def slice_schema_df(schema_df: pd.DataFrame, slice_size: int = 200, slice_num: int = 10):
@@ -33,3 +34,60 @@ def slice_schema_df(schema_df: pd.DataFrame, slice_size: int = 200, slice_num: i
         return result
 
     return [schema_df]
+
+
+def normalize_schema_links(
+        schema_links: Union[List[str], Dict[str, List[str]]],
+        output_type: str = "A"
+) -> Union[List[str], Dict[str, List[str]]]:
+    """
+    Normalize schema_links to a unified format.
+
+    Args:
+        schema_links: Input schema links in any format (List or Dict)
+        output_type: Desired output type - "A", "B", or "C" (default: "A")
+            - "A": List[str] with table.column only
+            - "B": Dict with {"tables": [...], "columns": [...]}
+            - "C": List[str] with table.column and literal values
+
+    Returns:
+        Normalized schema_links in the specified format
+    """
+    # Step 1: Extract columns and values from input
+    columns, values = [], []
+
+    if isinstance(schema_links, dict):
+        # Type B input: {"tables": [...], "columns": [...]}
+        raw_columns = schema_links.get("columns", [])
+        columns = [_clean_column_ref(col) for col in raw_columns]
+    elif isinstance(schema_links, list):
+        # Type A or C input: List[str]
+        for item in schema_links:
+            cleaned = _clean_column_ref(item)
+            if _is_column_ref(cleaned):
+                columns.append(cleaned)
+            else:
+                values.append(item)
+    else:
+        raise ValueError(f"Invalid schema_links type: {type(schema_links)}")
+
+    # Step 2: Convert to requested output format
+    if output_type == "A":
+        return list(dict.fromkeys(columns))  # Deduplicate while preserving order
+    elif output_type == "B":
+        tables = list(dict.fromkeys(col.split('.')[0] for col in columns))
+        return {"tables": tables, "columns": columns}
+    elif output_type == "C":
+        return list(dict.fromkeys(columns + values))
+    else:
+        raise ValueError(f"Invalid output_type: {output_type}. Must be 'A', 'B', or 'C'")
+
+
+def _clean_column_ref(ref: str) -> str:
+    """Remove backticks, quotes, and extra whitespace from column reference."""
+    return ref.strip().replace('`', '').replace('"', '').replace("'", '')
+
+
+def _is_column_ref(ref: str) -> bool:
+    """Check if a string is a column reference (table.column format)."""
+    return '.' in ref and len(ref.split('.')) == 2 and all(ref.split('.'))

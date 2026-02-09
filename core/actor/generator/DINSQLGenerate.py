@@ -13,7 +13,8 @@ from core.utils import (
     load_dataset,
     save_dataset, sql_clean
 )
-
+from core.actor.parser.parse_utils import normalize_schema_links
+from core.actor.decomposer.decompose_utils import format_sub_questions
 
 class DINSQLGenerator(BaseGenerator):
     """DIN-SQL method implementation for Text-to-SQL generation.
@@ -534,6 +535,7 @@ Intermediate_representation: select course.title , course.credits from classroom
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            sub_questions: Union[str, List[str], Dict] = None,
             data_logger=None,
             **kwargs
     ) -> str:
@@ -584,6 +586,8 @@ Intermediate_representation: select course.title , course.credits from classroom
             schema_link_path = row.get("schema_links", None)
             if schema_link_path:
                 schema_links = load_dataset(schema_link_path)
+                if not isinstance(schema_links, str):
+                    schema_links = normalize_schema_links(schema_links,"C")
                 logger.debug(f"Loaded schema links from: {schema_link_path}")
             else:
                 logger.debug("Generating schema links using DIN-SQL")
@@ -627,11 +631,14 @@ Intermediate_representation: select course.title , course.credits from classroom
                 logger.warning("SQL parsing failed")
         else:
             logger.debug("Processing NESTED category query")
-            try:
-                sub_questions = classification.split('questions = ["')[1].split('"]')[0]
-            except IndexError:
-                logger.warning("Sub-questions parsing failed")
-                sub_questions = "What is the answer?"
+            if sub_questions is not None:
+                sub_questions = format_sub_questions(sub_questions, output_type="C")
+            else:
+                try:
+                    sub_questions = classification.split('questions = ["')[1].split('"]')[0]
+                except IndexError:
+                    logger.warning("Sub-questions parsing failed")
+                    sub_questions = "What is the answer?"
 
             sql = self.llm_generation(self.hard_prompt_maker(question, schema, schema_links, sub_questions))
             try:

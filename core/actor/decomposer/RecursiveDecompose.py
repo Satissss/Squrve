@@ -21,6 +21,8 @@ from core.utils import (
     parse_json_from_str
 )
 from core.db_connect import get_sql_exec_result
+from core.actor.decomposer.decompose_utils import normalize_sub_questions
+
 
 class RecursiveDecomposer(BaseDecomposer):
     NAME = "RecursiveDecomposer"
@@ -45,7 +47,7 @@ class RecursiveDecomposer(BaseDecomposer):
         self.credential = credential or (self.dataset.credential if self.dataset else None)
         self.table_batch_size = table_batch_size
 
-    def load_schema(self,item, schema):
+    def load_schema(self, item, schema):
         """Process and normalize database schema from various input formats."""
         logger.debug("Processing database schema...")
 
@@ -86,13 +88,14 @@ class RecursiveDecomposer(BaseDecomposer):
             return external
         return None
 
-
     def _init_tables(self, question: str, schema: pd.DataFrame, llm, external_knowledge=None, data_logger=None):
         tables = schema["table_name"].unique().tolist()
         schema_str = parse_schema_from_df(schema)
 
-        select_prompt = SELECT_RELATED_TABLES_PROMPT.format(SCHEMA=schema_str, QUESTION=question, EXTERNAL=external_knowledge)
-        remove_prompt = REMOVE_UNRELATED_TABLES_PROMPT.format(SCHEMA=schema_str, QUESTION=question, EXTERNAL=external_knowledge)
+        select_prompt = SELECT_RELATED_TABLES_PROMPT.format(SCHEMA=schema_str, QUESTION=question,
+                                                            EXTERNAL=external_knowledge)
+        remove_prompt = REMOVE_UNRELATED_TABLES_PROMPT.format(SCHEMA=schema_str, QUESTION=question,
+                                                              EXTERNAL=external_knowledge)
         try:
             response = llm.complete(select_prompt).text
             select_tables = parse_json_from_str(response)['table_names']
@@ -133,12 +136,12 @@ class RecursiveDecomposer(BaseDecomposer):
         return schema[schema["table_name"].isin(tables)]
 
     def _execute_sql(
-        self,
-        sql_query: str,
-        db_id: str = None,
-        db_path: str = None,
-        db_type: str = "sqlite",
-        max_rows: int = 10
+            self,
+            sql_query: str,
+            db_id: str = None,
+            db_path: str = None,
+            db_type: str = "sqlite",
+            max_rows: int = 10
     ) -> str:
         """
         Execute a SQL query and return the result as a string.
@@ -180,15 +183,15 @@ class RecursiveDecomposer(BaseDecomposer):
         return str(exec_result)
 
     def _generate_stage0(
-        self,
-        question: str,
-        schema: pd.DataFrame,
-        llm,
-        db_id: str = None,
-        db_path: str = None,
-        db_type: str = "sqlite",
-        external_knowledge: Optional[str] = None,
-        data_logger=None
+            self,
+            question: str,
+            schema: pd.DataFrame,
+            llm,
+            db_id: str = None,
+            db_path: str = None,
+            db_type: str = "sqlite",
+            external_knowledge: Optional[str] = None,
+            data_logger=None
     ) -> List[Dict]:
         """
         Stage 0: Generate SQL for each single table.
@@ -204,7 +207,8 @@ class RecursiveDecomposer(BaseDecomposer):
         table_groups = [(table_name, group_df) for table_name, group_df in grouped]
 
         if data_logger:
-            data_logger.info(f"{self.NAME}._generate_stage0 | total_tables={len(table_groups)} | batch_size={self.table_batch_size}")
+            data_logger.info(
+                f"{self.NAME}._generate_stage0 | total_tables={len(table_groups)} | batch_size={self.table_batch_size}")
 
         # Divide into batches based on table_batch_size
         batches = []
@@ -243,7 +247,8 @@ class RecursiveDecomposer(BaseDecomposer):
                 batch_results = parse_json_from_str(response)
 
                 if data_logger:
-                    data_logger.info(f"{self.NAME}._generate_stage0 batch {batch_idx} | generated={len(batch_results)} items")
+                    data_logger.info(
+                        f"{self.NAME}._generate_stage0 batch {batch_idx} | generated={len(batch_results)} items")
 
                 # Process each result and add to stage0_results
                 for item in batch_results:
@@ -286,7 +291,8 @@ class RecursiveDecomposer(BaseDecomposer):
 
                 if data_logger:
                     log_result = result_str[:100] + "..." if len(result_str) > 100 else result_str
-                    data_logger.info(f"{self.NAME}._generate_stage0 sql {idx} | table={sql_container.get('table')} | result={log_result}")
+                    data_logger.info(
+                        f"{self.NAME}._generate_stage0 sql {idx} | table={sql_container.get('table')} | result={log_result}")
 
         if data_logger:
             data_logger.info(f"{self.NAME}._generate_stage0 completed | total_results={len(stage0_results)}")
@@ -314,14 +320,14 @@ class RecursiveDecomposer(BaseDecomposer):
             source_ids = container.get("source_query_ids", [])
             if source_ids:
                 consumed_ids.update(source_ids)
-        
+
         # Return containers whose query_id is NOT consumed
         active = []
         for idx, container in enumerate(sql_containers):
             query_id = f"query_{idx}"
             if query_id not in consumed_ids:
                 active.append((idx, container))
-        
+
         return active
 
     def _format_previous_sqls(self, sql_containers: List[Dict]) -> str:
@@ -338,7 +344,7 @@ class RecursiveDecomposer(BaseDecomposer):
             Formatted string of active SQLs
         """
         active_queries = self._get_active_queries(sql_containers)
-        
+
         lines = []
         for idx, container in active_queries:
             query_id = f"query_{idx}"
@@ -347,12 +353,12 @@ class RecursiveDecomposer(BaseDecomposer):
             result = container.get("result", None)
             stage = container.get("stage", 0)
             sub_question = container.get("sub_question", "")
-            
+
             # Truncate result if too long
             result_display = result if result else "Not executed"
             if result_display and len(result_display) > 500:
                 result_display = result_display[:500] + "\n... (truncated)"
-            
+
             lines.append(f"""### [{query_id}] (Stage {stage})
 - **Tables**: {tables}
 - **Sub-question**: {sub_question}
@@ -363,21 +369,21 @@ class RecursiveDecomposer(BaseDecomposer):
 - **Execution Result**: 
 {result_display}
 """)
-        
+
         return "\n".join(lines)
 
     def _generate_stage_n(
-        self,
-        question: str,
-        schema: pd.DataFrame,
-        llm,
-        sql_containers: List[Dict],
-        current_stage: int,
-        db_id: str = None,
-        db_path:str=None,
-        db_type: str = "sqlite",
-        external_knowledge: Optional[str] = None,
-        data_logger=None
+            self,
+            question: str,
+            schema: pd.DataFrame,
+            llm,
+            sql_containers: List[Dict],
+            current_stage: int,
+            db_id: str = None,
+            db_path: str = None,
+            db_type: str = "sqlite",
+            external_knowledge: Optional[str] = None,
+            data_logger=None
     ) -> Tuple[List[Dict], bool]:
         """
         Generate SQL for Stage N (N >= 1) through recursive merging.
@@ -468,12 +474,14 @@ class RecursiveDecomposer(BaseDecomposer):
 
                         if data_logger:
                             log_result = result_str[:100] + "..." if len(result_str) > 100 else result_str
-                            data_logger.info(f"{self.NAME}._generate_stage_n | stage={current_stage} | tables={sql_container['table']} | result={log_result}")
+                            data_logger.info(
+                                f"{self.NAME}._generate_stage_n | stage={current_stage} | tables={sql_container['table']} | result={log_result}")
 
                     new_containers.append(sql_container)
 
                 if data_logger:
-                    data_logger.info(f"{self.NAME}._generate_stage_n | stage={current_stage} | new_merges={len(new_containers)}")
+                    data_logger.info(
+                        f"{self.NAME}._generate_stage_n | stage={current_stage} | new_merges={len(new_containers)}")
 
                 return new_containers, False
 
@@ -484,15 +492,15 @@ class RecursiveDecomposer(BaseDecomposer):
             return [], False
 
     def generate_decomposition(
-        self,
-        question: str,
-        schema: pd.DataFrame,
-        llm,
-        db_id: str = None,
-        db_path: str = None,
-        db_type: str = "sqlite",
-        external_knowledge=None,
-        data_logger=None
+            self,
+            question: str,
+            schema: pd.DataFrame,
+            llm,
+            db_id: str = None,
+            db_path: str = None,
+            db_type: str = "sqlite",
+            external_knowledge=None,
+            data_logger=None
     ):
         """
         Generate SQL decomposition through recursive stages.
@@ -557,11 +565,12 @@ class RecursiveDecomposer(BaseDecomposer):
             # Count active (unconsumed) queries
             active_queries = self._get_active_queries(sql_containers)
             active_count = len(active_queries)
-            
+
             if data_logger:
                 active_ids = [f"query_{idx}" for idx, _ in active_queries]
-                data_logger.info(f"{self.NAME}.generate_decomposition | stage {current_stage} | active_queries={active_count} | ids={active_ids}")
-            
+                data_logger.info(
+                    f"{self.NAME}.generate_decomposition | stage {current_stage} | active_queries={active_count} | ids={active_ids}")
+
             # If only 1 active query remains, it's the final result
             if active_count <= 1:
                 if active_queries:
@@ -606,17 +615,18 @@ class RecursiveDecomposer(BaseDecomposer):
 
         if data_logger:
             final_count = sum(1 for c in sql_containers if c.get("is_final", False))
-            data_logger.info(f"{self.NAME}.generate_decomposition completed | total_containers={len(sql_containers)} | final_count={final_count}")
+            data_logger.info(
+                f"{self.NAME}.generate_decomposition completed | total_containers={len(sql_containers)} | final_count={final_count}")
 
         return sql_containers
 
     def act(
-        self,
-        item,
-        schema: Union[str, PathLike, Dict, List] = None,
-        schema_links: Union[str, List[str]] = None,
-        data_logger=None,
-        **kwargs
+            self,
+            item,
+            schema: Union[str, PathLike, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            data_logger=None,
+            **kwargs
     ):
         """
         Decompose the whole Text-to-SQL tasks as a directed acyclic graph generation process,
@@ -653,7 +663,8 @@ class RecursiveDecomposer(BaseDecomposer):
                 logger.debug(f"从路径加载模式链接: {schema_link_path}")
                 tables = self._parse_tables_from_schema_links(schema_links)
                 if data_logger:
-                    data_logger.info(f"{self.NAME}.act schema_links from path | path={schema_link_path} | tables={tables}")
+                    data_logger.info(
+                        f"{self.NAME}.act schema_links from path | path={schema_link_path} | tables={tables}")
             else:
                 logger.debug("使用自定义生成模式链接")
                 tables = self._init_tables(question, schema_df, llm, external_knowledge, data_logger)
@@ -679,7 +690,7 @@ class RecursiveDecomposer(BaseDecomposer):
             external_knowledge=external_knowledge,
             data_logger=data_logger
         )
-
+        sub_questions = normalize_sub_questions(sub_questions, output_type="C")
         # Use base class method to save output
         self.save_output(sub_questions, item, db_id=db_id)
         if data_logger:
