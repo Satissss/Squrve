@@ -7,6 +7,7 @@ from core.task.meta.MetaTask import MetaTask
 from core.actor.decomposer.BaseDecompose import BaseDecomposer
 from core.actor.decomposer.MACSQLDecompose import MACSQLDecomposer
 from core.actor.decomposer.DINSQLDecompose import DINSQLDecomposer
+from core.actor.decomposer.RecursiveDecompose import RecursiveDecomposer
 
 
 class DecomposeTask(MetaTask):
@@ -74,6 +75,10 @@ class DecomposeTask(MetaTask):
 
         elif actor_type in ("DINSQLDecomposer", "DINSQL"):
             actor = DINSQLDecomposer(**decompose_args)
+            return actor
+
+        elif actor_type in ("RecursiveDecomposer", "Recursive"):
+            actor = RecursiveDecomposer(**decompose_args)
             return actor
 
         warnings.warn(f"The decompose_type `{actor_type}` is not available.", category=UserWarning)

@@ -13,6 +13,7 @@ from core.actor.generator.MACSQLGenerate import MACSQLGenerator
 from core.actor.generator.RSLSQLGenerate import RSLSQLGenerator
 from core.actor.generator.ReFoRCEGenerate import ReFoRCEGenerator
 from core.actor.generator.OpenSearchSQLGenerate import OpenSearchSQLGenerator
+from core.actor.generator.RecursiveGenerate import RecursiveGenerator
 
 
 class GenerateTask(MetaTask):
@@ -93,6 +94,10 @@ class GenerateTask(MetaTask):
 
         elif actor_type in ("OpenSearchSQLGenerator", "OpenSearchSQL"):
             actor = OpenSearchSQLGenerator(**generate_args)
+            return actor
+
+        elif actor_type in ("RecursiveGenerator", "Recursive"):
+            actor = RecursiveGenerator(**generate_args)
             return actor
 
         warnings.warn(f"The generate_type `{actor_type}` is not available.", category=UserWarning)
