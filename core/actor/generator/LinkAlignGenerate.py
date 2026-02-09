@@ -15,6 +15,8 @@ from core.utils import (
     load_dataset,
     save_dataset
 )
+from core.actor.parser.parse_utils import format_schema_links
+from core.actor.decomposer.decompose_utils import format_sub_questions
 
 
 class LinkAlignGenerator(BaseGenerator):
@@ -217,6 +219,7 @@ You need to follow below requirements:
             item,
             schema: Union[str, PathLike, Dict, List] = None,
             schema_links: Union[str, List[str]] = None,
+            sub_questions: Union[str, List[str], Dict] = None,
             data_logger=None,
             **kwargs
     ):
@@ -284,26 +287,26 @@ You need to follow below requirements:
                 logger.debug("使用 LinkAlignParser 生成模式链接")
                 parser = LinkAlignParser(self.dataset, self.llm) if not self.parser else self.parser
                 schema_links = parser.act(item, origin_schema)
+        if not isinstance(schema_links, str):
+            schema_links = format_schema_links(schema_links, "C")
+            logger.debug(f"模式链接结果：{schema_links}")
 
         if data_logger:
             data_logger.info(f"{self.NAME}.schema linking output | {schema_links}")
         # Step 2: difficulty classification
         logger.debug("开始难度分类...")
-        try:
-            class_prompt = self.classification_prompt_maker(question, schema, schema_links)
-            classification = self.llm.complete(class_prompt).text
-            logger.debug("难度分类完成")
-        except Exception as e:
-            logger.error(f"难度分类失败: {e}")
-            print(e)
-            raise e
-        try:
-            sub_questions = classification.split('questions = [')[1].split(']')[0]
-            logger.debug(f"解析子问题: {sub_questions}")
-        except Exception as e:
-            logger.warning(f'解析子问题时出错，作为非嵌套处理: {e}')
-            print('warning: error when parsing sub_question. treat it as Non-Nested. error:', e)
-            sub_questions = classification
+        if sub_questions is not None:
+            sub_questions = format_sub_questions(sub_questions, output_type="C")
+        else:
+            try:
+                class_prompt = self.classification_prompt_maker(question, schema, schema_links)
+                classification = self.llm.complete(class_prompt).text
+                sub_questions = classification.split('questions = [')[1].split(']')[0]
+                logger.debug(f"解析子问题: {sub_questions}")
+            except Exception as e:
+                logger.warning(f'解析子问题时出错，作为非嵌套处理: {e}')
+                print('warning: error when parsing sub_question. treat it as Non-Nested. error:', e)
+                sub_questions = ""
 
         # step 3: SQL generation
         logger.debug("开始 SQL 生成...")

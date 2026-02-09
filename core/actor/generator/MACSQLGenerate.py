@@ -12,8 +12,9 @@ from core.utils import parse_schema_from_df
 from core.data_manage import single_central_process
 from core.db_connect import get_sql_exec_result
 from llama_index.core.llms.llm import LLM
+from core.actor.parser.parse_utils import format_schema_links
 
-# MAC-SQL 常量
+# MAC-SQL constants
 MAX_ROUND = 3
 SELECTOR_NAME = 'Selector'
 DECOMPOSER_NAME = 'Decomposer'
@@ -21,10 +22,10 @@ REFINER_NAME = 'Refiner'
 SYSTEM_NAME = 'System'
 
 
-# 工具函数
+# Utility functions
 def parse_json(text: str) -> dict:
-    """解析 JSON 格式的文本"""
-    # 查找 JSON 块
+    """Parse JSON format text"""
+    # Find JSON block
     start = text.find("```json")
     end = text.find("```", start + 7)
     
@@ -33,10 +34,10 @@ def parse_json(text: str) -> dict:
         try:
             return json.loads(json_string)
         except json.JSONDecodeError as e:
-            logger.warning(f"JSON 解析失败: {e}")
+            logger.warning(f"JSON parsing failed: {e}")
             return {}
     
-    # 如果没有找到 JSON 块，尝试直接解析整个文本
+    # If no JSON block found, try parsing entire text directly
     try:
         return json.loads(text.strip())
     except json.JSONDecodeError:
@@ -46,7 +47,7 @@ def parse_json(text: str) -> dict:
 
 
 def parse_sql_from_string(input_string: str) -> str:
-    """从字符串中提取 SQL"""
+    """Extract SQL from string"""
     sql_pattern = r'```sql(.*?)```'
     all_sqls = []
     for match in re.finditer(sql_pattern, input_string, re.DOTALL):
@@ -58,12 +59,56 @@ def parse_sql_from_string(input_string: str) -> str:
 
 
 def load_json_file(file_path: str) -> dict:
-    """加载 JSON 文件"""
+    """Load JSON file"""
     with open(file_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 
-# MAC-SQL 提示模板
+# Utility function for schema parsing
+def parse_schema_to_bird_format(schema: pd.DataFrame) -> Tuple[str, str]:
+    """Convert DataFrame schema to BIRD format string"""
+    desc_str = ""
+    fk_str = ""
+
+    # Group by table name
+    table_groups = {}
+    foreign_keys = []
+
+    for _, row in schema.iterrows():
+        table_name = row.get('table_name', '')
+        column_name = row.get('column_name', '')
+        column_type = row.get('column_type', '')
+
+        if table_name not in table_groups:
+            table_groups[table_name] = []
+
+        # Build column description
+        col_desc = f"  ({column_name}, {column_name}"
+        if column_type:
+            col_desc += f". Type: {column_type}"
+        col_desc += ".),\n"
+
+        table_groups[table_name].append(col_desc)
+
+        # Process foreign keys
+        if 'foreign_key' in row and pd.notna(row['foreign_key']):
+            fk_info = row['foreign_key']
+            if isinstance(fk_info, str) and '=' in fk_info:
+                foreign_keys.append(fk_info)
+
+    # Build description string
+    for table_name, columns in table_groups.items():
+        desc_str += f"# Table: {table_name}\n[\n"
+        desc_str += "".join(columns)
+        desc_str = desc_str.rstrip(",\n") + "\n]\n"
+
+    # Build foreign key string
+    fk_str = "\n".join(set(foreign_keys))
+
+    return desc_str.strip(), fk_str.strip()
+
+
+# MAC-SQL Prompt Templates
 selector_template = '''
 As an experienced and professional database administrator, your task is to analyze a user question and a database schema to provide relevant information. The database schema consists of table descriptions, each containing multiple column descriptions. Your goal is to identify the relevant tables and columns based on the user question and evidence provided.
 
@@ -417,7 +462,7 @@ Now please fixup old SQL and generate new SQL again.
 
 
 class Selector:
-    """MAC-SQL Selector Agent: 负责数据库模式选择和剪枝"""
+    """MAC-SQL Selector Agent: Responsible for database schema selection and pruning"""
     name = SELECTOR_NAME
 
     def __init__(self, llm: LLM, dataset_name: str, without_selector: bool = False):
@@ -427,67 +472,29 @@ class Selector:
         self._message = {}
 
     def _parse_schema_to_bird_format(self, schema: pd.DataFrame) -> Tuple[str, str]:
-        """将 DataFrame 格式的 schema 转换为 BIRD 格式的字符串"""
-        desc_str = ""
-        fk_str = ""
-
-        # 按表名分组
-        table_groups = {}
-        foreign_keys = []
-
-        for _, row in schema.iterrows():
-            table_name = row.get('table_name', '')
-            column_name = row.get('column_name', '')
-            column_type = row.get('column_type', '')
-
-            if table_name not in table_groups:
-                table_groups[table_name] = []
-
-            # 构建列描述
-            col_desc = f"  ({column_name}, {column_name}"
-            if column_type:
-                col_desc += f". Type: {column_type}"
-            col_desc += ".),\n"
-
-            table_groups[table_name].append(col_desc)
-
-            # 处理外键
-            if 'foreign_key' in row and pd.notna(row['foreign_key']):
-                fk_info = row['foreign_key']
-                if isinstance(fk_info, str) and '=' in fk_info:
-                    foreign_keys.append(fk_info)
-
-        # 构建描述字符串
-        for table_name, columns in table_groups.items():
-            desc_str += f"# Table: {table_name}\n[\n"
-            desc_str += "".join(columns)
-            desc_str = desc_str.rstrip(",\n") + "\n]\n"
-
-        # 构建外键字符串
-        fk_str = "\n".join(set(foreign_keys))
-
-        return desc_str.strip(), fk_str.strip()
+        """Convert DataFrame schema to BIRD format string (delegates to module-level function)"""
+        return parse_schema_to_bird_format(schema)
 
     def _is_need_prune(self, schema_str: str) -> bool:
-        """判断是否需要进行模式剪枝"""
+        """Determine if schema pruning is needed"""
         if self.without_selector:
             return False
 
-        # 更精确的启发式规则，基于原始实现
+        # More precise heuristic rules based on original implementation
         table_count = schema_str.count("# Table:")
         
-        # 计算总列数（更精确的计算）
+        # Calculate total column count (more precise calculation)
         column_count = 0
         lines = schema_str.split('\n')
         for line in lines:
             if line.strip().startswith('(') and ',' in line:
                 column_count += 1
 
-        # 基于原始实现的判断逻辑
+        # Decision logic based on original implementation
         if table_count <= 3:
             return False
             
-        # 如果平均每表列数 <= 6 且总列数 <= 30，则不需要剪枝
+        # If average columns per table <= 6 and total columns <= 30, no pruning needed
         avg_columns = column_count / table_count if table_count > 0 else 0
         if avg_columns <= 6 and column_count <= 30:
             return False
@@ -495,7 +502,7 @@ class Selector:
         return True
 
     def _prune_schema(self, db_id: str, query: str, schema_str: str, fk_str: str, evidence: str, data_logger=None) -> Dict:
-        """使用 LLM 进行模式剪枝"""
+        """Use LLM for schema pruning"""
         try:
             prompt = selector_template.format(
                 db_id=db_id,
@@ -510,11 +517,11 @@ class Selector:
                 data_logger.info(f"{SELECTOR_NAME}.llm_output | {response_text}")
             return parse_json(response_text)
         except Exception as e:
-            logger.error(f"模式剪枝失败: {e}")
+            logger.error(f"Schema pruning failed: {e}")
             return {}
 
     def talk(self, message: Dict):
-        """Selector 智能体的主要逻辑"""
+        """Main logic of Selector agent"""
         if message.get('send_to') != self.name:
             return
 
@@ -525,39 +532,37 @@ class Selector:
         schema = message.get('schema')
 
         if schema is None:
-            logger.error("Schema 信息缺失")
+            logger.error("Schema information missing")
             message['send_to'] = SYSTEM_NAME
             return
 
-        # 转换 schema 格式
+        # Convert schema format
         if isinstance(schema, pd.DataFrame):
             desc_str, fk_str = self._parse_schema_to_bird_format(schema)
         else:
-            logger.error("不支持的 schema 格式")
+            logger.error("Unsupported schema format")
             message['send_to'] = SYSTEM_NAME
             return
 
-        # 判断是否需要剪枝
+        # Determine if pruning is needed
         need_prune = self._is_need_prune(desc_str)
 
         if need_prune:
-            logger.debug("开始模式剪枝...")
+            logger.debug("Starting schema pruning...")
             data_logger = message.get('data_logger')
             extracted_schema = self._prune_schema(db_id, query, desc_str, fk_str, evidence, data_logger)
             message['extracted_schema'] = extracted_schema
             message['pruned'] = True
-            logger.debug(f"剪枝结果: {extracted_schema}")
+            logger.debug(f"Pruning result: {extracted_schema}")
         else:
             message['extracted_schema'] = {}
             message['pruned'] = False
 
-        message['desc_str'] = desc_str
-        message['fk_str'] = fk_str
         message['send_to'] = DECOMPOSER_NAME
 
 
 class Decomposer:
-    """MAC-SQL Decomposer Agent: 负责问题分解和 SQL 生成"""
+    """MAC-SQL Decomposer Agent: Responsible for question decomposition and SQL generation"""
     name = DECOMPOSER_NAME
 
     def __init__(self, llm: LLM, dataset_name: str):
@@ -566,29 +571,44 @@ class Decomposer:
         self._message = {}
 
     def talk(self, message: Dict):
-        """Decomposer 智能体的主要逻辑"""
+        """Main logic of Decomposer agent"""
         if message.get('send_to') != self.name:
             return
 
         self._message = message
         query = message.get('query', '')
         evidence = message.get('evidence', '')
-        desc_str = message.get('desc_str', '')
-        fk_str = message.get('fk_str', '')
+        schema = message.get('schema')
 
-        if not query or not desc_str:
-            logger.error("缺少必要的查询或模式信息")
+        # Retrieve externally provided schema_links
+        schema_links_str = message.get('schema_links_str')
+
+        if not query or schema is None:
+            logger.error("Missing required query or schema information")
             message['send_to'] = SYSTEM_NAME
             return
 
-        # 选择合适的模板
+        # Generate desc_str and fk_str from schema
+        if not isinstance(schema, pd.DataFrame):
+            logger.error("Invalid schema format")
+            message['send_to'] = SYSTEM_NAME
+            return
+        
+        desc_str, fk_str = parse_schema_to_bird_format(schema)
+
+        # Enrich evidence with externally provided schema_links
+        enriched_evidence = evidence
+        if schema_links_str:
+            enriched_evidence += f"\n\nRelevant schema links:\n{schema_links_str}"
+
+        # Select appropriate template
         if self.dataset_name == 'bird':
             template = decompose_template_bird
             prompt = template.format(
                 desc_str=desc_str,
                 fk_str=fk_str,
                 query=query,
-                evidence=evidence
+                evidence=enriched_evidence
             )
         else:
             template = decompose_template_spider
@@ -597,16 +617,20 @@ class Decomposer:
                 fk_str=fk_str,
                 query=query
             )
+            # For non-bird datasets, append schema_links as supplementary hints
+            if schema_links_str:
+                context_hint = f"\n【Schema Links】\n{schema_links_str}"
+                prompt = prompt.rstrip() + context_hint + "\n\nSQL\n"
 
         try:
-            logger.debug("开始问题分解和 SQL 生成...")
+            logger.debug("Starting question decomposition and SQL generation...")
             data_logger = message.get('data_logger')
             response = self.llm.complete(prompt)
             reply = response.text.strip()
             if data_logger:
                 data_logger.info(f"{DECOMPOSER_NAME}.llm_output | {reply}")
 
-            # 提取最终的 SQL
+            # Extract final SQL
             final_sql = parse_sql_from_string(reply)
 
             message['final_sql'] = final_sql
@@ -614,16 +638,16 @@ class Decomposer:
             message['fixed'] = False
             message['send_to'] = REFINER_NAME
 
-            logger.debug(f"生成的 SQL: {final_sql[:100]}...")
+            logger.debug(f"Generated SQL: {final_sql[:100]}...")
 
         except Exception as e:
-            logger.error(f"问题分解失败: {e}")
+            logger.error(f"Question decomposition failed: {e}")
             message['final_sql'] = "error: Failed to generate SQL"
             message['send_to'] = SYSTEM_NAME
 
 
 class Refiner:
-    """MAC-SQL Refiner Agent: 负责 SQL 执行验证和修复"""
+    """MAC-SQL Refiner Agent: Responsible for SQL execution validation and refinement"""
     name = REFINER_NAME
 
     def __init__(self, llm: LLM, dataset_name: str):
@@ -632,9 +656,9 @@ class Refiner:
         self._message = {}
 
     def _execute_sql(self, sql: str, db_type: str, db_path: str, db_id: str, credential: Dict = None) -> Dict:
-        """使用 Squrve 框架的 get_sql_exec_result 执行 SQL"""
+        """Execute SQL using Squrve framework's get_sql_exec_result"""
         try:
-            # 构建参数
+            # Build parameters
             exec_args = {
                 "sql_query": sql,
                 "db_path": db_path,
@@ -642,7 +666,7 @@ class Refiner:
                 "credential_path": credential
             }
 
-            # 执行 SQL
+            # Execute SQL
             result = get_sql_exec_result(db_type, **exec_args)
 
             if isinstance(result, tuple):
@@ -656,29 +680,29 @@ class Refiner:
                         return {"success": True, "result": data,
                                 "row_count": len(data) if hasattr(data, '__len__') else 1}
                 else:
-                    return {"success": False, "error": "执行结果格式异常"}
+                    return {"success": False, "error": "Execution result format error"}
             else:
-                return {"success": False, "error": "执行结果格式异常"}
+                return {"success": False, "error": "Execution result format error"}
 
         except Exception as e:
-            logger.error(f"SQL 执行失败: {e}")
+            logger.error(f"SQL execution failed: {e}")
             return {"success": False, "error": str(e)}
 
     def _is_need_refine(self, exec_result: Dict) -> bool:
-        """判断是否需要修复 SQL"""
+        """Determine if SQL needs refinement"""
         if not exec_result.get("success", False):
             return True
 
-        # 对于 Spider 数据集，即使结果为空也不一定需要修复
+        # For Spider dataset, empty results don't necessarily need refinement
         if self.dataset_name == 'spider':
             return False
 
-        # 对于其他数据集，如果结果为空则需要修复
+        # For other datasets, empty results need refinement
         row_count = exec_result.get("row_count", 0)
         return row_count == 0
 
     def _refine_sql(self, query: str, evidence: str, desc_str: str, fk_str: str, original_sql: str, error: str, data_logger=None) -> str:
-        """使用 LLM 修复 SQL"""
+        """Use LLM to refine SQL"""
         try:
             prompt = refiner_template.format(
                 desc_str=desc_str,
@@ -695,11 +719,11 @@ class Refiner:
             return parse_sql_from_string(reply)
 
         except Exception as e:
-            logger.error(f"SQL 修复失败: {e}")
+            logger.error(f"SQL refinement failed: {e}")
             return original_sql
 
     def talk(self, message: Dict):
-        """Refiner 智能体的主要逻辑"""
+        """Main logic of Refiner agent"""
         if message.get('send_to') != self.name:
             return
 
@@ -714,15 +738,15 @@ class Refiner:
         desc_str = message.get('desc_str', '')
         fk_str = message.get('fk_str', '')
 
-        # 如果 SQL 包含错误信息，直接返回
+        # If SQL contains error message, return directly
         if 'error' in final_sql.lower():
             message['try_times'] = message.get('try_times', 0) + 1
             message['pred'] = final_sql
             message['send_to'] = SYSTEM_NAME
             return
 
-        # 执行 SQL
-        logger.debug("开始执行 SQL 验证...")
+        # Execute SQL
+        logger.debug("Starting SQL validation execution...")
         data_logger = message.get('data_logger')
         if data_logger:
             data_logger.info(f"{REFINER_NAME}.sql_execute | {final_sql}")
@@ -735,27 +759,27 @@ class Refiner:
                 row_count = exec_result.get('row_count', 0)
                 data_logger.info(f"{REFINER_NAME}.sql_result | success=True, row_count={row_count}")
 
-        # 判断是否需要修复
+        # Determine if refinement is needed
         need_refine = self._is_need_refine(exec_result)
 
         if not need_refine:
-            # SQL 执行成功，无需修复
+            # SQL execution successful, no refinement needed
             message['try_times'] = message.get('try_times', 0) + 1
             message['pred'] = final_sql
             message['send_to'] = SYSTEM_NAME
-            logger.debug("SQL 执行成功，无需修复")
+            logger.debug("SQL execution successful, no refinement needed")
         else:
-            # 需要修复 SQL
+            # SQL needs refinement
             try_times = message.get('try_times', 0)
             if try_times >= MAX_ROUND - 1:
-                # 达到最大尝试次数，返回原始 SQL
+                # Reached maximum attempts, return original SQL
                 message['try_times'] = try_times + 1
                 message['pred'] = final_sql
                 message['send_to'] = SYSTEM_NAME
-                logger.warning(f"达到最大修复次数 {MAX_ROUND}，返回原始 SQL")
+                logger.warning(f"Reached maximum refinement attempts {MAX_ROUND}, returning original SQL")
             else:
-                # 尝试修复 SQL
-                logger.debug("开始修复 SQL...")
+                # Attempt to refine SQL
+                logger.debug("Starting SQL refinement...")
                 error_info = exec_result.get('error', 'Empty result set')
                 refined_sql = self._refine_sql(query, evidence, desc_str, fk_str, final_sql, error_info, data_logger)
 
@@ -763,11 +787,11 @@ class Refiner:
                 message['final_sql'] = refined_sql
                 message['fixed'] = True
                 message['send_to'] = REFINER_NAME
-                logger.debug(f"SQL 修复完成: {refined_sql[:100]}...")
+                logger.debug(f"SQL refinement completed: {refined_sql[:100]}...")
 
 
 class ChatManager:
-    """MAC-SQL ChatManager: 管理三个智能体之间的协作"""
+    """MAC-SQL ChatManager: Manages collaboration between three agents"""
 
     def __init__(self, llm: LLM, dataset_name: str, without_selector: bool = False):
         self.llm = llm
@@ -779,36 +803,36 @@ class ChatManager:
         ]
 
     def _chat_single_round(self, message: Dict):
-        """执行单轮对话"""
+        """Execute single round of conversation"""
         for agent in self.chat_group:
             if message.get('send_to') == agent.name:
                 agent.talk(message)
                 break
 
     def start(self, user_message: Dict):
-        """开始多智能体协作"""
+        """Start multi-agent collaboration"""
         start_time = time.time()
 
         if user_message.get('send_to') == SYSTEM_NAME:
             user_message['send_to'] = SELECTOR_NAME
 
         for round_num in range(MAX_ROUND):
-            logger.debug(f"开始第 {round_num + 1} 轮对话，当前发送到: {user_message.get('send_to')}")
+            logger.debug(f"Starting round {round_num + 1}, sending to: {user_message.get('send_to')}")
             self._chat_single_round(user_message)
 
             if user_message.get('send_to') == SYSTEM_NAME:
-                logger.debug("对话结束")
+                logger.debug("Conversation ended")
                 break
 
         end_time = time.time()
         exec_time = end_time - start_time
-        logger.info(f"MAC-SQL 协作完成，耗时: {exec_time:.2f} 秒")
+        logger.info(f"MAC-SQL collaboration completed, time elapsed: {exec_time:.2f} seconds")
 
 
 class MACSQLGenerator(BaseGenerator):
     """
     MAC-SQL Generator: Multi-Agent Collaborative SQL Generation
-    实现 MAC-SQL 方法的端到端 Text-to-SQL 生成
+    Implements end-to-end Text-to-SQL generation using MAC-SQL method
     """
 
     NAME = "MACSQLGenerator"
@@ -836,7 +860,7 @@ class MACSQLGenerator(BaseGenerator):
         self.dataset_name = dataset_name
         self.without_selector = without_selector
 
-        # 安全地初始化 db_path 和 credential，检查 dataset 是否为 None
+        # Safely initialize db_path and credential, checking if dataset is None
         if db_path is not None:
             self.db_path = db_path
         elif self.dataset is not None:
@@ -852,53 +876,53 @@ class MACSQLGenerator(BaseGenerator):
             self.credential = None
 
     def _validate_inputs(self, item, schema) -> Tuple[bool, str]:
-        """验证输入参数的有效性"""
+        """Validate input parameters"""
         if self.dataset is None:
-            return False, "Dataset 未初始化"
+            return False, "Dataset not initialized"
 
         if self.llm is None:
-            return False, "LLM 未初始化"
+            return False, "LLM not initialized"
 
         try:
             row = self.dataset[item]
             if 'question' not in row:
-                return False, "数据样本缺少 'question' 字段"
+                return False, "Data sample missing 'question' field"
             if 'db_id' not in row:
-                return False, "数据样本缺少 'db_id' 字段"
+                return False, "Data sample missing 'db_id' field"
         except Exception as e:
-            return False, f"无法访问数据样本: {e}"
+            return False, f"Cannot access data sample: {e}"
 
         return True, ""
 
     def _prepare_schema(self, item, schema) -> pd.DataFrame:
-        """准备和标准化 schema"""
-        # 加载 schema
+        """Prepare and standardize schema"""
+        # Load schema
         if isinstance(schema, (str, Path)):
             schema = load_dataset(schema)
 
         if schema is None:
-            # 从数据集获取 schema
+            # Get schema from dataset
             schema = self.dataset.get_db_schema(item)
             if schema is None:
-                raise Exception("无法获取有效的数据库模式!")
+                raise Exception("Cannot retrieve valid database schema!")
 
-        # 标准化 schema 格式
+        # Standardize schema format
         if isinstance(schema, dict):
             schema = single_central_process(schema)
         elif isinstance(schema, list):
             schema = pd.DataFrame(schema)
 
         if not isinstance(schema, pd.DataFrame):
-            raise Exception("无法处理数据库模式格式!")
+            raise Exception("Cannot process database schema format!")
 
         return schema
 
     def _prepare_database_info(self, row) -> Tuple[str, str, str, Dict]:
-        """准备数据库连接信息"""
+        """Prepare database connection information"""
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
 
-        # 设置数据库路径
+        # Set database path
         if self.db_path:
             if db_type == 'sqlite':
                 db_path = str(Path(self.db_path) / f"{db_id}.sqlite")
@@ -911,34 +935,6 @@ class MACSQLGenerator(BaseGenerator):
 
         return db_id, db_type, db_path, credential
 
-    def _fallback_sql_generation(self, question: str, schema_str: str) -> str:
-        """回退的 SQL 生成方法"""
-        logger.warning("使用回退 SQL 生成方法")
-
-        prompt = f"""You are an expert SQL developer. Please generate a SQL query for the following question.
-
-Question: {question}
-
-Database Schema:
-{schema_str}
-
-Please generate a valid SQL query. Only return the SQL statement:"""
-
-        try:
-            response = self.llm.complete(prompt)
-            sql = response.text.strip()
-
-            # 清理 SQL 输出
-            if sql.startswith('```sql'):
-                sql = sql[6:]
-            if sql.endswith('```'):
-                sql = sql[:-3]
-
-            return sql.strip()
-        except Exception as e:
-            logger.error(f"回退 SQL 生成失败: {e}")
-            return "SELECT 1"  # 返回默认 SQL
-
     def act(
             self,
             item,
@@ -947,85 +943,89 @@ Please generate a valid SQL query. Only return the SQL statement:"""
             data_logger=None,
             **kwargs
     ):
-        """实现 MAC-SQL 的端到端 SQL 生成逻辑"""
+        """Implement end-to-end SQL generation logic for MAC-SQL"""
         if data_logger:
             data_logger.info(f"{self.NAME}.act start | item={item}")
-        logger.info(f"MACSQLGenerator 开始处理样本 {item}")
+        logger.info(f"MACSQLGenerator starting to process sample {item}")
 
-        # 验证输入
+        # Validate input
         is_valid, error_msg = self._validate_inputs(item, schema)
         if not is_valid:
-            logger.error(f"输入验证失败: {error_msg}")
+            logger.error(f"Input validation failed: {error_msg}")
             raise Exception(error_msg)
 
-        try:
-            # 获取数据样本
-            row = self.dataset[item]
-            question = row['question']
-            evidence = row.get('evidence', '')
+        # Get data sample
+        row = self.dataset[item]
+        question = row['question']
+        evidence = row.get('evidence', '')
 
-            logger.debug(f"处理问题: {question[:100]}...")
+        logger.debug(f"Processing question: {question[:100]}...")
 
-            # 准备 schema
-            schema_df = self._prepare_schema(item, schema)
+        # Parse externally provided schema_links
+        schema_links_str = None
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                schema_links = load_dataset(schema_link_path)
+                logger.debug(f"Loaded schema links from: {schema_link_path}")
+        else:
+            logger.debug("Using externally provided schema links")
 
-            # 准备数据库信息
-            db_id, db_type, db_path, credential = self._prepare_database_info(row)
+        if not isinstance(schema_links, str) and schema_links is not None:
+            schema_links_str = format_schema_links(schema_links, "C")
 
-            logger.debug(f"数据库信息: db_id={db_id}, db_type={db_type}")
+        # Prepare schema
+        schema_df = self._prepare_schema(item, schema)
 
-            # 创建 ChatManager
-            chat_manager = ChatManager(
-                llm=self.llm,
-                dataset_name=self.dataset_name,
-                without_selector=self.without_selector
-            )
+        # Prepare database information
+        db_id, db_type, db_path, credential = self._prepare_database_info(row)
 
-            # 初始化用户消息
-            user_message = {
-                "idx": row.get('instance_id', item),
-                "db_id": db_id,
-                "db_type": db_type,
-                "db_path": db_path,
-                "credential": credential,
-                "query": question,
-                "evidence": evidence,
-                "schema": schema_df,
-                "extracted_schema": {},
-                "ground_truth": row.get('query', ''),
-                "send_to": SYSTEM_NAME,
-                "data_logger": data_logger
-            }
+        logger.debug(f"Database info: db_id={db_id}, db_type={db_type}")
 
-            # 执行 MAC-SQL 流程
-            logger.debug("开始 MAC-SQL 多智能体协作...")
-            chat_manager.start(user_message)
+        # Determine if Selector should be skipped when schema_links is provided
+        skip_selector = schema_links_str is not None
+        
+        # Create ChatManager
+        chat_manager = ChatManager(
+            llm=self.llm,
+            dataset_name=self.dataset_name,
+            without_selector=self.without_selector or skip_selector
+        )
 
-            # 获取生成的 SQL
-            pred_sql = user_message.get('pred', user_message.get('final_sql', ''))
+        # Initialize user message
+        user_message = {
+            "idx": row.get('instance_id', item),
+            "db_id": db_id,
+            "db_type": db_type,
+            "db_path": db_path,
+            "credential": credential,
+            "query": question,
+            "evidence": evidence,
+            "schema": schema_df,
+            "extracted_schema": {},
+            "ground_truth": row.get('query', ''),
+            "send_to": SYSTEM_NAME,
+            "data_logger": data_logger
+        }
 
-            if not pred_sql or pred_sql.strip() == "":
-                logger.warning("MAC-SQL 未生成有效的 SQL，使用回退方法")
-                schema_str = parse_schema_from_df(schema_df)
-                pred_sql = self._fallback_sql_generation(question, schema_str)
+        # Pass schema_links to the multi-agent pipeline
+        if schema_links_str:
+            user_message['schema_links_str'] = schema_links_str
+            user_message['send_to'] = DECOMPOSER_NAME
+            logger.debug("Skipping Selector due to provided schema_links")
 
-            logger.debug(f"最终生成的 SQL: {pred_sql[:100]}...")
+        # Execute MAC-SQL process
+        logger.debug("Starting MAC-SQL multi-agent collaboration...")
+        chat_manager.start(user_message)
 
-            pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
+        # Get generated SQL
+        pred_sql = user_message.get('pred', user_message.get('final_sql', ''))
 
-            logger.info(f"MACSQLGenerator 样本 {item} 处理完成")
-            if data_logger:
-                data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
-            return pred_sql
+        logger.debug(f"Final generated SQL: {pred_sql[:100]}...")
 
-        except Exception as e:
-            logger.error(f"MACSQLGenerator 处理失败: {e}")
-            # 尝试回退方法
-            try:
-                row = self.dataset[item]
-                schema_df = self._prepare_schema(item, schema)
-                schema_str = parse_schema_from_df(schema_df)
-                return self._fallback_sql_generation(row['question'], schema_str)
-            except Exception as fallback_e:
-                logger.error(f"回退方法也失败: {fallback_e}")
-                raise Exception(f"MAC-SQL 生成失败: {e}")
+        pred_sql = self.save_output(pred_sql, item, row.get("instance_id"))
+
+        logger.info(f"MACSQLGenerator sample {item} processing completed")
+        if data_logger:
+            data_logger.info(f"{self.NAME}.final_sql | sql={pred_sql}")
+        return pred_sql
