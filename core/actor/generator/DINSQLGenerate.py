@@ -13,7 +13,7 @@ from core.utils import (
     load_dataset,
     save_dataset, sql_clean
 )
-from core.actor.parser.parse_utils import normalize_schema_links
+from core.actor.parser.parse_utils import format_schema_links
 from core.actor.decomposer.decompose_utils import format_sub_questions
 
 class DINSQLGenerator(BaseGenerator):
@@ -587,7 +587,7 @@ Intermediate_representation: select course.title , course.credits from classroom
             if schema_link_path:
                 schema_links = load_dataset(schema_link_path)
                 if not isinstance(schema_links, str):
-                    schema_links = normalize_schema_links(schema_links,"C")
+                    schema_links = format_schema_links(schema_links,"C")
                 logger.debug(f"Loaded schema links from: {schema_link_path}")
             else:
                 logger.debug("Generating schema links using DIN-SQL")

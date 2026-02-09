@@ -328,16 +328,6 @@ You need to follow below requirements:
         if data_logger:
             data_logger.info(f"{self.NAME}.predict sql output | {sql_list}")
 
-        # step 4: SQL debugging by experience
-        # logger.debug("开始基于经验的 SQL 调试...")
-        # for idx, sql in enumerate(sql_list):
-        #     debugged_sql = sql_debug_by_experience(self.llm, question, schema, sql, db_type, schema_links)
-        #     # SQL post-process
-        #     if self.sql_post_process_function:
-        #         debugged_sql = self.sql_post_process_function(debugged_sql, self.dataset)
-        #     sql_list[idx] = debugged_sql
-        # logger.debug("基于经验的 SQL 调试完成")
-
         # LinkAlign: SQL debugging by feedback
         if self.use_feedback_debug:
             if data_logger:

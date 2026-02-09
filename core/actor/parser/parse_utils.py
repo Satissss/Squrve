@@ -91,3 +91,25 @@ def _clean_column_ref(ref: str) -> str:
 def _is_column_ref(ref: str) -> bool:
     """Check if a string is a column reference (table.column format)."""
     return '.' in ref and len(ref.split('.')) == 2 and all(ref.split('.'))
+
+
+def format_schema_links(schema_links: Union[str, List[str], List[List[str]]], output_type: str = "A") -> str:
+    if schema_links is None:
+        return ""
+    if isinstance(schema_links, str):
+        return schema_links
+
+    schema_links = normalize_schema_links(schema_links, output_type)
+
+    if isinstance(schema_links, list):
+        # 如果是嵌套列表（多个 parser 的结果），合并它们
+        return "\n".join([str(link) for link in schema_links])
+    elif isinstance(schema_links, dict):
+        format_lis = []
+        if "tables" in schema_links:
+            format_lis.append("Linked Tables: " + str(schema_links["tables"]))
+        if "columns" in schema_links:
+            format_lis.append("Linked Columns: " + str(schema_links["columns"]))
+        schema_links = "\n\n".join(format_lis)
+
+    return schema_links
