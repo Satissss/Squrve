@@ -18,7 +18,7 @@ from core.utils import (
 from core.actor.parser.parse_utils import format_schema_links
 from core.actor.decomposer.decompose_utils import format_sub_questions
 
-
+@BaseGenerator.register_actor
 class LinkAlignGenerator(BaseGenerator):
     """ We adapt the DIN-SQL method to scalable real-world db environment by applying the LinkAlign framework """
 

@@ -829,6 +829,7 @@ class ChatManager:
         logger.info(f"MAC-SQL collaboration completed, time elapsed: {exec_time:.2f} seconds")
 
 
+@BaseGenerator.register_actor
 class MACSQLGenerator(BaseGenerator):
     """
     MAC-SQL Generator: Multi-Agent Collaborative SQL Generation

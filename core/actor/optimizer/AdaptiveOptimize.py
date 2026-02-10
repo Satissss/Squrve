@@ -11,7 +11,7 @@ from core.data_manage import Dataset, load_dataset, save_dataset, single_central
 from core.db_connect import get_sql_exec_result
 from core.utils import sql_clean, parse_schema_from_df, parse_list_from_str, parse_json_from_str
 
-
+@BaseOptimizer.register_actor
 class AdaptiveOptimizer(BaseOptimizer):
     NAME = "AdaptiveOptimizer"
 

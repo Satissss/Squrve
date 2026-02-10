@@ -240,7 +240,7 @@ Your answer should be returned by json format.
 }}
 '''
 
-
+@BaseGenerator.register_actor
 class RSLSQLGenerator(BaseGenerator):
     NAME = "RSLSQLGenerator"
 

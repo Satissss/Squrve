@@ -24,7 +24,7 @@ class CHESSConfig:
     # Unit test settings
     ut_unit_test_count: int = 20
 
-
+@BaseSelector.register_actor
 class CHESSSelector(BaseSelector):
     """Selector component from CHESS-SQL for choosing the best SQL candidate using execution results and unit tests."""
 

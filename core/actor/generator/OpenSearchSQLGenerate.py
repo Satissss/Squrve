@@ -1246,6 +1246,7 @@ def muti_process_sql(dcheck, sqls, l_values, values, question, new_db_info, hint
     return vote, none_case
 
 
+@BaseGenerator.register_actor
 class OpenSearchSQLGenerator(BaseGenerator):
     NAME = "OpenSearchSQLGenerator"
 

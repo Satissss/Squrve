@@ -437,7 +437,7 @@ def sql_raw_parse(sql, return_question):
         logger.warning(f"Error in sql_raw_parse: {e}")
         return "", None
 
-
+@BaseScaler.register_actor
 class OpenSearchSQLScaler(BaseScaler):
     NAME = "OpenSearchSQLScaler"
     OUTPUT_NAME = "pred_sql"

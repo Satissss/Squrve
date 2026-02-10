@@ -13,7 +13,7 @@ from pathlib import Path
 from loguru import logger
 import numpy as np
 
-
+@BaseParser.register_actor
 class OpenSearchCoTParser(BaseParser):
     NAME = "OpenSearchCoTParser"
 

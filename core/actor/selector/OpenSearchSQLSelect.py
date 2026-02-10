@@ -5,7 +5,7 @@ from pathlib import Path
 from core.actor.selector.BaseSelect import BaseSelector
 from core.data_manage import Dataset
 
-
+@BaseSelector.register_actor
 class OpenSearchSQLSelector(BaseSelector):
     """Selector component based on OpenSearch-SQL for choosing/optimizing SQL candidates."""
 

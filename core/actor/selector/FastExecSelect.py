@@ -9,7 +9,7 @@ from core.data_manage import Dataset
 from core.db_connect import get_sql_exec_result_with_time
 from core.utils import compare_pandas_table
 
-
+@BaseSelector.register_actor
 class FastExecSelector(BaseSelector):
     """
     Selector that keeps only successfully executed SQL candidates and picks the

@@ -6,22 +6,50 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/base.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/decomposer/BaseDecompose.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/BaseDecompose.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/decomposer/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/decomposer/DINSQLDecompose.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/DINSQLDecompose.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/decomposer/MACSQLDecompose.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/MACSQLDecompose.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/BaseGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/DAILSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DAILSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/OpenSearchSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/OpenSearchSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/RSLSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/RSLSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/ReFoRCEGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/ReFoRCEGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/RecursiveGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/RecursiveGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/AdaptiveOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/AdaptiveOptimize.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/BaseOptimize.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/CHESSOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/DINSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/LinkAlignOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/LinkAlignOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/MACSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/OpenSearchSQLOptimize.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/optimizer/RSLSQLOptimize.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/BaseParse.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/parser/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/DINSQLCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/MACSQLCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/OpenSearchCoTParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/reducer/BaseReduce.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/reducer/BaseReduce.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/reducer/LinkAlignReduce.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/reducer/LinkAlignReduce.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/reducer/ZeroReduce.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/reducer/ZeroReduce.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/reducer/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/reducer/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/scaler/BaseScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/BaseScale.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/scaler/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/DINSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/DINSQLScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/MACSQLScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/OpenSearchSQLScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/RSLSQLScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/RSLSQLScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/AgentDebateSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/AgentDebateSelect.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/selector/BaseSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/BaseSelect.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/selector/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/CHESSSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/CHESSSelect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/ChaseSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/ChaseSelect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/FastExecSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/FastExecSelect.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/OpenSearchSQLSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/OpenSearchSQLSelect.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -830,7 +858,7 @@
       <workItem from="1770366121029" duration="98000" />
       <workItem from="1770554787196" duration="50000" />
       <workItem from="1770602993163" duration="15769000" />
-      <workItem from="1770703637601" duration="15241000" />
+      <workItem from="1770703637601" duration="17737000" />
     </task>
     <servers />
   </component>
@@ -1006,7 +1034,7 @@
     <SUITE FILE_PATH="coverage/QueryFlow$tt.coverage" NAME="tt Coverage Results" MODIFIED="1748335668165" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/QueryFlow$evaluate.coverage" NAME="evaluate Coverage Results" MODIFIED="1747704013340" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
     <SUITE FILE_PATH="coverage/Squrve$error_analysis.coverage" NAME="error_analysis Coverage Results" MODIFIED="1765554398840" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/booksql" />
-    <SUITE FILE_PATH="coverage/Squrve$run2.coverage" NAME="run2 Coverage Results" MODIFIED="1770726775579" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
+    <SUITE FILE_PATH="coverage/Squrve$run2.coverage" NAME="run2 Coverage Results" MODIFIED="1770731195709" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/Squrve$print_actors.coverage" NAME="print_actors Coverage Results" MODIFIED="1764766629859" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl" />
     <SUITE FILE_PATH="coverage/Squrve$run_test.coverage" NAME="run_test Coverage Results" MODIFIED="1758370544728" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$gather_label_moderate.coverage" NAME="gather_label_moderate Coverage Results" MODIFIED="1766419326336" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test_app" />

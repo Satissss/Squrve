@@ -9,7 +9,7 @@ from core.data_manage import Dataset
 from core.utils import parse_schema_from_df, load_dataset
 from llama_index.core.llms.llm import LLM
 
-
+@BaseScaler.register_actor
 class MACSQLScaler(BaseScaler):
     """Scaler implementation based on MAC-SQL's SQL generation strategy for producing multiple SQL candidates."""
 

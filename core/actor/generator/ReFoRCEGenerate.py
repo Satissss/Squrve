@@ -16,7 +16,7 @@ from core.db_connect import get_sql_exec_result
 
 # Complete ReFoRCE implementation following the original paper and source code
 # Includes: Column Exploration, Self-Refinement, Majority Voting, and Consensus Enforcement
-
+@BaseGenerator.register_actor
 class ReFoRCEGenerator(BaseGenerator):
     OUTPUT_NAME = "pred_sql"
     NAME = "ReFoRCEGenerator"

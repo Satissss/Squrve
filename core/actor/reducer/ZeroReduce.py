@@ -6,7 +6,7 @@ from core.utils import save_dataset
 from typing import Union, Dict, List
 import pandas as pd
 
-
+@BaseReducer.register_actor
 class ZeroReducer(BaseReducer):
     """ Return all schemas of the target database for the data sample directly """
 

@@ -15,7 +15,7 @@ from core.utils import (
 )
 from loguru import logger
 
-
+@BaseParser.register_actor
 class LinkAlignParser(BaseParser):
     """
     Extract the required schema information for a single sample using Schema Linking provided by LinkAlign

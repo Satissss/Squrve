@@ -7,7 +7,7 @@ from llama_index.core.llms import LLM
 from core.actor.decomposer.BaseDecompose import BaseDecomposer
 from core.data_manage import Dataset
 
-
+@BaseDecomposer.register_actor
 class DINSQLDecomposer(BaseDecomposer):
     """Decomposer implementation based on DIN-SQL's classification for identifying sub-questions in complex queries."""
 

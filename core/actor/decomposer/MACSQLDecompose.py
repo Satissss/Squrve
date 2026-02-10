@@ -19,6 +19,7 @@ from core.utils import (
 # Import for database connection (for future use if needed)
 # from core.db_connect import get_sql_exec_result, execute_sql
 
+@BaseDecomposer.register_actor
 class MACSQLDecomposer(BaseDecomposer):
     """
     MAC-SQL Decomposer: Decomposes complex queries into sub-questions with corresponding SQL statements.

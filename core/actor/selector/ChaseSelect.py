@@ -10,7 +10,7 @@ from core.data_manage import Dataset
 from core.db_connect import get_sql_exec_result_with_time
 from core.utils import compare_pandas_table, load_dataset, parse_json_from_str
 
-
+@BaseSelector.register_actor
 class ChaseSelector(BaseSelector):
     """
     Selector that keeps only successfully executed SQL candidates and picks the

@@ -12,7 +12,7 @@ from core.data_manage import Dataset, load_dataset, save_dataset, single_central
 from core.db_connect import get_sql_exec_result
 from core.utils import parse_schema_from_df
 
-
+@BaseOptimizer.register_actor
 class RSLSQLOptimizer(BaseOptimizer):
     NAME = "RSLSQLOptimizer"
 

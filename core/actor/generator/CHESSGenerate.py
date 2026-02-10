@@ -54,7 +54,7 @@ class CHESSConfig:
     ss_engine: str = "gpt-4o-mini"
     ss_temperature: float = 0.2
 
-
+@BaseGenerator.register_actor
 class CHESSGenerator(BaseGenerator):
     """CHESS-SQL: Contextual Harnessing for Efficient SQL Synthesis
 
@@ -593,7 +593,7 @@ class CHESSGenerator(BaseGenerator):
                 if candidate["SQL"] == pred_sql:
                     best_candidate_idx = i
                     break
-            
+
             best_candidate = candidates[best_candidate_idx]
             if best_candidate.get("execution_status") in ["ERROR", "EMPTY_RESULT"]:
                 logger.debug("开始SQL修订（基于执行错误）...")

@@ -23,7 +23,7 @@ from core.utils import (
 from core.db_connect import get_sql_exec_result
 from core.actor.decomposer.decompose_utils import normalize_sub_questions
 
-
+@BaseDecomposer.register_actor
 class RecursiveDecomposer(BaseDecomposer):
     NAME = "RecursiveDecomposer"
 

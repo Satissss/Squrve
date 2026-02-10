@@ -10,7 +10,7 @@ from core.db_connect import get_sql_exec_result
 from core.utils import sql_clean, parse_schema_from_df
 import pandas as pd
 
-
+@BaseOptimizer.register_actor
 class LinkAlignOptimizer(BaseOptimizer):
     """Optimizer that debugs and refines SQL queries using experience-based and feedback-based methods from LinkAlign."""
 

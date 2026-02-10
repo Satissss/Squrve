@@ -23,7 +23,7 @@ from core.utils import (
 )
 from core.db_connect import get_sql_exec_result
 
-nltk.download('stopwords', quiet=True)
+# nltk.download('stopwords', quiet=True)
 
 
 # Utility Functions
@@ -1830,6 +1830,7 @@ def get_example_selector(selector_type):
 # Similarly for others
 
 # Main Class
+@BaseGenerator.register_actor
 class DAILSQLGenerate(BaseGenerator):
     NAME = "DAILSQL"
     OUTPUT_NAME = "pred_sql"

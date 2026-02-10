@@ -14,7 +14,7 @@ from core.utils import (
     save_dataset
 )
 
-
+@BaseGenerator.register_actor
 class RecursiveGenerator(BaseGenerator):
     """Recursive SQL generator that uses recursive decomposition to generate complete SQL statements."""
 

@@ -16,6 +16,7 @@ from core.utils import (
 from core.actor.parser.parse_utils import format_schema_links
 from core.actor.decomposer.decompose_utils import format_sub_questions
 
+@BaseGenerator.register_actor
 class DINSQLGenerator(BaseGenerator):
     """DIN-SQL method implementation for Text-to-SQL generation.
 

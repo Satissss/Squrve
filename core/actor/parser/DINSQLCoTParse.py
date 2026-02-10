@@ -13,7 +13,7 @@ from core.utils import (
 )
 from loguru import logger
 
-
+@BaseParser.register_actor
 class DINSQLCoTParser(BaseParser):
     """
     Extract relevant schema links for a query using chain-of-thought prompting in a single pass.

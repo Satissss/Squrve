@@ -10,7 +10,7 @@ from core.utils import load_dataset, save_dataset
 from core.data_manage import Dataset, single_central_process
 from llama_index.core.llms.llm import LLM
 
-
+@BaseParser.register_actor
 class MACSQLCoTParser(BaseParser):
     """
     Extract relevant schema links for a query using MAC-SQL approach with table and column selection.

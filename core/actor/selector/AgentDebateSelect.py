@@ -55,7 +55,7 @@ class ExpertOutput:
     agree: bool
     reason: str
 
-
+@BaseSelector.register_actor
 class AgentDebateSelector(BaseSelector):
     """
     Multi-round debate selector:

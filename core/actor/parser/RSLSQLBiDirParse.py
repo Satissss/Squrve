@@ -9,7 +9,7 @@ from core.actor.parser.BaseParse import BaseParser, parallel_slice_parse
 from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from llama_index.core.llms.llm import LLM
 
-
+@BaseParser.register_actor
 class RSLSQLBiDirParser(BaseParser):
     NAME = "RSLSQLBiDirParser"
 

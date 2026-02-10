@@ -21,6 +21,7 @@ def parse_sql_from_string(input_string: str) -> str:
     else:
         return "error: No SQL found in the input string"
 
+@BaseOptimizer.register_actor
 class MACSQLOptimizer(BaseOptimizer):
     """Optimizer that debugs and refines SQL queries using MAC-SQL's refinement method with execution feedback."""
 

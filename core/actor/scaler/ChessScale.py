@@ -16,7 +16,7 @@ from core.actor.prompts.CHESSPrompt import (
     template_extract_keywords,
 )
 
-
+@BaseScaler.register_actor
 class ChessScaler(BaseScaler):
     """Scaler implementation based on CHESS-SQL's candidate generation for producing multiple SQL candidates."""
 

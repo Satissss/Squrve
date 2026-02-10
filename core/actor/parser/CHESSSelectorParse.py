@@ -13,7 +13,7 @@ from core.utils import load_dataset, save_dataset
 from core.db_connect import execute_sql
 from llama_index.core.llms.llm import LLM
 
-
+@BaseParser.register_actor
 class CHESSSelectorParser(BaseParser):
     """
     Parser that replicates the schema selection from CHESS-SQL: filters columns, selects tables, and selects columns.

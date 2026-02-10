@@ -19,7 +19,7 @@ from core.utils import (
     parse_schema_link_from_str
 )
 
-
+@BaseReducer.register_actor
 class LinkAlignReducer(BaseReducer):
     """ Use LinkAlign’s Schema Reduce to get a sample’s related schema subset """
 
