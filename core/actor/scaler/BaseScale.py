@@ -4,12 +4,12 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from core.utils import parse_schema_from_df
 from abc import abstractmethod
 
-
+@ActorPool.register_actor
 class BaseScaler(Actor):
     """ Use different prompt strategies to generate multiple SQL candidates matching the query. """
     OUTPUT_NAME: str = "pred_sql"

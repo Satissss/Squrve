@@ -2,12 +2,12 @@ from os import PathLike
 from typing import Union, Dict, List, Any
 from pathlib import Path
 
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from core.data_manage import save_dataset, Dataset
 from abc import abstractmethod
 from loguru import logger
 
-
+@ActorPool.register_actor
 class BaseGenerator(Actor):
     OUTPUT_NAME = "pred_sql"
     STRATEGY = MergeStrategy.APPEND.value

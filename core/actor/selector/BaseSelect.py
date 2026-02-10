@@ -4,13 +4,13 @@ from pathlib import Path
 from loguru import logger
 import time
 import os
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from core.data_manage import Dataset
 from core.utils import load_dataset, save_dataset
 from core.db_connect import execute_sql
 from abc import abstractmethod
 
-
+@ActorPool.register_actor
 class BaseSelector(Actor):
     OUTPUT_NAME = "pred_sql"
     STRATEGY = MergeStrategy.OVERWRITE.value

@@ -1,6 +1,6 @@
 from os import PathLike
 from pathlib import Path
-from BaseReduce import BaseReducer
+from core.actor.reducer.BaseReduce import BaseReducer
 from core.data_manage import Dataset, single_central_process
 from core.utils import save_dataset
 from typing import Union, Dict, List

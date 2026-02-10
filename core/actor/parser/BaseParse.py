@@ -1,4 +1,4 @@
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from abc import abstractmethod
 from os import PathLike
 from typing import Union, Dict, List
@@ -10,7 +10,7 @@ from core.data_manage import single_central_process, Dataset, save_dataset
 from core.utils import load_dataset, parse_schema_from_df
 from core.actor.parser.parse_utils import slice_schema_df
 
-
+@ActorPool.register_actor
 class BaseParser(Actor):
     # The NAME variable is defined in the implementing subclasses,
     # and by convention it is recommended to use a name ending with *Parser.

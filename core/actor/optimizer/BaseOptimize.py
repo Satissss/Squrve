@@ -4,12 +4,12 @@ from pathlib import Path
 from loguru import logger
 import pandas as pd
 
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from core.data_manage import Dataset, load_dataset, save_dataset, single_central_process
 from core.utils import parse_schema_from_df
 from abc import abstractmethod
 
-
+@ActorPool.register_actor
 class BaseOptimizer(Actor):
     OUTPUT_NAME = "pred_sql"
     STRATEGY = MergeStrategy.OVERWRITE.value

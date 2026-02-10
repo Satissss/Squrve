@@ -7,6 +7,7 @@ from .MACSQLGenerate import MACSQLGenerator
 from .OpenSearchSQLGenerate import OpenSearchSQLGenerator
 from .ReFoRCEGenerate import ReFoRCEGenerator
 from .RSLSQLGenerate import RSLSQLGenerator
+from .RecursiveGenerate import RecursiveGenerator
 
 __all__ = [
     "BaseGenerator",
@@ -17,5 +18,6 @@ __all__ = [
     "MACSQLGenerator",
     "OpenSearchSQLGenerator",
     "ReFoRCEGenerator",
-    "RSLSQLGenerate"
+    "RSLSQLGenerate",
+    "RecursiveGenerator",
 ]

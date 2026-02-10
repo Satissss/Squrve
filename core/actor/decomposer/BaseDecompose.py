@@ -4,13 +4,13 @@ import pandas as pd
 from typing import Union, Dict, List
 from loguru import logger
 
-from core.actor.base import Actor, MergeStrategy
+from core.actor.base import Actor, MergeStrategy, ActorPool
 from abc import abstractmethod
 
 from core.data_manage import single_central_process, Dataset, save_dataset
 from core.utils import load_dataset, parse_schema_from_df
 
-
+@ActorPool.register_actor
 class BaseDecomposer(Actor):
     """ Decompose complex queries into a series of sub-questions. """
     # The NAME variable is defined in the implementing subclasses,
