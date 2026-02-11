@@ -43,6 +43,10 @@ class AgentTask(MetaTask):
             from core.actor.agent.WorkflowAgent import WorkflowAgent
             actor = WorkflowAgent(**agent_args)
             return actor
+        elif actor_type in ("MultiWorkflowAgent", "MultiWorkflow"):
+            from core.actor.agent.WorkflowAgent import MultiWorkflowAgent
+            actor = MultiWorkflowAgent(**agent_args)
+            return actor
 
         warnings.warn(f"The decompose_type `{actor_type}` is not available.", category=UserWarning)
         return None
