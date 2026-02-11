@@ -19,6 +19,25 @@ class ChaseSelector(BaseSelector):
 
     NAME = "ChaseSelector"
 
+    SKILL = """# ChaseSelector
+
+Chase-SQL style selection: execute all candidates, keep only successful runs, group by identical execution results. Per group, take fastest SQL; pairwise LLM comparison (schema + question + SQL + execution result) assigns scores—winner gains loser's group count. Optional majority voting when ambiguous. Advantage: execution result as ground truth, reduces hallucination; drawback: requires DB connectivity, many LLM calls for pairwise comparison.
+
+## Inputs
+- `pred_sql`: List of SQL candidates to select from.
+- `schema`: DB schema for LLM comparison. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (single selected SQL)
+
+## Steps
+1. Execute all candidates; keep only successful runs.
+2. Group by identical execution result.
+3. Per group: pick fastest SQL, use group size as initial score.
+4. Pairwise LLM comparison; update scores; optionally use majority voting.
+5. Return SQL with highest score.
+"""
+
     def __init__(
             self,
             dataset: Dataset = None,
@@ -27,11 +46,26 @@ class ChaseSelector(BaseSelector):
             save_dir: Union[str, Path] = "../files/pred_sql",
             retry_num: int = 3,
             force_voting: bool = True,
+            use_external: bool = True,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, **kwargs)
         self.retry_num = retry_num
         self.force_voting = force_voting
+        self.use_external: bool = use_external
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def _compare_sql_pair(self, question, schema, sql1, sql2) -> bool:
         """
@@ -204,6 +238,12 @@ Return the result strictly in JSON format:
         if not question:
             logger.warning(f"{self.NAME} | No question found for item {item}")
             return ""
+
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
 
         db_type = row.get("db_type", "sqlite")
         db_id = row.get("db_id", "")

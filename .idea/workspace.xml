@@ -6,7 +6,16 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/agent/WorkflowAgent.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/agent/WorkflowAgent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/base.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/CHESSGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DINSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/LinkAlignGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/MACSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/LinkAlignParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/RSLSQLBiDirParse.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/scaler/ChessScale.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/selector/ChaseSelect.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/selector/ChaseSelect.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -816,7 +825,7 @@
       <workItem from="1770554787196" duration="50000" />
       <workItem from="1770602993163" duration="15769000" />
       <workItem from="1770703637601" duration="21445000" />
-      <workItem from="1770778222841" duration="13243000" />
+      <workItem from="1770778222841" duration="21360000" />
     </task>
     <servers />
   </component>

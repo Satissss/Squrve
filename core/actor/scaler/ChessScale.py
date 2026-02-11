@@ -5,6 +5,8 @@ from loguru import logger
 import pandas as pd
 
 from core.actor.scaler.BaseScale import BaseScaler
+from core.actor.parser.parse_utils import format_schema_links
+from core.actor.decomposer.decompose_utils import format_sub_questions
 from core.data_manage import Dataset
 from core.utils import parse_schema_from_df, load_dataset, save_dataset
 from llama_index.core.llms.llm import LLM
@@ -21,6 +23,24 @@ class ChessScaler(BaseScaler):
     """Scaler implementation based on CHESS-SQL's candidate generation for producing multiple SQL candidates."""
 
     NAME = "ChessScaler"
+
+    SKILL = """# ChessScaler
+
+CHESS-style candidate scaling: keyword extraction → keyword-based schema retrieval → build evidence (keywords + schema_links + sub_questions) → generate multiple SQL candidates via four diversified CHESS templates. Distributes `generate_num` across templates for diversity. Advantage: multi-template diversification increases candidate variety; drawback: keyword retrieval is heuristic, multiple LLM calls per item.
+
+## Inputs
+- `schema_links`: Precomputed links. If absent, loaded from dataset.
+- `sub_questions`: Sub-questions. If absent, not used in evidence.
+
+## Output
+`pred_sql` (list of SQL candidates)
+
+## Steps
+1. Load schema, schema_links, sub_questions; build evidence.
+2. IR: extract keywords (LLM) → retrieve context from schema by keyword match.
+3. Generate candidates with four CHESS templates (divide generate_num across them).
+4. Deduplicate, save, return `pred_sql`.
+"""
 
     CANDIDATE_TEMPLATE = '''You are an experienced database expert.
 Now you need to generate a SQL query given the database information, a question and some additional information.
@@ -259,6 +279,42 @@ Reasoning Examples:
         row = self.dataset[item]
         question = row['question']
         evidence = row.get('evidence', '') or kwargs.get('evidence', '') or ''
+
+        # Evidence and external are the same prior knowledge; prompts use evidence (HINT), so merge external into evidence
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("Loaded external knowledge")
+
+        # Fallback: load schema_links from dataset if not provided via pipeline
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                loaded = load_dataset(schema_link_path)
+                if loaded is not None:
+                    schema_links = loaded
+                    if data_logger:
+                        data_logger.info(f"{self.NAME}: loaded schema_links from dataset: {schema_link_path}")
+
+        # Format schema_links (same as DINSQL): normalize to string when not already str
+        if schema_links is not None and not isinstance(schema_links, str):
+            schema_links = format_schema_links(schema_links, "C")
+
+        # Fallback: load sub_questions from dataset if not provided via pipeline
+        if sub_questions is None:
+            sub_question_path = row.get("sub_questions", None)
+            if sub_question_path:
+                loaded = load_dataset(sub_question_path)
+                if loaded is not None:
+                    sub_questions = loaded
+                    if data_logger:
+                        data_logger.info(f"{self.NAME}: loaded sub_questions from dataset: {sub_question_path}")
+
+        # Format sub_questions (same as DINSQL): normalize when not None
+        if sub_questions is not None:
+            sub_questions = format_sub_questions(sub_questions, output_type="C")
+
         # Load and process schema using base class method
         schema = self.process_schema(schema, item)
 
@@ -267,35 +323,27 @@ Reasoning Examples:
         context = self._retrieve_context(question, schema, keywords)
         built_evidence = self._build_evidence(question, context, keywords, evidence, schema_links, sub_questions)
 
-        if self.use_external:
-            if data_logger:
-                data_logger.info(f"{self.NAME}: use external knowledge to explain the question.")
-            external_knowledge = self.load_external_knowledge(row.get("external", None))
-            if external_knowledge:
-                question += "\n" + external_knowledge
-                logger.debug("已加载外部知识")
-
         reasoning_examples = None
         if self.use_few_shot:
             if data_logger:
-                data_logger.info(f"{self.NAME}: use retrieved reasoning exapmles to enhance the results.")
+                data_logger.info(f"{self.NAME}: use retrieved reasoning examples to enhance the results.")
             reasoning_example_path = row.get("reasoning_examples", None)
             if reasoning_example_path:
                 reasoning_examples = load_dataset(reasoning_example_path)
-                logger.debug(f"加载推理示例: {reasoning_example_path}")
+                logger.debug(f"Loaded reasoning examples: {reasoning_example_path}")
 
-        # 在 act 方法内部初始化 llm，考虑 self.llm 是否为列表
+        # Initialize LLM in act method (handle self.llm as list or single instance)
         if isinstance(self.llm, list) and self.llm:
             llm = self.llm[0]
         else:
             llm = self.llm
 
         if llm is None:
-            # 如果没有有效的 LLM，返回空结果
+            # Return empty result if no valid LLM available
             logger.warning("No LLM available for SQL generation")
             return []
 
-        # 仅使用第一个 LLM 生成 SQL 候选（使用多策略模板）
+        # Generate SQL candidates using multi-strategy templates (first LLM only)
         pred_sqls = self._generate_candidates_with_templates(
             llm_=llm,
             question=question,
@@ -309,10 +357,10 @@ Reasoning Examples:
         # Deduplicate
         pred_sqls = list(dict.fromkeys(pred_sqls))
 
-        # 确保至少有一个 SQL 结果，如果没有生成任何 SQL，创建一个默认的
+        # Ensure at least one SQL result; create default SQL if none generated
         if not pred_sqls:
             logger.warning(f"No SQL candidates generated for item {item}, creating default SQL")
-            pred_sqls = ["SELECT * FROM table LIMIT 1"]  # 默认 SQL
+            pred_sqls = ["SELECT * FROM table LIMIT 1"]  # Default fallback SQL
 
         logger.info(f"ChessScaler: Final pred_sqls for item {item}: {len(pred_sqls)} candidates")
         if data_logger:

@@ -67,6 +67,24 @@ class AgentDebateSelector(BaseSelector):
 
     NAME = "AgentDebateSelector"
 
+    SKILL = """# AgentDebateSelector
+
+Two-agent debate selection: Proposer (Data Analyst) selects best SQL from pool or proposes a corrected SQL; Expert (Database Scientist) validates with agree/disagree. Per round: Proposer → Expert; if Expert agrees, stop; else continue up to max_rounds. Pool grows when Proposer proposes new SQL. Uses schema, schema_links, external knowledge. Persists chat_history as JSON. Advantage: iterative refinement via debate; drawback: 2 LLM calls per round.
+
+## Inputs
+- `pred_sql`: SQL candidates (list or single). Required; loaded from dataset if absent.
+- `schema_links`: Precomputed links. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (single SQL)
+
+## Steps
+1. Load pred_sql into SQL pool; load schema, schema_links, external.
+2. Per round (up to max_rounds): Proposer picks or proposes → add new SQL to pool if proposed → Expert validates.
+3. If Expert agrees, stop.
+4. Save final SQL and chat_history; return `pred_sql`.
+"""
+
     PROPOSER_ROLE_NAME = "Data Analyst"
     PROPOSER_ROLE_DESCRIPTION = (
         "You are a senior data analyst specialized in Text-to-SQL. "

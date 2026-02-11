@@ -26,6 +26,25 @@ class DINSQLGenerator(BaseGenerator):
 
     NAME = "DINSQLGenerator"
 
+    SKILL = """# DINSQLGenerator
+
+DIN-SQL uniquely uses difficulty-based decomposition: schema linking first, then classifies each question as EASY / NON-NESTED / NESTED, and applies tailored few-shot prompts plus an LLM debugging pass. Advantage: stronger handling of complex queries; drawback: 4+ LLM calls per sample.
+
+## Inputs
+- `schema_links`: Precomputed links from question to tables/columns/values. If absent, produced by schema-linking step.
+- `sub_questions`: Sub-questions for NESTED queries. If absent, parsed from classification output.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Schema linking (skip if `schema_links` provided).
+2. Difficulty classification (EASY / NON-NESTED / NESTED).
+3. SQL generation with difficulty-specific prompt (EASY→easy, NON-NESTED→medium, NESTED→hard; use `sub_questions` for NESTED).
+4. SQL debugging.
+5. Return `pred_sql`.
+"""
+
     # Prompt constants for better organization and readability
     SCHEMA_LINKING_PROMPT = '''Table advisor, columns = [*,s_ID,i_ID]
 Table classroom, columns = [*,building,room_number,capacity]
@@ -438,6 +457,7 @@ Intermediate_representation: select course.title , course.credits from classroom
             llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
+            use_external: bool = True,
             db_path: Optional[Union[str, PathLike]] = None,
             credential: Optional[Dict] = None,
             **kwargs
@@ -447,10 +467,24 @@ Intermediate_representation: select course.title , course.credits from classroom
         self.llm: Optional[LLM] = llm
         self.is_save = is_save
         self.save_dir: Union[str, PathLike] = save_dir
+        self.use_external: bool = use_external
 
         # Safely initialize db_path and credential
         self.db_path = db_path or (self.dataset.db_path if self.dataset else None)
         self.credential = credential or (self.dataset.credential if self.dataset else None)
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def schema_linking_prompt_maker(self, question: str, schema: str) -> str:
         instruction = "# Find the schema_links for generating SQL queries for each question based on the database schema and Foreign keys.\n"
@@ -550,6 +584,12 @@ Intermediate_representation: select course.title , course.credits from classroom
         db_id = row["db_id"]
         db_path = Path(self.db_path) / (db_id + ".sqlite") if self.db_path else self.db_path
         logger.debug(f"Processing question: {question[:100]}... (DB: {db_id}, Type: {db_type})")
+
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question += "\n" + external_knowledge
+                logger.debug("已加载外部知识")
 
         # Load and process schema
         logger.debug("Processing database schema...")

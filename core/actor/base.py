@@ -1,6 +1,6 @@
 import copy
 from abc import ABC, abstractmethod
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict
 
 from core.data_manage import Dataset
 from enum import Enum
@@ -11,6 +11,7 @@ class Actor(ABC):
     NAME: str
     OUTPUT_NAME: str
     STRATEGY: str
+    SKILL: str
     dataset: Dataset
 
     @abstractmethod
@@ -47,6 +48,9 @@ class Actor(ABC):
                     setattr(new_obj, k, v)  # deepcopy 失败则直接引用
         return new_obj
 
+    @classmethod
+    def skill(cls):
+        return getattr(cls, "SKILL", None)
 
 class ComplexActor(Actor):
     def __init__(
@@ -186,3 +190,17 @@ class ActorPool:
                         return actor
 
         raise ValueError(f"No actor with name {name} found")
+
+    @classmethod
+    def gather_skills(cls):
+        skill_dict = {}
+        for base_actor in cls.get_all_actors():
+            if not hasattr(base_actor, "get_all_actors"):
+                continue
+            for actor in base_actor.get_all_actors():
+                skill_str = actor.skill()
+                actor_name = getattr(actor, "NAME", None)
+                if skill_str and actor_name:
+                    skill_dict[actor_name] = skill_str
+
+        return skill_dict

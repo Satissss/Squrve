@@ -839,6 +839,24 @@ class MACSQLGenerator(BaseGenerator):
     NAME = "MACSQLGenerator"
     OUTPUT_NAME = "pred_sql"
 
+    SKILL = """# MACSQLGenerator
+
+MAC-SQL uses a three-agent pipeline (Selector→Decomposer→Refiner) that collaborates via message passing: Selector prunes large schemas (BIRD format, drop irrelevant tables/columns), Decomposer decomposes and generates SQL in one step (dataset-specific templates for BIRD vs Spider), Refiner executes SQL and iteratively fixes by error feedback up to MAX_ROUND. Skips Selector when `schema_links` provided. Advantage: multi-agent specialization; drawback: round-bound refinement, depends on DB for Refiner.
+
+## Inputs
+- `schema_links`: Precomputed links from question to tables/columns/values. If provided, skips Selector and enriches Decomposer evidence.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Schema preparation; skip Selector if `schema_links` provided.
+2. Selector: prune schema (drop irrelevant tables, top-6 columns per table) when needed.
+3. Decomposer: decompose question + generate SQL (BIRD: with evidence; Spider: direct).
+4. Refiner: execute SQL → if error or empty (non-Spider), fix by error feedback; repeat up to MAX_ROUND.
+5. Return `pred_sql`.
+"""
+
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
@@ -848,6 +866,7 @@ class MACSQLGenerator(BaseGenerator):
             max_round: int = 3,
             dataset_name: str = "spider",
             without_selector: bool = False,
+            use_external: bool = True,
             db_path: Optional[Union[str, Path]] = None,
             credential: Optional[Dict] = None,
             **kwargs
@@ -860,6 +879,7 @@ class MACSQLGenerator(BaseGenerator):
         self.max_round = max_round
         self.dataset_name = dataset_name
         self.without_selector = without_selector
+        self.use_external: bool = use_external
 
         # Safely initialize db_path and credential, checking if dataset is None
         if db_path is not None:
@@ -936,6 +956,19 @@ class MACSQLGenerator(BaseGenerator):
 
         return db_id, db_type, db_path, credential
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
     def act(
             self,
             item,
@@ -959,6 +992,13 @@ class MACSQLGenerator(BaseGenerator):
         row = self.dataset[item]
         question = row['question']
         evidence = row.get('evidence', '')
+
+        # evidence 与 external 实为同一类先验知识，提示词使用 evidence，故将 external 赋给 evidence
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("已加载外部知识")
 
         logger.debug(f"Processing question: {question[:100]}...")
 

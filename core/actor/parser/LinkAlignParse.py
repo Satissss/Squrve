@@ -23,6 +23,23 @@ class LinkAlignParser(BaseParser):
 
     NAME = "LinkAlignParser"
 
+    SKILL = """# LinkAlignParser
+
+LinkAlign schema linking: two modes—pipeline (single LLM extraction) or agent (multi-agent debate between data analyst and database scientist over schema context). turn_n and link_num scale with db_size when automatic. Supports parallel slice parse for large schemas. Advantage: agent mode improves link quality via debate; drawback: agent mode requires many LLM calls.
+
+## Inputs
+- `schema`: DB schema. If absent, loaded from dataset.
+
+## Output
+`schema_links`
+
+## Steps
+1. Load schema, build schema context.
+2. Generate schema links via SchemaLinkingTool (pipeline: single pass; agent: multi-turn debate → summary).
+3. Parse and deduplicate schema_links.
+4. Return `schema_links`.
+"""
+
     def __init__(
             self,
             dataset: Dataset = None,

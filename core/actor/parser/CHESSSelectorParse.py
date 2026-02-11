@@ -20,6 +20,23 @@ class CHESSSelectorParser(BaseParser):
     """
     NAME = "CHESSSelectorParser"
 
+    SKILL = """# CHESSSelectorParser
+
+CHESS-SQL schema selection: three-stage coarse-to-fine pipeline—filter columns (per-column relevance via LLM + evidence), select tables, select columns—each stage uses question and evidence as hint. Optional parallel for column filtering. Advantage: granular pruning for large schemas; drawback: many LLM calls (one per column in step 1).
+
+## Inputs
+- `schema`: DB schema. If absent, loaded from dataset.
+
+## Output
+`schema_links`
+
+## Steps
+1. Filter columns: per-column LLM judges relevant/irrelevant (question + evidence); keep relevant only.
+2. Select tables: from filtered schema, LLM picks needed tables.
+3. Select columns: from selected tables, LLM picks needed columns.
+4. Return `schema_links` (table.column list).
+"""
+
     FILTER_COLUMN_TEMPLATE = """You are a detail-oriented data scientist tasked with evaluating the relevance of database column information for answering specific SQL query question based on provided hint.
 
 Your goal is to assess whether the given column details are pertinent to constructing an SQL query to address the question informed by the hint. Label the column information as "relevant" if it aids in query formulation, or "irrelevant" if it does not.
@@ -230,6 +247,10 @@ Only output a json as your response."""
         response = self._llm_call(prompt)
         result = self._parse_json(response)
         selected_tables = result.get("table_names", [])
+        if not isinstance(selected_tables, list):
+            selected_tables = []
+        # Only keep tables that exist in tentative_schema
+        selected_tables = [t for t in selected_tables if t in tentative_schema]
         tentative_schema = {t: tentative_schema.get(t, []) for t in selected_tables}
         table_links = [f"{t}.{c}" for t, cols in tentative_schema.items() for c in cols]
         self.log_schema_links(data_logger, table_links, stage="Select tables")
@@ -261,6 +282,7 @@ Only output a json as your response."""
     def merge_results(self, results: List):
         if not results:
             logger.info("Input results empty!")
+            return []
 
         merge_result = []
         for row in results:

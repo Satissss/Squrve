@@ -13,6 +13,24 @@ from llama_index.core.llms.llm import LLM
 class RSLSQLBiDirParser(BaseParser):
     NAME = "RSLSQLBiDirParser"
 
+    SKILL = """# RSLSQLBiDirParser
+
+RSL-SQL bidirectional schema linking: forward (LLM selects tables + top-15 columns) and reverse (LLM generates preliminary SQL; extract links from SQL). Merges three sources—LLM selection, evidence text extraction, SQL extraction—then filters by db_schema. Uses sample data and evidence in prompts. Advantage: SQL-as-reverse-signal enriches links; drawback: requires preliminary SQL generation (extra LLM call).
+
+## Inputs
+- `schema`: DB schema. If absent, loaded from dataset.
+
+## Output
+`schema_links` (dict: `{tables, columns}`)
+
+## Steps
+1. Table/column selection: LLM identifies tables and top-15 columns per table.
+2. Preliminary SQL generation: LLM generates SQL from selection + examples.
+3. Extract links from evidence text and from generated SQL.
+4. Merge and filter against db_schema.
+5. Return `schema_links`.
+"""
+
     TABLE_AUG_INSTRUCTION = '''
 You are an intelligent agent responsible for identifying the database tables involved based on the user's questions and database structure information. Your main tasks are:
 

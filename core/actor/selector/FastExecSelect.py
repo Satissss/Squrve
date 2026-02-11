@@ -18,6 +18,23 @@ class FastExecSelector(BaseSelector):
 
     NAME = "FastExecSelector"
 
+    SKILL = """# FastExecSelector
+
+Execution-only selection: no LLM. Execute all candidates, keep successful runs, group by identical result. Pick fastest SQL from the most frequent result group; if all results differ (no consensus), pick fastest overall. Advantage: fast, no LLM cost; drawback: requires DB connectivity, assumes execution result equals correctness.
+
+## Inputs
+- `pred_sql`: List of SQL candidates to select from.
+
+## Output
+`pred_sql` (single selected SQL)
+
+## Steps
+1. Execute all candidates; keep only successful runs.
+2. Group by identical execution result.
+3. If one group is largest: pick fastest SQL from that group; else (all differ): pick fastest overall.
+4. Return selected SQL.
+"""
+
     def __init__(
             self,
             dataset: Dataset = None,

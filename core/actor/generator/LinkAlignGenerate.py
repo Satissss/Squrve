@@ -24,6 +24,26 @@ class LinkAlignGenerator(BaseGenerator):
 
     NAME = "LinkAlignGenerator"
 
+    SKILL = """# LinkAlignGenerator
+
+LinkAlign adapts DIN-SQL for scalable real-world DBs: uses LinkAlignReducer to prune large schemas and LinkAlignParser for schema linking, injects external prior knowledge, then generates with a single NESTED-style prompt and debugs via execution feedback (execute→get error→fix, multi-turn). Advantage: scales to large schemas and real DBs; drawback: depends on DB connectivity for feedback debugging.
+
+## Inputs
+- `schema_links`: Precomputed links from question to tables/columns/values. If absent, produced by LinkAlignParser.
+- `sub_questions`: Sub-questions for decomposition. If absent, parsed from classification output.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Schema reduction via LinkAlignReducer (when loading schema from dataset).
+2. Schema linking (skip if `schema_links` provided).
+3. Sub-question extraction via classification (skip if `sub_questions` provided).
+4. SQL generation with NESTED-style hard prompt (optional reasoning_examples).
+5. Feedback-based debugging: execute SQL, fix by error feedback, up to `debug_turn_n` rounds.
+6. Return `pred_sql`.
+"""
+
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
@@ -73,7 +93,10 @@ class LinkAlignGenerator(BaseGenerator):
     def load_external_knowledge(cls, external: Union[str, Path] = None):
         if not external:
             return None
-        external = load_dataset(external)
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
         if external and len(external) > 50:
             external = "####[External Prior Knowledge]:\n" + external
             return external

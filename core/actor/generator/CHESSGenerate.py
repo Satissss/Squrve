@@ -75,6 +75,7 @@ class CHESSGenerator(BaseGenerator):
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/pred_sql",
             config: Optional[CHESSConfig] = None,
+            use_external: bool = True,
             sql_post_process_function: Optional[Callable] = None,
             db_path: Optional[Union[str, PathLike]] = None,
             credential: Optional[Dict] = None,
@@ -85,6 +86,7 @@ class CHESSGenerator(BaseGenerator):
         self.is_save = is_save
         self.save_dir: Union[str, PathLike] = save_dir
         self.config = config or CHESSConfig()
+        self.use_external: bool = use_external
         self.sql_post_process_function: Optional[Callable] = sql_post_process_function
 
         # Initialize database path and credentials
@@ -102,6 +104,18 @@ class CHESSGenerator(BaseGenerator):
         else:
             self.credential = None
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def _build_evidence(self, question: str, schema_text: str, keywords: List[str], dataset_evidence: str) -> str:
         """Construct lightweight evidence/chain-of-thought style hints.
@@ -500,6 +514,13 @@ class CHESSGenerator(BaseGenerator):
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get("db_id", "")
         evidence = row.get('evidence', '')
+
+        # evidence 与 external 实为同一类先验知识，提示词使用 evidence (HINT)，故将 external 赋给 evidence
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("已加载外部知识")
 
         logger.debug(f"处理问题: {question[:100]}... (数据库: {db_id}, 类型: {db_type})")
 
