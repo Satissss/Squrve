@@ -6,11 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/agent/BaseAgent.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/agent/BaseAgent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/agent/WorkflowAgent.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/agent/WorkflowAgent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/base.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/base.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/actor/generator/DAILSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/DAILSQLGenerate.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/core/engine.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/engine.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -820,7 +816,7 @@
       <workItem from="1770554787196" duration="50000" />
       <workItem from="1770602993163" duration="15769000" />
       <workItem from="1770703637601" duration="21445000" />
-      <workItem from="1770778222841" duration="5613000" />
+      <workItem from="1770778222841" duration="13243000" />
     </task>
     <servers />
   </component>
