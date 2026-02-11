@@ -173,3 +173,16 @@ class ActorPool:
     @classmethod
     def get_all_actors(cls):
         return cls._registered_actor_lis
+
+    @classmethod
+    def get_actor_by_name(cls, name):
+        for base_actor in cls.get_all_actors():
+            checker = getattr(base_actor, "syntax_check", None)
+            if callable(checker) and checker(name):
+                if not hasattr(base_actor, "get_all_actors"):
+                    continue
+                for actor in base_actor.get_all_actors():
+                    if getattr(actor, "NAME", None) == name:
+                        return actor
+
+        raise ValueError(f"No actor with name {name} found")

@@ -11,15 +11,11 @@ class BaseAgent(Actor):
             self,
             dataset: Dataset = None,
             llm=None,
-            is_save: bool = True,
-            save_dir: Union[str, PathLike] = "...",
             **kwargs
     ):
         """Initialize base decomposer with common parameters."""
         self.dataset = dataset
         self.llm = llm
-        self.is_save = is_save
-        self.save_dir = save_dir
         self.kwargs = kwargs
 
     @abstractmethod

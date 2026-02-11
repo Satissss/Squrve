@@ -1832,7 +1832,7 @@ def get_example_selector(selector_type):
 # Main Class
 @BaseGenerator.register_actor
 class DAILSQLGenerate(BaseGenerator):
-    NAME = "DAILSQL"
+    NAME = "DAILSQLGenerator"
     OUTPUT_NAME = "pred_sql"
 
     @property

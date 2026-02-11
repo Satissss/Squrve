@@ -35,7 +35,9 @@ class Engine:
         "OptimizeTask",
         "optimize",
         "SelectTask",
-        "select"
+        "select",
+        "AgentTask",
+        "agent"
     ]
 
     def __init__(
@@ -333,6 +335,9 @@ class Engine:
         elif task_type in ("SelectTask", "select"):
             task = self.generate_select_task(**init_args)
 
+        elif task_type in ("AgentTask", "agent"):
+            task = self.generate_agent_task(**init_args)
+
         return task
 
     def generate_generate_task(self, **kwargs):
@@ -411,6 +416,12 @@ class Engine:
             kwargs["output_format"] = self.router.select_output_format if hasattr(self.router, 'select_output_format') else "str"
 
         task = SelectTask(**kwargs)
+        return task
+
+    def generate_agent_task(self, **kwargs):
+        from core.task.meta.AgentTask import AgentTask
+
+        task = AgentTask(**kwargs)
         return task
 
     def init_complex_task(
