@@ -158,7 +158,7 @@ class BaseParser(Actor):
         return cls._registered_actor_lis
 
 def parallel_slice_parse(func):
-    slice_size = 100  # todo adjust to a external params. needed to pass
+    slice_size = 500  # todo adjust to a external params. needed to pass
     max_workers = 5  # 最大线程数
 
     def wrapper(self, item, schema: Union[str, PathLike, Dict, List] = None, data_logger=None, **kwargs):

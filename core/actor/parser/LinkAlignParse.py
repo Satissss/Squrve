@@ -44,7 +44,7 @@ LinkAlign schema linking: two modes—pipeline (single LLM extraction) or agent 
             self,
             dataset: Dataset = None,
             llm: Union[LLM, List[LLM]] = None,
-            output_format: str = "str",  # output in `list` or `str`
+            output_format: str = "list",  # output in `list` or `str`
             is_save: bool = True,
             save_dir: Union[str, PathLike] = "../files/schema_links",
             use_external: bool = False,

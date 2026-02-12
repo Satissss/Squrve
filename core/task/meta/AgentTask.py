@@ -47,6 +47,10 @@ class AgentTask(MetaTask):
             from core.actor.agent.WorkflowAgent import MultiWorkflowAgent
             actor = MultiWorkflowAgent(**agent_args)
             return actor
+        elif actor_type in ("ForkGatherAgent", "ForkGather"):
+            from core.actor.agent.ForkGatherAgent import ForkGatherAgent
+            actor = ForkGatherAgent(**agent_args)
+            return actor
 
         warnings.warn(f"The decompose_type `{actor_type}` is not available.", category=UserWarning)
         return None

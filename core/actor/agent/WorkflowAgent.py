@@ -13,7 +13,8 @@ from typing import Optional, Union, List, Dict, Any
 from llama_index.core.llms import LLM
 
 from core.actor.agent.BaseAgent import BaseAgent
-from core.actor.base import ActorPool
+from core.actor.base import ActorPool, Actor
+from core.actor.selector import FastExecSelector
 from core.data_manage import Dataset
 from core.actor.nest.tree import TreeActor
 from core.actor.nest.pipeline import PipelineActor
@@ -56,7 +57,6 @@ class WorkflowAgent(BaseAgent):
     """
 
     NAME: str = "WorkflowAgent"
-    OUTPUT_NAME: str = ""  # Dynamically determine
 
     def __init__(
             self,
@@ -147,14 +147,13 @@ class WorkflowAgent(BaseAgent):
         try:
             pipe_actor = self.__init_actors__()
             res = pipe_actor.act(item, **kwargs)
-            self.OUTPUT_NAME = pipe_actor.output_name
-
+            check = self.__actor_check__(pipe_actor)
+            if not check:
+                return ""
             return res
         except Exception as e:
             logger.exception("WorkflowAgent failed to initialize or execute actors: %s", e)
-            self.OUTPUT_NAME = "None"
-
-            return None
+            return ""
 
 
 class MultiWorkflowAgent(BaseAgent):
@@ -191,7 +190,6 @@ class MultiWorkflowAgent(BaseAgent):
     """
 
     NAME: str = "MultiWorkflowAgent"
-    OUTPUT_NAME: str = ""  # Dynamically determined from last pipeline step
 
     def __init__(
             self,
@@ -299,9 +297,10 @@ class MultiWorkflowAgent(BaseAgent):
         try:
             pipe_actor = self.__init_actors__()
             res = pipe_actor.act(item, **kwargs)
-            self.OUTPUT_NAME = pipe_actor.output_name
+            check = self.__actor_check__(pipe_actor)
+            if not check:
+                return ""
             return res
         except Exception as e:
             logger.exception("MultiWorkflowAgent failed to initialize or execute actors: %s", e)
-            self.OUTPUT_NAME = "None"
-            return None
+            return ""
