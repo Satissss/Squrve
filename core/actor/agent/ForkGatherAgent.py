@@ -24,7 +24,8 @@ class ForkGatherAgent(BaseAgent):
             select_type: str = "FastExecSelector",
             use_external: bool = True,
             max_n: Optional[int] = None,
-            open_parallel: bool = False,  # todo when use multiple workflows, how to merge the final result is still unsolved.
+            open_parallel: bool = True,
+            rollout_llm_args: Dict[str, Any] = None,
             **kwargs
     ):
         """Initialize ForkGatherAgent.
@@ -42,6 +43,7 @@ class ForkGatherAgent(BaseAgent):
         self.max_n = max_n
         self.use_external = use_external
         self.open_parallel = open_parallel
+        self.rollout_llm_args = rollout_llm_args
         self.check: bool = self._check_select_type()
 
     @classmethod
@@ -189,7 +191,7 @@ You are encouraged to select templates from the candidate set; however, you may 
     - First, reason step by step to determine the final Actor list.
     - Provide your reasoning within `<think>...</think>`.
     - Provide the final result strictly within `<answer>...</answer>`.
-    - The final answer must be a **Python JSON Object**, enclosed exactly as ```list[...]``` inside `<answer>`.
+    - The final answer must be a **Python JSON Object**, enclosed exactly as ```list[...]``` inside `<answer>`, such as ```list["LinkAlignGenerator"]```.
 
 2. Actor Legality:
     - Only use Actors from the `Available Actors`; any unlisted Actor is invalid.
@@ -218,6 +220,15 @@ You are encouraged to select templates from the candidate set; however, you may 
 
         return prompt
 
+    def _init_rollout_llm(self):
+        if not self.rollout_llm_args:
+            return self.llm
+
+        from core.llm.OpenaiModel import OpenaiModel
+        llm = OpenaiModel(**self.rollout_llm_args)
+
+        return llm
+
     def _fork(self, item, data_logger=None):
         """Rollout multiple candidate workflows via LLM; each workflow is an actor pipeline."""
         row = self.dataset[item]
@@ -240,9 +251,10 @@ You are encouraged to select templates from the candidate set; however, you may 
 
         prompt = self._generate_prompt(question, external, schema, db_size)
         can_workflows = {}
+        rollout_llm = self._init_rollout_llm()
         for ind in range(self.max_n):
             try:
-                res = self.llm.complete(prompt).text
+                res = rollout_llm.complete(prompt).text
                 flag, actor_lis = self.validate_response_str(res)
                 if flag:
                     can_workflows[f"W{ind}"] = {"actor_lis": actor_lis}
