@@ -16,12 +16,33 @@ class LinkAlignOptimizer(BaseOptimizer):
 
     NAME = "LinkAlignOptimizer"
 
+    SKILL = """# LinkAlignOptimizer
+
+LinkAlignOptimizer refines SQL via feedback-only loop: execute → if error, use db-type-specific prompt (sqlite/big_query/snowflake) with error history → LLM fixes → retry up to debug_turn_n. Advantage: db-type-specific prompts; drawback: depends on DB.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+- `schema_links`: If absent, loaded from row.
+- `pred_sql`: SQL(s) to optimize. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (list of SQL)
+
+## Steps
+1. Load schema, schema_links, pred_sql.
+2. For each SQL: _sql_debug_by_feedback (up to debug_turn_n turns).
+3. _sql_debug_by_feedback: execute → if error: db-type prompt with error history → LLM fixes → retry.
+4. Optional parallel processing for multiple SQLs.
+5. Save and return pred_sql.
+"""
+
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
             llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/optimized_sql",
+            use_external: bool = True,
             use_feedback_debug: bool = True,
             debug_turn_n: int = 3,
             open_parallel: bool = True,
@@ -29,8 +50,22 @@ class LinkAlignOptimizer(BaseOptimizer):
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
+        self.use_external: bool = use_external
         self.use_feedback_debug = use_feedback_debug
         self.debug_turn_n = debug_turn_n
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def _sql_debug_by_experience(
             self,
@@ -309,6 +344,12 @@ For the given question, analyze and refine the erroneous SQL statement using the
 
         row = self.dataset[item]
         question = row['question']
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question = question + "\n" + external_knowledge
+                logger.debug("已加载外部知识")
+
         db_type = row['db_type']
         db_id = row.get("db_id")
         db_path = Path(self.dataset.db_path) / (

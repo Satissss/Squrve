@@ -160,6 +160,19 @@ Only output a json as your response."""
         self.open_parallel = open_parallel
         self.max_workers = max_workers
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
+
     def _format_column_profile(self, schema_row: pd.Series, db_type: str) -> str:
         """Format a single column profile for LLM evaluation."""
         table = schema_row['table_name']
@@ -202,6 +215,13 @@ Only output a json as your response."""
         question = data_row["question"]
         evidence = data_row.get("evidence", "")
         db_type = data_row.get("db_type", "sqlite")
+
+        # evidence 与 external 实为同一类先验知识，提示词使用 evidence (HINT)，故将 external 赋给 evidence
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(data_row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("已加载外部知识")
 
         # Use base class method to process schema
         schema_df = self.process_schema(item, schema)

@@ -15,12 +15,33 @@ from core.utils import sql_clean, parse_schema_from_df, parse_list_from_str, par
 class AdaptiveOptimizer(BaseOptimizer):
     NAME = "AdaptiveOptimizer"
 
+    SKILL = """# AdaptiveOptimizer
+
+AdaptiveOptimizer refines SQL via decomposition-based feedback: decomposes SQL into atomic meta-SQLs, executes each, then fixes syntax errors (isolate via atomic results) or logic errors (with optional domain knowledge, quit when no change). Two-phase loop: syntax fix when exec fails, logic fix when exec succeeds. Advantage: error isolation via atomic decomposition; drawback: many exec calls, depends on DB.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+- `schema_links`: Precomputed links. When db_size > 500, used as filter_schema instead of full schema.
+- `pred_sql`: SQL(s) to optimize. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (list of SQL)
+
+## Steps
+1. Load schema, schema_links, pred_sql.
+2. For each SQL: _optimize_single_sql (up to debug_turn_n turns).
+3. _optimize_single_sql: _get_meta_sql_feedback (decompose → execute meta-SQLs) → if syntax error: _refine_syntax_schema_error; if exec ok: _refine_logic_error (optional, quit_flag when done).
+4. Optional parallel processing for multiple SQLs.
+5. Save and return pred_sql.
+"""
+
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
             llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/optimized_sql",
+            use_external: bool = True,
             debug_turn_n: int = 2,
             open_parallel: bool = True,
             max_workers: Optional[int] = None,
@@ -32,12 +53,26 @@ class AdaptiveOptimizer(BaseOptimizer):
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
+        self.use_external: bool = use_external
         self.debug_turn_n = debug_turn_n
         self.quit_flag = quit_flag
         self.skip_logic_refine = skip_logic_refine
         self.domain = domain
         self.domain_save_dir = domain_save_dir
         self.top_k = top_k
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     @staticmethod
     def _build_exec_args(
@@ -570,6 +605,12 @@ Draft the corrected SQL.
 
         row = self.dataset[item]
         question = row['question']
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                question = question + "\n" + external_knowledge
+                logger.debug("已加载外部知识")
+
         db_type = row['db_type']
         db_id = row.get("db_id")
         db_size = row.get("db_size", -1)

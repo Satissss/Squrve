@@ -249,7 +249,7 @@ class RSLSQLGenerator(BaseGenerator):
 
     NAME = "RSLSQLGenerator"
 
-    SKILL = """# RLSQLGenerator
+    SKILL = """# RSLSQLGenerator
 
 RSL-SQL reinforces schema linking via bidirectional linking (evidence + preliminary SQL + LLM) and information augmentation (table, keyword, condition), then binary-selection between two SQL candidates and self-correction for empty results. Advantage: robust schema linking; drawback: many LLM calls, depends on DB for selection and correction.
 

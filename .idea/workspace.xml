@@ -7,6 +7,7 @@
     <list default="true" id="cfb74d7b-3612-4e7d-b8b7-dbf9e8da0202" name="Changes" comment="test dev">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/core/actor/generator/RSLSQLGenerate.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/generator/RSLSQLGenerate.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" beforeDir="false" afterPath="$PROJECT_DIR$/core/actor/parser/CHESSSelectorParse.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -134,7 +135,7 @@
     "Python.rollout_data.executor": "Run",
     "Python.run (1).executor": "Run",
     "Python.run.executor": "Run",
-    "Python.run2.executor": "Run",
+    "Python.run2.executor": "Debug",
     "Python.run_.executor": "Debug",
     "Python.run_2.executor": "Debug",
     "Python.run_ambidb.executor": "Run",
@@ -819,7 +820,7 @@
       <workItem from="1770703637601" duration="21445000" />
       <workItem from="1770778222841" duration="28038000" />
       <workItem from="1770864817025" duration="12835000" />
-      <workItem from="1770947106377" duration="3099000" />
+      <workItem from="1770947106377" duration="5366000" />
     </task>
     <servers />
   </component>
@@ -906,33 +907,38 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>495</line>
+          <line>514</line>
           <option name="timeStamp" value="197" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>630</line>
+          <line>649</line>
           <option name="timeStamp" value="198" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>265</line>
+          <line>284</line>
           <option name="timeStamp" value="199" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>291</line>
+          <line>310</line>
           <option name="timeStamp" value="200" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/decomposer/RecursiveDecompose.py</url>
-          <line>530</line>
+          <line>549</line>
           <option name="timeStamp" value="202" />
         </line-breakpoint>
         <line-breakpoint enabled="true" type="python-line">
           <url>file://$PROJECT_DIR$/core/actor/generator/RSLSQLGenerate.py</url>
-          <line>856</line>
+          <line>878</line>
           <option name="timeStamp" value="203" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="python-line">
+          <url>file://$PROJECT_DIR$/core/actor/agent/ForkGatherAgent.py</url>
+          <line>151</line>
+          <option name="timeStamp" value="208" />
         </line-breakpoint>
       </breakpoints>
       <breakpoints-defaults>
@@ -1001,7 +1007,7 @@
     <SUITE FILE_PATH="coverage/QueryFlow$tt.coverage" NAME="tt Coverage Results" MODIFIED="1748335668165" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/ttt" />
     <SUITE FILE_PATH="coverage/QueryFlow$evaluate.coverage" NAME="evaluate Coverage Results" MODIFIED="1747704013340" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/tttt" />
     <SUITE FILE_PATH="coverage/Squrve$error_analysis.coverage" NAME="error_analysis Coverage Results" MODIFIED="1765554398840" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/booksql" />
-    <SUITE FILE_PATH="coverage/Squrve$run2.coverage" NAME="run2 Coverage Results" MODIFIED="1770950758684" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
+    <SUITE FILE_PATH="coverage/Squrve$run2.coverage" NAME="run2 Coverage Results" MODIFIED="1770953194914" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/startup_run" />
     <SUITE FILE_PATH="coverage/Squrve$print_actors.coverage" NAME="print_actors Coverage Results" MODIFIED="1764766629859" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/squrl" />
     <SUITE FILE_PATH="coverage/Squrve$run_test.coverage" NAME="run_test Coverage Results" MODIFIED="1758370544728" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/experiment" />
     <SUITE FILE_PATH="coverage/Squrve$gather_label_moderate.coverage" NAME="gather_label_moderate Coverage Results" MODIFIED="1766419326336" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/test_app" />

@@ -16,6 +16,26 @@ from core.utils import parse_schema_from_df
 class RSLSQLOptimizer(BaseOptimizer):
     NAME = "RSLSQLOptimizer"
 
+    SKILL = """# RSLSQLOptimizer
+
+RSLSQLOptimizer refines SQL via RSL-style augmentation and self-correction: key_word_augmentation, condition_augmentation → enrich table_info → self_correction (execute → if empty, LLM fixes; repeat up to debug_turn_n). Advantage: augmentation enriches context; drawback: many LLM calls, depends on DB.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+- `schema_links`: If absent, loaded from row.
+- `pred_sql`: SQL(s) to optimize. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (list of SQL)
+
+## Steps
+1. Load schema, schema_links, pred_sql.
+2. For each SQL: optimize_single_sql.
+3. optimize_single_sql: key_word_augmentation, condition_augmentation → self_correction (execute → if empty fix by LLM; repeat).
+4. Optional parallel processing for multiple SQLs.
+5. Save and return pred_sql.
+"""
+
     SELF_CORRECTION_PROMPT = '''You are an AI agent responsible for generating the correct SQL statements based on the following information:
 - A small number of SQL Q&A pairs: used for reference and learning common query patterns.
 - Database structure information: including table names, fields, relationships between tables (such as foreign keys, etc.).
@@ -163,6 +183,19 @@ You are an intelligent agent responsible for identifying the conditions in the u
 
         # Load column meanings
         self.column_meaning = load_dataset("files/datasets/column_meaning.json") or {}
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def parse_json_response(self, response):
         """
@@ -434,7 +467,8 @@ You are an intelligent agent responsible for identifying the conditions in the u
             schema_links: Union[str, List] = "None",
             db_id: Optional[str] = None,
             db_path: Optional[Union[str, Path]] = None,
-            credential: Optional[dict] = None
+            credential: Optional[dict] = None,
+            item: Optional[int] = None
     ) -> str:
         try:
             # Since schema is already a string format, we need to work with it directly
@@ -446,11 +480,15 @@ You are an intelligent agent responsible for identifying the conditions in the u
             # Get evidence and example from dataset if available
             evidence = ""
             example = ""
-            if self.dataset and db_id:
-                row = self.dataset[db_id] if db_id in self.dataset else None
+            if self.dataset and item is not None:
+                row = self.dataset[item]
                 if row:
-                    evidence = row.get('evidence', '') or (
-                        load_dataset(row.get('external', '')) if self.use_external else '')
+                    evidence = row.get('evidence', '')
+                    if self.use_external:
+                        external_knowledge = self.load_external_knowledge(row.get("external", None))
+                        if external_knowledge:
+                            evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                            logger.debug("已加载外部知识")
                     example = load_dataset(row.get('reasoning_examples', '')) if self.use_few_shot else ''
 
             word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
@@ -507,7 +545,7 @@ You are an intelligent agent responsible for identifying the conditions in the u
             
         def process_sql(sql):
             return self.optimize_single_sql(
-                sql, question, schema, db_type, schema_links, db_id, db_path, credential
+                sql, question, schema, db_type, schema_links, db_id, db_path, credential, item=item
             )
 
         optimized_sqls = []

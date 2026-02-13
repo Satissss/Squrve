@@ -17,6 +17,26 @@ class CHESSOptimizer(BaseOptimizer):
 
     NAME = "CHESSOptimizer"
 
+    SKILL = """# CHESSOptimizer
+
+CHESSOptimizer refines SQL via execute→revise loop: execute SQL, if error or empty pass (question, schema, sql, result, evidence) to CHESS REVISE_TEMPLATE, repeat up to debug_turn_n until exec succeeds with non-empty result. Advantage: CHESS-style structured prompt; drawback: depends on DB.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+- `schema_links`: Optional (not used in optimization logic).
+- `pred_sql`: SQL(s) to optimize. If absent, loaded from dataset.
+
+## Output
+`pred_sql` (list of SQL)
+
+## Steps
+1. Load schema, pred_sql; load evidence (with optional external).
+2. For each SQL: _optimize_single_sql (up to debug_turn_n turns).
+3. _optimize_single_sql: execute → if error or empty: _revise_sql (CHESS template) → retry.
+4. Optional parallel processing for multiple SQLs.
+5. Save and return pred_sql.
+"""
+
     REVISE_TEMPLATE = '''**Task Description:**
 You are an SQL database expert tasked with correcting a SQL query. A previous attempt to run a query did not yield the correct results, either due to errors in execution or because the result returned was empty or unexpected. Your role is to analyze the error based on the provided database schema and the details of the failed execution, and then provide a corrected version of the SQL query.
 
@@ -288,13 +308,28 @@ SELECT column FROM table WHERE condition
             llm: Optional[LLM] = None,
             is_save: bool = True,
             save_dir: Union[str, Path] = "../files/optimized_sql",
+            use_external: bool = True,
             debug_turn_n: int = 3,
             open_parallel: bool = True,
             max_workers: Optional[int] = None,
             **kwargs
     ):
         super().__init__(dataset, llm, is_save, save_dir, open_parallel, max_workers, **kwargs)
+        self.use_external: bool = use_external
         self.debug_turn_n = debug_turn_n
+
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     def _revise_sql(
             self,
@@ -390,6 +425,11 @@ SELECT column FROM table WHERE condition
         db_type = row.get('db_type', 'sqlite')
         db_id = row.get("db_id")
         evidence = row.get('evidence', '')
+        if self.use_external:
+            external_knowledge = self.load_external_knowledge(row.get("external", None))
+            if external_knowledge:
+                evidence = evidence + "\n" + external_knowledge if evidence else external_knowledge
+                logger.debug("已加载外部知识")
 
         db_path = None
         if hasattr(self.dataset, 'db_path') and self.dataset.db_path:
