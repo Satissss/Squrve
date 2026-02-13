@@ -16,25 +16,6 @@ from core.utils import parse_schema_from_df
 class RSLSQLOptimizer(BaseOptimizer):
     NAME = "RSLSQLOptimizer"
 
-    SKILL = """# RSLSQLOptimizer
-
-RSLSQLOptimizer refines SQL via RSL-style augmentation and self-correction: key_word_augmentation, condition_augmentation → enrich table_info → self_correction (execute → if empty, LLM fixes; repeat up to debug_turn_n). Advantage: augmentation enriches context; drawback: many LLM calls, depends on DB.
-
-## Inputs
-- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
-- `schema_links`: If absent, loaded from row.
-- `pred_sql`: SQL(s) to optimize. If absent, loaded from dataset.
-
-## Output
-`pred_sql` (list of SQL)
-
-## Steps
-1. Load schema, schema_links, pred_sql.
-2. For each SQL: optimize_single_sql.
-3. optimize_single_sql: key_word_augmentation, condition_augmentation → self_correction (execute → if empty fix by LLM; repeat).
-4. Optional parallel processing for multiple SQLs.
-5. Save and return pred_sql.
-"""
 
     SELF_CORRECTION_PROMPT = '''You are an AI agent responsible for generating the correct SQL statements based on the following information:
 - A small number of SQL Q&A pairs: used for reference and learning common query patterns.
@@ -56,7 +37,7 @@ Your main tasks are:
 
 3. Analyze database structure information:
     - Based on the database structure information, understand the fields and relationships of the table, and build the basic framework of the SQL statement.
-
+s
 4. Check sample data:
     - Analyze the data characteristics based on the first three rows of the table values to help determine how to construct query conditions and filter results.
 
