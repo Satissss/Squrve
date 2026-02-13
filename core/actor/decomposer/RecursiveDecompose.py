@@ -27,6 +27,25 @@ from core.actor.decomposer.decompose_utils import normalize_sub_questions
 class RecursiveDecomposer(BaseDecomposer):
     NAME = "RecursiveDecomposer"
 
+    SKILL = """# RecursiveDecomposer
+
+RecursiveDecomposer uses DAG-style recursive decomposition: resolve tables (from `schema_links` or LLM select/remove), Stage 0 (one SQL per table), Stage 1-n (recursive merge via JOIN until single final SQL). Advantage: stepwise table-driven decomposition; drawback: many LLM calls, depends on DB for optional feedback.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+- `schema_links`: Precomputed links (tables or table.column list). If absent, produced by _init_tables.
+
+## Output
+`sub_questions`
+
+## Steps
+1. Load schema; load external knowledge if use_external.
+2. Resolve tables: parse from `schema_links` (or path) or _init_tables (LLM select + remove).
+3. Filter schema by tables.
+4. generate_decomposition: Stage 0 → Stage 1-n recursive merge.
+5. normalize_sub_questions, save and return sub_questions.
+"""
+
     def __init__(
             self,
             dataset: Dataset = None,

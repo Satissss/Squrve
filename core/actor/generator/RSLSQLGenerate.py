@@ -1,15 +1,18 @@
 from os import PathLike
-from typing import Union, Optional, Dict, Any
+from typing import Union, Optional, Dict, Any, List
 import json
 import pandas as pd
 from pathlib import Path
 from loguru import logger
 import re
 
+from core.actor.decomposer.decompose_utils import format_sub_questions
 from core.actor.generator.BaseGenerate import BaseGenerator
 from core.data_manage import Dataset, load_dataset, single_central_process
 from core.utils import save_dataset
 from core.db_connect import get_sql_exec_result
+from core.actor.parser.parse_utils import normalize_schema_links
+
 
 # Prompts from Instruction.py
 TABLE_AUG_INSTRUCTION = '''
@@ -242,7 +245,29 @@ Your answer should be returned by json format.
 
 @BaseGenerator.register_actor
 class RSLSQLGenerator(BaseGenerator):
+    """RSL-SQL method implementation: Reinforcement Schema Linking with multi-stage augmentation and self-correction."""
+
     NAME = "RSLSQLGenerator"
+
+    SKILL = """# RLSQLGenerator
+
+RSL-SQL reinforces schema linking via bidirectional linking (evidence + preliminary SQL + LLM) and information augmentation (table, keyword, condition), then binary-selection between two SQL candidates and self-correction for empty results. Advantage: robust schema linking; drawback: many LLM calls, depends on DB for selection and correction.
+
+## Inputs
+- `schema_links`: Precomputed links (tables/columns). If absent, produced by table_column_selection.
+- `sub_questions`: Sub-questions for decomposition. If provided, injected into SQL generation prompts.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Preliminary SQL: table_column_selection (or use `schema_links`) → preliminary_sql_gen.
+2. Bidirectional schema linking: merge links from evidence, preliminary SQL, and LLM output; filter by actual schema.
+3. Information augmentation: table_column_selection, key_word_augmentation, condition_augmentation → sql_generation_aug.
+4. Binary selection: execute preliminary SQL and augmented SQL → LLM picks the better one.
+5. Self-correction: execute → if empty result, fix by LLM; repeat up to max iterations.
+6. Return `pred_sql`.
+"""
 
     def __init__(
             self,
@@ -280,6 +305,18 @@ class RSLSQLGenerator(BaseGenerator):
         else:
             self.credential = None
 
+    @classmethod
+    def load_external_knowledge(cls, external: Union[str, Path] = None):
+        if not external:
+            return None
+        try:
+            external = load_dataset(external)
+        except FileNotFoundError:
+            logger.debug("External file not found, treat it as content.")
+        if external and len(external) > 50:
+            external = "####[External Prior Knowledge]:\n" + external
+            return external
+        return None
 
     @property
     def name(self):
@@ -557,17 +594,36 @@ class RSLSQLGenerator(BaseGenerator):
         return ddls_data
 
     def get_foreign_key_from_schema(self, schema_df, tables=None):
-        """从schema DataFrame中提取外键信息"""
+        """从schema DataFrame中提取外键信息，参考 parse_schema_from_df 的外键加载逻辑"""
         if schema_df is None or schema_df.empty:
             return "#\n# "
 
         if tables is None:
             tables = self.get_all_tables_from_schema(schema_df)
 
-        # 这里需要根据实际的schema结构来提取外键信息
-        # 由于用户提供的schema格式中没有明确的外键信息，我们返回空的外键信息
-        foreign_str = "#\n# "
-        return foreign_str.strip()
+        foreign_key_lines = []
+        for _, row in schema_df.iterrows():
+            table_name = row.get('table_name', '')
+            col_name = row.get('column_name', '')
+            if table_name not in tables:
+                continue
+
+            # 格式1: foreign_key 为字符串，如 "[ref_table.ref_col]"（参考 parse_schema_from_df）
+            foreign_key = row.get("foreign_key", "")
+            if foreign_key and isinstance(foreign_key, str):
+                keys = re.findall(r"\[(.*?)\]", foreign_key)
+                for key in keys:
+                    foreign_key_lines.append(f"{table_name}({col_name}) references {key}")
+            else:
+                # 格式2: foreign_key_table + foreign_key_column 分开存储
+                fk_table = row.get("foreign_key_table") or row.get("referenced_table")
+                fk_col = row.get("foreign_key_column") or row.get("referenced_column")
+                if fk_table and fk_col and str(fk_table).strip() and str(fk_col).strip():
+                    foreign_key_lines.append(f"{table_name}({col_name}) references {fk_table}.{fk_col}")
+
+        if foreign_key_lines:
+            return "# " + ";\n# ".join(foreign_key_lines) + ";\n# "
+        return "#\n# "
 
     def get_explanation_from_schema(self, schema_df, tables, columns):
         """从schema DataFrame中获取列描述信息"""
@@ -651,10 +707,14 @@ class RSLSQLGenerator(BaseGenerator):
         response = self.llm.complete(TABLE_AUG_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)
 
-    def preliminary_sql_gen(self, table_info, table_column, example, question, evidence):
+    def preliminary_sql_gen(self, table_info, table_column, example, question, evidence, sub_questions: str = ""):
         table_info += f'### tables: {table_column["tables"]}\n'
         table_info += f'### columns: {table_column["columns"]}\n'
-        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        question_part = "### definition: " + evidence
+        if isinstance(sub_questions, str) and sub_questions.strip():
+            question_part += f"\n### Sub-questions (decomposition for reference):\n{sub_questions.strip()}"
+        question_part += "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        prompt = example.strip() + "\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n" + table_info.strip() + "\n\n" + question_part
         response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
@@ -743,12 +803,16 @@ class RSLSQLGenerator(BaseGenerator):
         response = self.llm.complete(CONDITION_AUG_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)
 
-    def sql_generation_aug(self, table_info, table_aug, word_aug, cond_aug, example, question, evidence):
+    def sql_generation_aug(self, table_info, table_aug, word_aug, cond_aug, example, question, evidence, sub_questions: str = ""):
         table_info += f'\n### sql_keywords: {word_aug["sql_keywords"]}\n'
         table_info += f'### tables: {table_aug["tables"]}\n'
         table_info += f'### columns: {table_aug["columns"]}\n'
         table_info += f'### conditions: {cond_aug["conditions"]}'
-        prompt = example.strip() + '\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n' + table_info.strip() + '\n\n### definition: ' + evidence + "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        question_part = "### definition: " + evidence
+        if isinstance(sub_questions, str) and sub_questions.strip():
+            question_part += f"\n### Sub-questions (decomposition for reference):\n{sub_questions.strip()}"
+        question_part += "\n### Question: " + question + "\n\nReturn your answer in JSON format as {\"sql\": \"your sql\"}."
+        prompt = example.strip() + '\n\n### Answer the question by sqlite SQL query only and with no explanation. You must minimize SQL execution time while ensuring correctness.\n' + table_info.strip() + "\n\n" + question_part
         response = self.llm.complete(SQL_GENERATION_INSTRUCTION + "\n" + prompt).text
         return self.parse_json_response(response)['sql'].replace('\n', ' ')
 
@@ -805,8 +869,9 @@ class RSLSQLGenerator(BaseGenerator):
     def act(
             self,
             item,
-            schema=None,
-            schema_links=None,
+            schema: Union[str, PathLike, Dict, List] = None,
+            schema_links: Union[str, List[str]] = None,
+            sub_questions: Union[str, List[str], Dict] = None,
             data_logger=None,
             **kwargs
     ):
@@ -818,7 +883,7 @@ class RSLSQLGenerator(BaseGenerator):
         question = row['question']
         db_id = row['db_id']
         db_type = row.get('db_type', 'sqlite')
-        evidence = row.get('evidence', '') or (load_dataset(row.get('external', '')) if self.use_external else '')
+        evidence = row.get('evidence', '') or (self.load_external_knowledge(row.get('external', None)) or '') if self.use_external else ''
         # 优先使用动态选择的few-shot示例，回退到静态示例
         if self.use_few_shot:
             dynamic_example = self.select_few_shot_examples(question, k=3)
@@ -856,9 +921,18 @@ class RSLSQLGenerator(BaseGenerator):
         else:
             raise ValueError("Invalid schema format")
 
-        logger.debug("Database schema processed")
+        if sub_questions is not None:
+            sub_questions = format_sub_questions(sub_questions, output_type="C")
 
         # Step 1: Preliminary SQL - 使用schema DataFrame而不是直接访问数据库
+        if schema_links is None:
+            schema_link_path = row.get("schema_links", None)
+            if schema_link_path:
+                schema_links = load_dataset(schema_link_path)
+                if not isinstance(schema_links, str):
+                    schema_links = normalize_schema_links(schema_links, "B")
+                    logger.debug(f"Loaded schema links from: {schema_link_path}")
+
         try:
             simple_ddl, _ = self.get_simple_ddl_from_schema(schema_df)
             ddl_data = self.get_ddl_data_from_schema(schema_df, self.get_all_tables_from_schema(schema_df),
@@ -866,9 +940,13 @@ class RSLSQLGenerator(BaseGenerator):
                                                       self.get_all_tables_from_schema(schema_df)}, db_id, db_type)
             foreign_key = self.get_foreign_key_from_schema(schema_df)
             table_info = f'### Sqlite SQL tables, with their properties:\n{simple_ddl}\n### Here are some data information about database references.\n{ddl_data}\n### Foreign key information of Sqlite SQL tables, used for table joins:\n{foreign_key}'
-            table_column = self.table_column_selection(table_info, question, evidence)
+            if schema_links is None or isinstance(schema_links, str):
+                logger.debug("Generating schema links using RSL-SQL")
+                table_column = self.table_column_selection(table_info, question, evidence)
+            else:
+                table_column = schema_links
 
-            pre_sql = self.preliminary_sql_gen(table_info, table_column, example, question, evidence)
+            pre_sql = self.preliminary_sql_gen(table_info, table_column, example, question, evidence, sub_questions or "")
         except Exception as e:
             logger.error(f"Error in preliminary SQL generation: {e}")
             # Fallback to a simple SQL
@@ -900,7 +978,7 @@ class RSLSQLGenerator(BaseGenerator):
             table_aug = self.table_column_selection(table_info_aug, question, evidence)  # Similar to table_augmentation
             word_aug = self.key_word_augmentation(table_info_aug, question, evidence)
             cond_aug = self.condition_augmentation(question)
-            sql2 = self.sql_generation_aug(table_info_aug, table_aug, word_aug, cond_aug, example, question, evidence)
+            sql2 = self.sql_generation_aug(table_info_aug, table_aug, word_aug, cond_aug, example, question, evidence, sub_questions or "")
         except Exception as e:
             logger.error(f"Error in information augmentation: {e}")
             # Fallback values

@@ -27,6 +27,23 @@ class MACSQLDecomposer(BaseDecomposer):
 
     NAME = "MACSQLDecomposer"
 
+    SKILL = """# MACSQLDecomposer
+
+MACSQLDecomposer produces (sub_question, sql) pairs in one shot via BIRD-style template; evidence from row enriches the prompt. Advantage: joint sub-question and SQL output; drawback: BIRD-specific.
+
+## Inputs
+- `schema`: Database schema (str/path/dict/list). If absent, loaded from dataset.
+
+## Output
+`sub_questions`
+
+## Steps
+1. Process schema to BIRD format (desc_str).
+2. Load question, evidence from row.
+3. generate_decomposition: LLM with DECOMPOSE_TEMPLATE_BIRD → parse_qa_pairs.
+4. Save and return sub_questions.
+"""
+
     # Prompt templates from MAC-SQL
     DECOMPOSE_TEMPLATE_BIRD = '''Given a 【Database schema】 description, a knowledge 【Evidence】 and the 【Question】, you need to use valid SQLite and understand the database and knowledge, and then decompose the question into subquestions for text-to-SQL generation.
 When generating SQL, we should always consider constraints:

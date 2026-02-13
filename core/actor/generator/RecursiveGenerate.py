@@ -20,6 +20,24 @@ class RecursiveGenerator(BaseGenerator):
 
     NAME = "RecursiveGenerator"
 
+    SKILL = """# RecursiveGenerator
+
+RecursiveGenerator uses recursive decomposition: resolve tables (from `schema_links` or LLM select/remove), then Stage 0 (one SQL per table) → Stage 1-n (recursive merge via JOIN until single final SQL). Advantage: DAG-style stepwise decomposition; drawback: many LLM calls, depends on DB for optional feedback.
+
+## Inputs
+- `schema_links`: Precomputed links (tables or table.column list). If absent, produced by LLM select/remove table selection.
+
+## Output
+`pred_sql`
+
+## Steps
+1. Schema loading and normalization.
+2. Table resolution: parse from `schema_links` (or path) or _init_tables (LLM select related + remove unrelated).
+3. Filter schema by resolved tables.
+4. Recursive decomposition: Stage 0 (one SQL per table) → Stage 1-n (recursive merge until single final SQL).
+5. Extract final SQL (is_final=True) and return `pred_sql`.
+"""
+
     def __init__(
             self,
             dataset: Optional[Dataset] = None,
