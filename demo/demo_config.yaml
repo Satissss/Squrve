@@ -1,0 +1,17 @@
+# Squrve Demo Configuration
+# Demo-specific settings; Router/Engine use startup_config.json
+
+# Paths (relative to project root)
+paths:
+  uploaded_db_root: "files/uploaded_db"
+  temp_data_dir: "files/temp_demo_data"
+  schema_source_dir: "files/schema_source"
+  data_source_dir: "files/data_source"
+
+# Router config path (for LLM, etc.)
+router_config: "demo/startup_config.json"
+
+# Server
+server:
+  name: "0.0.0.0"
+  port: 7860
