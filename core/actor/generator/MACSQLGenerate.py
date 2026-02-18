@@ -930,7 +930,7 @@ MAC-SQL uses a three-agent pipeline (Selector→Decomposer→Refiner) that colla
         # Standardize schema format
         if isinstance(schema, dict):
             schema = single_central_process(schema)
-        elif isinstance(schema, list):
+        if isinstance(schema, list):
             schema = pd.DataFrame(schema)
 
         if not isinstance(schema, pd.DataFrame):

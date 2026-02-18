@@ -51,7 +51,7 @@ class BaseScaler(Actor):
 
         if isinstance(schema, dict):
             schema = single_central_process(schema)
-        elif isinstance(schema, list):
+        if isinstance(schema, list):
             schema = pd.DataFrame(schema)
 
         if isinstance(schema, pd.DataFrame):

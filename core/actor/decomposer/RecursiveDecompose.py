@@ -88,7 +88,7 @@ RecursiveDecomposer uses DAG-style recursive decomposition: resolve tables (from
         # Normalize schema type
         if isinstance(schema, dict):
             schema = single_central_process(schema)
-        elif isinstance(schema, list):
+        if isinstance(schema, list):
             schema = pd.DataFrame(schema)
 
         return schema
