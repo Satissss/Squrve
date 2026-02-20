@@ -2,10 +2,9 @@ import math
 import warnings
 from os import PathLike
 from pathlib import Path
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional, Tuple
 
 import pandas as pd
-from torch.fx.experimental.recording import shape_env_check_state_equal
 from func_timeout import func_timeout, FunctionTimedOut
 
 from core.data_manage import Dataset, load_dataset
@@ -15,23 +14,6 @@ from loguru import logger
 
 
 class Evaluator:
-    """
-        用于对 Text-to-SQL 流程提供专业的评估。
-        需要设计的评估方法：
-            Reduce:
-            - recall: 标准数据库模式的召回率
-            - reduce_rate: 减少数据库模式的数量占比
-            - precision: 削减后数据库模式的精准率
-
-            Parse:
-            - recall: 模式链接的召回率
-            - precision: 模式链接的准确率
-            - exact matching: 模式链接的精准匹配率
-
-            Generate:
-            - execute accuracy: 生成 SQL 的执行准确率
-    """
-
     _eval_type_lis = [
         "reduce_recall", "reduce_rate", "reduce_precision",  # Reduce
         "parse_recall", "parse_precision", "parse_exact_matching",  # Parse
@@ -60,6 +42,18 @@ class Evaluator:
             return eval_type
 
         return []
+
+    @staticmethod
+    def _resolve_sql(row: dict, key: str) -> Optional[str]:
+        """Resolve SQL from row by key (raw string or file path). Returns None if invalid."""
+        raw = row.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            return None
+        try:
+            sql = load_dataset(raw) if Path(raw).is_file() else raw
+        except Exception:
+            return None
+        return sql if isinstance(sql, str) and sql.strip() else None
 
     def eval_all(self, verbose: bool = True):
         dataset = self.dataset
@@ -263,13 +257,15 @@ class Evaluator:
             if not isinstance(row, dict):
                 print(f"Warning: Row {item} is not a dictionary")
                 return None
-            pred_sql = row.get("pred_sql", "")
-            pred_sql = load_dataset(pred_sql) if Path(pred_sql).is_file() else pred_sql
-            gold_sql = row.get("query", "")
-
-            if not pred_sql or not gold_sql:
-                print(f"Warning: The pred sql or gold sql is not available for item {item}")
+            gold_sql = self._resolve_sql(row, "query")
+            if gold_sql is None:
+                print(f"Warning: The gold sql is not available for item {item}")
                 return None
+
+            pred_sql = self._resolve_sql(row, "pred_sql")
+            if pred_sql is None:
+                print(f"Warning: The pred sql is not available for item {item}")
+                return 0
 
             db_id = row.get("db_id", "")
             db_type = row.get("db_type", "")
@@ -289,15 +285,15 @@ class Evaluator:
             }
             pred_args = {"sql_query": pred_sql, **base_exec_args}
             gold_args = {"sql_query": gold_sql, **base_exec_args}
-            pred, err = get_sql_exec_result(**pred_args)
-            gold, _ = get_sql_exec_result(**gold_args)
+            pred, pred_err = get_sql_exec_result(**pred_args)
+            gold, gold_err = get_sql_exec_result(**gold_args)
 
             if gold is None:
-                print(f"Invalid Warning: Ground-Truth SQL Execution Error for item {item}")
+                logger.warning(f"Ground-Truth SQL execution error for item {item}: {gold_err}")
                 return None
 
             if pred is None:
-                print(f"Predicted SQL Execution Failure for item {item}: {err}")
+                logger.warning(f"Predicted SQL execution failure for item {item}: {pred_err}")
                 return 0
             score = self.compare_pandas_table(pred, gold)
 
@@ -400,30 +396,78 @@ class Evaluator:
         return recall_ == precision_
 
     @classmethod
-    def compare_pandas_table(cls, pred, gold, condition_cols=None, ignore_order=False):
-        """_summary_
+    def _is_na(cls, x) -> bool:
+        """Safe scalar NA check that won't raise on array-like values."""
+        if x is None:
+            return True
+        try:
+            return bool(pd.isna(x))
+        except (ValueError, TypeError):
+            return False
+
+    @classmethod
+    def quick_reject(cls, pred: pd.DataFrame, gold: pd.DataFrame, ignore_order: bool) -> bool:
+        """Return True if pred and gold are obviously not equivalent."""
+        
+        def _normalize_and_sort_row(row: Tuple) -> Tuple:
+            # 标准化：NA→None, float→round
+            normalized = tuple(
+                None if cls._is_na(x) 
+                else round(x, 2) if isinstance(x, float)
+                else x
+                for x in row
+            )
+            # 排序
+            return tuple(sorted(normalized, key=lambda x: (x is None, type(x).__name__, str(x))))
+
+        # 快速检查
+        if pred.shape != gold.shape:
+            return True
+
+        # 转换并比较
+        pred_rows = [_normalize_and_sort_row(tuple(row)) for row in pred.values]
+        gold_rows = [_normalize_and_sort_row(tuple(row)) for row in gold.values]
+        if ignore_order:
+            return sorted(pred_rows) != sorted(gold_rows)
+        
+        return pred_rows != gold_rows
+
+
+    @classmethod
+    def compare_pandas_table(
+        cls,
+        pred,
+        gold,
+        condition_cols=None,
+        ignore_order=False,
+        strict_columns=False,
+    ):
+        """Compare two DataFrames for equivalence.
 
         Args:
-            pred (Dataframe): _description_
-            gold (Dataframe): _description_
-            condition_cols (list, optional): _description_. Defaults to [].
-            ignore_order (bool, optional): _description_. Defaults to False.
-
+            pred: Predicted result DataFrame.
+            gold: Gold standard result DataFrame.
+            condition_cols: Column indices to compare. Default [] means all columns.
+            ignore_order: Whether to ignore order when comparing values within columns.
+            strict_columns: If True, require pred and gold to have exactly the same columns 
+                            (same number and same content). If False (default), allow pred to 
+                            have extra columns beyond what's in gold, since SQL queries often 
+                            have ambiguity about which columns to return.
         """
-        if not condition_cols:
-            condition_cols = []
-        # print('condition_cols', condition_cols)
+        if strict_columns and cls.quick_reject(pred, gold, ignore_order=ignore_order):
+            return 0
 
+        condition_cols = condition_cols or []
         tolerance = 1e-2
 
         def vectors_match(v1, v2, tol=tolerance, ignore_order_=False):
             if ignore_order_:
-                v1, v2 = (sorted(v1, key=lambda x: (x is None, str(x), isinstance(x, (int, float)))),
-                          sorted(v2, key=lambda x: (x is None, str(x), isinstance(x, (int, float)))))
+                sort_key = lambda x: (cls._is_na(x), type(x).__name__, str(x))
+                v1, v2 = sorted(v1, key=sort_key), sorted(v2, key=sort_key)
             if len(v1) != len(v2):
                 return False
             for a, b in zip(v1, v2):
-                if pd.isna(a) and pd.isna(b):
+                if cls._is_na(a) and cls._is_na(b):
                     continue
                 elif isinstance(a, (int, float)) and isinstance(b, (int, float)):
                     if not math.isclose(float(a), float(b), abs_tol=tol):
@@ -432,21 +476,24 @@ class Evaluator:
                     return False
             return True
 
-        if condition_cols:
-            gold_cols = gold.iloc[:, condition_cols]
-        else:
-            gold_cols = gold
-        pred_cols = pred
+        gold_cols_df = gold.iloc[:, condition_cols] if condition_cols else gold
+        t_gold_list = gold_cols_df.transpose().values.tolist()
+        t_pred_list = pred.transpose().values.tolist()
 
-        t_gold_list = gold_cols.transpose().values.tolist()
-        t_pred_list = pred_cols.transpose().values.tolist()
-        score = 1
-        for _, gold in enumerate(t_gold_list):
-            if not any(vectors_match(gold, pred, ignore_order_=ignore_order) for pred in t_pred_list):
-                score = 0
-            else:
-                for j, pred in enumerate(t_pred_list):
-                    if vectors_match(gold, pred, ignore_order_=ignore_order):
-                        break
+        if not t_gold_list:
+            return 1
 
-        return score
+        # Each gold column must match a distinct pred column (bipartite assignment).
+        used_pred_indices: set = set()
+        for gold_col in t_gold_list:
+            matched_idx = next(
+                (j for j, pred_col in enumerate(t_pred_list)
+                 if j not in used_pred_indices
+                 and vectors_match(gold_col, pred_col, ignore_order_=ignore_order)),
+                None,
+            )
+            if matched_idx is None:
+                return 0
+            used_pred_indices.add(matched_idx)
+
+        return 1

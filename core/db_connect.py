@@ -144,7 +144,7 @@ def get_sql_exec_result(db_type: str, **kwargs):
     elif db_type == "snowflake":
         return get_snowflake_sql_result(**kwargs)
 
-    return None
+    return None, None
 
 
 def get_sql_exec_result_with_time(db_type: str, **kwargs):
