@@ -24,7 +24,8 @@ class MetaTask(BaseTask):
         self.max_workers: int = max_workers
         self.is_save: bool = self.is_save_dataset if is_save is None else is_save
 
-        self.actor: Actor = self.load_actor(**actor_args if actor_args else {}) if actor is None else actor
+        merged_actor_args = {**kwargs, **(actor_args or {})}
+        self.actor: Actor = self.load_actor(**merged_actor_args) if actor is None else actor
 
     @wrap_run
     def run(self):
@@ -70,7 +71,11 @@ class MetaTask(BaseTask):
                     results[idx] = val
 
         logger.info(f"MetaTask 执行完成: {self.name} ({self.task_id}), 成功处理: {len(results)}/{len(self.dataset)} 个样本")
+        # Preserve db_path before replacing dataset, as actor.dataset may not carry it.
+        prev_db_path = self.dataset.db_path if self.dataset is not None else None
         self.dataset = actor.dataset
+        if prev_db_path and self.dataset is not None and self.dataset.db_path is None:
+            self.dataset.db_path = prev_db_path
 
         if self.is_save:
             # For ComplexTask, actor.dataset and task.dataset may differ
