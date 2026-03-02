@@ -11,6 +11,7 @@ from core.actor.parser.CHESSSelectorParse import CHESSSelectorParser
 from core.actor.parser.MACSQLCoTParse import MACSQLCoTParser
 from core.actor.parser.RSLSQLBiDirParse import RSLSQLBiDirParser
 from core.actor.parser.OpenSearchCoTParse import OpenSearchCoTParser
+from core.actor.parser.AutoLinkParse import AutoLinkParser
 
 
 class ParseTask(MetaTask):
@@ -23,7 +24,8 @@ class ParseTask(MetaTask):
         "CHESSSelectorParser", "CHESS",
         "MACSQLCoTParser", "MACSQL",
         "RSLSQLBiDirParser", "RSLSQL",
-        "OpenSearchCoTParser", "OpenSearchSQL"
+        "OpenSearchCoTParser", "OpenSearchSQL",
+        "AutoLinkParser", "AutoLink",
     ]
 
     def __init__(
@@ -98,6 +100,10 @@ class ParseTask(MetaTask):
 
         elif actor_type in ("OpenSearchCoTParser", "OpenSearchSQL"):
             actor = OpenSearchCoTParser(**parse_args)
+            return actor
+
+        elif actor_type in ("AutoLinkParser", "AutoLink"):
+            actor = AutoLinkParser(**parse_args)
             return actor
 
         warnings.warn(f"The parse_type `{actor_type}` is not available.", category=UserWarning)

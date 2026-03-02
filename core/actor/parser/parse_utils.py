@@ -113,3 +113,124 @@ def format_schema_links(schema_links: Union[str, List[str], List[List[str]]], ou
         schema_links = "\n\n".join(format_lis)
 
     return schema_links
+
+
+# ---------------------------------------------------------------------------
+# AutoLink agent output parser
+# ---------------------------------------------------------------------------
+
+def parse_model_output(output: str):
+    """Parse tool-call blocks from a raw AutoLink agent LLM response.
+
+    Recognises @schema_retrieval, @sql_execution, @sql_draft,
+    @add_schema, and @stop() blocks, including multi-line triple-quoted
+    query arguments.
+
+    Returns
+    -------
+    full_lines : list[str]
+        Raw text of each matched tool-call block.
+    tool_calls : list[dict]
+        Parsed representation. Each dict has at least a 'tool' key;
+        additional keys depend on the tool type:
+        - schema_retrieval -> {tool, table, column, description}
+        - sql_execution / sql_draft -> {tool, query}
+        - add_schema -> {tool, table, column}
+        - stop -> {tool}
+    """
+    import re as _re
+
+    call_types = [
+        "@schema_retrieval",
+        "@sql_execution",
+        "@sql_draft",
+        "@sql_exploration",
+        "@stop()",
+        "@add_schema",
+    ]
+
+    lines = [l.strip() for l in output.splitlines()]
+    blocks = []
+    i = 0
+
+    while i < len(lines):
+        line = lines[i]
+        if any(line.startswith(ct) for ct in call_types):
+            stack = []
+            block_lines = [line]
+            open_pos = line.find("(")
+            if open_pos != -1:
+                stack.append("(")
+                for c in line[open_pos + 1:]:
+                    if c == "(":
+                        stack.append("(")
+                    elif c == ")":
+                        stack.pop()
+                        if not stack:
+                            break
+                j = i + 1
+                while stack and j < len(lines):
+                    next_line = lines[j].strip()
+                    block_lines.append(next_line)
+                    for c in next_line:
+                        if c == "(":
+                            stack.append("(")
+                        elif c == ")":
+                            if stack:
+                                stack.pop()
+                            if not stack:
+                                break
+                    j += 1
+                    if not stack:
+                        break
+                i = j
+                blocks.append("\n".join(block_lines))
+            else:
+                i += 1
+        else:
+            i += 1
+
+    full_lines = []
+    tool_calls = []
+
+    for block in blocks:
+        for call_type in call_types:
+            if not block.strip().startswith(call_type):
+                continue
+            full_lines.append(block)
+
+            if call_type == "@schema_retrieval":
+                table_m = _re.search(r'table\s*[:=]\s*["\']([^"\']*)["\']', block)
+                col_m   = _re.search(r'column\s*[:=]\s*["\']([^"\']*)["\']', block)
+                desc_m  = _re.search(r'description\s*[:=]\s*["\']([^"\']*)["\']', block)
+                tool_calls.append({
+                    "tool":        "schema_retrieval",
+                    "table":       table_m.group(1) if table_m else "",
+                    "column":      col_m.group(1)   if col_m   else "",
+                    "description": desc_m.group(1)  if desc_m  else "",
+                })
+
+            elif call_type == "@add_schema":
+                table_m = _re.search(r'table\s*[:=]\s*["\']([^"\']*)["\']', block)
+                col_m   = _re.search(r'column\s*[:=]\s*["\']([^"\']*)["\']', block)
+                tool_calls.append({
+                    "tool":   "add_schema",
+                    "table":  table_m.group(1) if table_m else "",
+                    "column": col_m.group(1)   if col_m   else "",
+                })
+
+            elif call_type in ("@sql_execution", "@sql_draft"):
+                tool_type = call_type[1:]
+                qm = _re.search(r'query\s*[:=]\s*"""(.*?)"""', block, _re.DOTALL)
+                if not qm:
+                    qm = _re.search(r'query\s*[:=]\s*["\']([^"\']*)["\']', block)
+                query = qm.group(1) if qm else ""
+                tool_calls.append({"tool": tool_type, "query": query})
+
+            elif call_type == "@stop()":
+                tool_calls.append({"tool": "stop"})
+
+            break  # only match first call_type per block
+
+    return full_lines, tool_calls
+

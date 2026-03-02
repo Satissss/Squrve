@@ -460,7 +460,8 @@ class Engine:
                     "max_workers": meta.get("max_workers", 3),
                     "open_actor_parallel": meta.get("open_actor_parallel", True),
                     **kwargs.get("task", {}),
-                    "actor_args": kwargs.get("actor")
+                    "actor_args": kwargs.get("actor"),
+                    "dataset_meta": kwargs.get("dataset", {})
                 }
                 task = self.generate_complex_task(**generate_args)
                 if task is not None:
@@ -486,6 +487,7 @@ class Engine:
             max_workers: int = 5,
             open_actor_parallel: bool = True,
             actor_args: Dict = None,
+            dataset_meta: Dict = None,
             **kwargs
     ):
         if meta_tasks is None:
@@ -526,6 +528,13 @@ class Engine:
             **kwargs
         }
         task = ComplexTask(**init_args)
+
+        # Inject dataset-level config (e.g. db_path) from meta.dataset into the task's dataset.
+        # This is needed for evaluation (execute_accuracy) to find the database files.
+        if dataset_meta and task.dataset is not None:
+            db_path = dataset_meta.get("db_path", None)
+            if db_path and task.dataset.db_path is None:
+                task.dataset.db_path = db_path
 
         return task
 
