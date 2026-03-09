@@ -10,6 +10,7 @@ from core.actor.selector.CHESSSelect import CHESSSelector
 from core.actor.selector.OpenSearchSQLSelect import OpenSearchSQLSelector
 from core.actor.selector.ChaseSelect import ChaseSelector
 from core.actor.selector.AgentDebateSelect import AgentDebateSelector
+from core.actor.selector.AutoLinkSelect import AutoLinkSelector
 
 
 class SelectTask(MetaTask):
@@ -90,6 +91,10 @@ class SelectTask(MetaTask):
         
         elif actor_type in ("AgentDebateSelector", "AgentDebate"):
             actor = AgentDebateSelector(**select_args)
+            return actor
+
+        elif actor_type in ("AutoLinkSelector", "AutoLink"):
+            actor = AutoLinkSelector(**select_args)
             return actor
 
         warnings.warn(f"The select_type `{actor_type}` is not available.", category=UserWarning)

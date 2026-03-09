@@ -12,6 +12,7 @@ from core.actor.scaler.DINSQLScale import DINSQLScaler
 from core.actor.scaler.MACSQLScale import MACSQLScaler
 from core.actor.scaler.RSLSQLScale import RSLSQLScaler
 from core.actor.scaler.BaseScale import BaseScaler
+from core.actor.scaler.AutoLinkScale import AutoLinkScaler
 
 
 class ScaleTask(MetaTask):
@@ -94,6 +95,10 @@ class ScaleTask(MetaTask):
 
         elif actor_type in ("RSLSQLScaler", "RSLSQL"):
             actor = RSLSQLScaler(**scale_args)
+            return actor
+
+        elif actor_type in ("AutoLinkScaler", "AutoLink"):
+            actor = AutoLinkScaler(**scale_args)
             return actor
 
         warnings.warn(f"The scale_type `{actor_type}` is not available.", category=UserWarning)

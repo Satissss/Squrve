@@ -8,6 +8,8 @@ __pycache__/
 benchmarks
 baselines
 
+embedding
+
 files/data_source
 files/external
 files/instance_schemas

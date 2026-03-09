@@ -5,7 +5,8 @@ from llama_index.core.llms import (
     CompletionResponseGen,
     LLMMetadata,
 )
-from llama_index.core.llms.callbacks import llm_completion_callback
+from llama_index.core.base.llms.types import ChatMessage, ChatResponse
+from llama_index.core.llms.callbacks import llm_completion_callback, llm_chat_callback
 from openai import OpenAI
 
 
@@ -122,4 +123,60 @@ class QwenModel(CustomLLM):
                 accumulated_text += token
                 yield CompletionResponse(text=accumulated_text, delta=token)
 
+    @llm_chat_callback()
+    def chat(self, messages: list, **kwargs) -> ChatResponse:
+        """
+        真正的多角色 chat 调用，保留 system / user / assistant 角色。
 
+        AutoLinkParser / AutoLinkOptimize 依赖此接口来正确传递 system prompt。
+        若缺少此方法，llama_index 的 CustomLLM 基类会回退到 complete()，
+        把所有角色拼成一条 user 消息，导致 system prompt 失效。
+
+        其他所有 actor (DIN-SQL, CHESS, MACSQL …) 均使用 complete()，
+        不受此方法影响。
+        """
+        api_messages = []
+        for m in messages:
+            # 兼容 llama_index ChatMessage 对象和普通 dict
+            if hasattr(m, "role"):
+                role    = m.role.value if hasattr(m.role, "value") else str(m.role)
+                content = m.content or ""
+            else:
+                role    = m.get("role", "user")
+                content = m.get("content", "")
+            api_messages.append({"role": role, "content": content})
+
+        if self.is_stream:
+            full_text = ""
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=api_messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                stream=True,
+                timeout=self.time_out,
+            )
+            for chunk in response:
+                delta = chunk.choices[0].delta
+                # 丢弃 reasoning_content，只收集正式回答内容
+                if hasattr(delta, "reasoning_content") and delta.reasoning_content is not None:
+                    pass
+                else:
+                    full_text += delta.content or ""
+            text = full_text
+        else:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=api_messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                top_p=self.top_p,
+                stream=False,
+                timeout=self.time_out,
+            )
+            text = response.choices[0].message.content or ""
+
+        return ChatResponse(
+            message=ChatMessage(role="assistant", content=text)
+        )

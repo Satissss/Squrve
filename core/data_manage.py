@@ -1635,7 +1635,7 @@ def single_central_process(row: Dict):
             "table_name": tables[table_ind],
             "column_name": col_name,
             "column_types": types[ind],  # Adjust for star column
-            "column_descriptions": descriptions[ind][1] if descriptions else "",
+            "column_descriptions": descriptions[ind][1] if descriptions and ind < len(descriptions) else "",
             "table_to_projDataset": pro_infos.get(tables[table_ind], ""),
             "primary_key": False,  # Use consistent boolean type
             "foreign_key": "",

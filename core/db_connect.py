@@ -7,6 +7,7 @@ import pandas as pd
 from google.cloud import bigquery
 import snowflake.connector
 import sqlite3
+import threading
 
 from core.data_manage import load_dataset
 
@@ -28,23 +29,30 @@ def get_sqlite_result(
 
     try:
         with sqlite3.connect(db_path) as conn:
-            if save_path:
-                save_path.parent.mkdir(parents=True, exist_ok=True)
-                for i, chunk in enumerate(pd.read_sql_query(sql_query, conn, chunksize=chunk_size)):
-                    chunk.to_csv(
-                        save_path,
-                        mode="a" if i else "w",
-                        header=not save_path.exists() or i == 0,
-                        index=False,
-                    )
-                return True, None
 
-            df = pd.read_sql_query(sql_query, conn)
-            return df, None
+            timer = threading.Timer(600.0, conn.interrupt)
+            timer.start()
+            
+            try:
+                if save_path:
+                    save_path.parent.mkdir(parents=True, exist_ok=True)
+                    for i, chunk in enumerate(pd.read_sql_query(sql_query, conn, chunksize=chunk_size)):
+                        chunk.to_csv(
+                            save_path,
+                            mode="a" if i else "w",
+                            header=not save_path.exists() or i == 0,
+                            index=False,
+                        )
+                    return True, None
+
+                df = pd.read_sql_query(sql_query, conn)
+                return df, None
+                
+            finally:
+                timer.cancel()
 
     except Exception as exc:
-        return None, str(exc)
-
+        return None, f"{str(exc)}"
 
 def get_snowflake_sql_result(
         sql_query: str,
@@ -183,7 +191,7 @@ def execute_sql(db_type, db_path, sql, credential):
         res = exec_result
         err = None
     if err:
-        return err
+        raise RuntimeError(err)
     if res is None or (isinstance(res, pd.DataFrame) and res.empty):
         return "No data found for the specified query"
     if isinstance(res, pd.DataFrame):

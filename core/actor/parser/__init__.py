@@ -5,6 +5,7 @@ from .MACSQLCoTParse import MACSQLCoTParser
 from .RSLSQLBiDirParse import RSLSQLBiDirParser
 from .CHESSSelectorParse import CHESSSelectorParser
 from .OpenSearchCoTParse import OpenSearchCoTParser
+from .AutoLinkParse import AutoLinkParser
 
 __all__ = [
     "BaseParser",
@@ -14,4 +15,5 @@ __all__ = [
     "RSLSQLBiDirParser",
     "CHESSSelectorParser",
     "OpenSearchCoTParser",
+    "AutoLinkParser",
 ]
