@@ -183,3 +183,166 @@ Additional Strict Constraints
 
 You have up to 10 turns. Begin.
 """
+
+# ---------------------------------------------------------------------------
+# SQL generation prompt  (migrated from AutoLink/run/config.py)
+# ---------------------------------------------------------------------------
+
+AUTOLINK_SQL_GENERATION = """\
+{SQL_TYPE}
+{SQL_DIALECT_OPTIMIZATION}
+
+Given the database schema information and question, please directly output a \
+{SQL_DIALECT_NAME} SQL query. The SQL query should be correct and match the question.
+
+**Database Schema:**
+{PROMPT}
+
+**Question:**
+{QUESTION}
+
+Please output only the SQL query wrapped in ```sql ... ``` code block. No explanation needed.
+"""
+
+# Dialect labels used in SQL_GENERATION template
+AUTOLINK_DIALECT_LABEL = {
+    "sqlite":    "SQLite",
+    "bigquery":  "BigQuery",
+    "big_query": "BigQuery",
+    "snowflake": "Snowflake",
+}
+
+# ---------------------------------------------------------------------------
+# SQL revision prompt  (migrated from AutoLink/run/config.py)
+# ---------------------------------------------------------------------------
+
+AUTOLINK_REVISE_SYSTEM = """\
+You are an expert SQL debugger specialising in {SQL_DIALECT_NAME} SQL.
+Given a schema, an original question, a candidate SQL query, and the execution \
+error message, revise the SQL query to fix the error.
+Output only the corrected SQL inside a ```sql ... ``` block. No explanation.
+"""
+
+AUTOLINK_REVISE_USER = """\
+**Database Schema:**
+{PROMPT}
+
+**Question:**
+{QUESTION}
+
+**Original SQL:**
+```sql
+{SQL}
+```
+
+**Execution Error:**
+{ERROR}
+
+Please provide the corrected SQL.
+"""
+
+# ---------------------------------------------------------------------------
+# SQL selection prompt  (migrated from AutoLink/run/config.py)
+# ---------------------------------------------------------------------------
+
+AUTOLINK_SELECT_SYSTEM = """\
+You are an expert SQL evaluator. You will be given a database schema, a question, \
+and two candidate SQL queries. Choose which query is more likely to be correct \
+and output **only** "SQL1" or "SQL2". No explanation.
+"""
+
+AUTOLINK_SELECT_USER = """\
+**Database Schema:**
+{PROMPT}
+
+**Question:**
+{QUESTION}
+
+**SQL1:**
+```sql
+{SQL1}
+```
+
+**SQL2:**
+```sql
+{SQL2}
+```
+
+Which SQL is more likely to be correct? Output only "SQL1" or "SQL2".
+"""
+
+
+# ---------------------------------------------------------------------------
+# Shared schema-filtering helper
+# ---------------------------------------------------------------------------
+
+def build_filtered_schema_text(
+    schema_df: "pd.DataFrame",
+    schema_links: dict,
+    schema_text_fallback: str = "",
+) -> str:
+    """
+    Filter *schema_df* to only the tables / columns identified by the
+    AutoLinkParser and return a formatted schema text string.
+
+    This is the Squrve-pipeline equivalent of the original AutoLink
+    ``final_schema_prompts/`` files.  The returned text includes column
+    types, descriptions, and sample values – not just bare names.
+
+    Fallback behaviour
+    ------------------
+    * If ``schema_links`` is None, or both ``tables`` and ``columns`` lists
+      are empty, ``schema_text_fallback`` (the full schema text) is returned
+      unchanged.  This keeps behaviour identical to the pre-change code for
+      items where the Parser returned no results.
+
+    Parameters
+    ----------
+    schema_df : pd.DataFrame
+        The full schema DataFrame for the current item (loaded via
+        ``self.dataset.get_db_schema(item)``).
+    schema_links : dict
+        Output of AutoLinkParser, e.g.
+        ``{"tables": ["account", "disp"], "columns": ["account_id", "type"]}``.
+    schema_text_fallback : str
+        Full schema text to return when filtering yields nothing.
+    """
+    import pandas as pd
+    from core.utils import parse_schema_from_df
+
+    tables  = (schema_links or {}).get("tables",  [])
+    columns = (schema_links or {}).get("columns", [])
+
+    # Nothing to filter on → return full schema unchanged
+    if not tables and not columns:
+        return schema_text_fallback
+
+    if not isinstance(schema_df, pd.DataFrame) or schema_df.empty:
+        return schema_text_fallback
+
+    # Normalise column header names for case-insensitive lookup
+    col_map    = {c.lower(): c for c in schema_df.columns}
+    table_col  = col_map.get("table_name",  col_map.get("table",  None))
+    column_col = col_map.get("column_name", col_map.get("column", None))
+
+    if table_col is None:
+        return schema_text_fallback
+
+    tables_lower  = {str(t).lower() for t in tables}
+    columns_lower = {str(c).lower() for c in columns}
+
+    # Keep a row if its table is relevant OR its column is relevant
+    mask = schema_df[table_col].astype(str).str.lower().isin(tables_lower)
+    if column_col and columns_lower:
+        mask = mask | schema_df[column_col].astype(str).str.lower().isin(columns_lower)
+
+    filtered_df = schema_df[mask]
+
+    if filtered_df.empty:
+        return schema_text_fallback
+
+    try:
+        return parse_schema_from_df(filtered_df)
+    except Exception:
+        return schema_text_fallback
+

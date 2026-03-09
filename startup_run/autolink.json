@@ -1,0 +1,178 @@
+{
+    "api_key": {
+        "deepseek": "your_api_key_here",
+        "qwen": "your_api_key_here",
+        "zhipu": "your_api_key_here"
+    },
+    "llm": {
+        "use": "qwen",
+        "model_name": "qwen3.5-flash",
+        "context_window": 120000,
+        "max_token": 8000,
+        "top_p": 0.3,
+        "temperature": 0.1,
+        "time_out": 300.0
+    },
+    "text_embed": {
+        "embed_model_name": "BAAI/bge-large-en-v1.5"
+    },
+    "dataset": {
+        "data_source_dir": "../files/data_source",
+        "need_few_shot": false,
+        "need_external": true
+    },
+    "database": {
+        "skip_schema_init": false,
+        "schema_source_dir": "../files/schema_source",
+        "multi_database": false,
+        "vector_store": "../vector_store",
+        "need_build_index": false
+    },
+    "task": {
+        "task_meta": [
+            {
+                "task_id": "autolink_parse",
+                "task_type": "ParseTask",
+                "data_source": "../files/data_source/bird_dev_.json",
+                "schema_source": "bird:dev",
+                "is_save_dataset": true,
+                "open_parallel": true,
+                "max_workers": 8,
+                "meta": {
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    },
+                    "task": {
+                        "parse_type": "AutoLinkParser",
+                        "embed_path": "../embeddings/bird_dev",
+                        "db_type": "sqlite",
+                        "retrieval_top_k": 3,
+                        "retrieval_device": "cuda:0",
+                        "max_turns": 10,
+                        "use_external": true
+                    }
+                }
+            },
+            {
+                "task_id": "autolink_generate",
+                "task_type": "GenerateTask",
+                "data_source": "../files/data_source/bird_dev_.json",
+                "schema_source": "bird:dev",
+                "is_save_dataset": true,
+                "open_parallel": true,
+                "max_workers": 8,
+                "meta": {
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    },
+                    "task": {
+                        "generate_type": "AutoLinkGenerator",
+                        "num_candidates": 5,
+                        "use_external": true
+                    }
+                }
+            },
+            {
+                "task_id": "autolink_scale",
+                "task_type": "ScaleTask",
+                "data_source": "../files/data_source/bird_dev_.json",
+                "schema_source": "bird:dev",
+                "is_save_dataset": true,
+                "open_parallel": true,
+                "max_workers": 8,
+                "meta": {
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    },
+                    "task": {
+                        "scale_type": "AutoLinkScaler",
+                        "sql_timeout": 60.0
+                    }
+                }
+            },
+            {
+                "task_id": "autolink_optimize",
+                "task_type": "OptimizeTask",
+                "data_source": "../files/data_source/bird_dev_.json",
+                "schema_source": "bird:dev",
+                "is_save_dataset": true,
+                "open_parallel": true,
+                "max_workers": 8,
+                "meta": {
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    },
+                    "task": {
+                        "optimize_type": "AutoLinkOptimizer",
+                        "max_revise_turns": 3
+                    }
+                }
+            },
+            {
+                "task_id": "autolink_select",
+                "task_type": "SelectTask",
+                "data_source": "../files/data_source/bird_dev_.json",
+                "schema_source": "bird:dev",
+                "is_save_dataset": true,
+                "open_parallel": true,
+                "max_workers": 4,
+                "meta": {
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    },
+                    "task": {
+                        "select_type": "AutoLinkSelector",
+                        "max_vote_workers": 4
+                    }
+                }
+            }
+        ],
+        "cpx_task_meta": [
+            {
+                "task_id": "autolink_pipeline",
+                "task_lis": [
+                    "autolink_parse",
+                    "autolink_generate",
+                    "autolink_scale",
+                    "autolink_optimize",
+                    "autolink_select"
+                ],
+                "eval_type": [
+                    "execute_accuracy"
+                ],
+                "is_save_dataset": true,
+                "dataset_save_path": "../files/datasets/bird_dev_result.json",
+                "meta": {
+                    "actor": {
+                        "autolink_parse": {
+                            "save_dir": "../files/schema_links/bird_dev"
+                        },
+                        "autolink_generate": {
+                            "save_dir": "../files/pred_sql/bird_dev"
+                        },
+                        "autolink_scale": {
+                            "save_dir": "../files/pred_sql/bird_dev"
+                        },
+                        "autolink_optimize": {
+                            "save_dir": "../files/pred_sql/bird_dev"
+                        },
+                        "autolink_select": {
+                            "save_dir": "../files/pred_sql/bird_dev"
+                        }
+                    },
+                    "dataset": {
+                        "db_path": "../benchmarks/bird/dev/database"
+                    }
+                },
+                "open_parallel": true,
+                "max_workers": 10
+            }
+        ],
+        "is_save_dataset": true
+    },
+    "engine": {
+        "exec_process": [
+            "autolink_pipeline"
+        ]
+    }
+}

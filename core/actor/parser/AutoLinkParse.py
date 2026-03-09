@@ -183,6 +183,13 @@ class AutoLinkParser(BaseParser):
             or row.get("sqlite_path")
             or row.get("db_file")
         )
+        # For SQLite: db_path in config is a directory; construct the actual file path
+        # using db_id (e.g. "...database/california_schools.sqlite")
+        if db_type == "sqlite" and db_path:
+            db_id = row.get("db_id", "")
+            path_obj = Path(str(db_path))
+            if db_id and path_obj.is_dir():
+                db_path = str(path_obj / f"{db_id}.sqlite")
         cred    = self.db_credential or row.get("credential")
         return db_type, db_path, cred
 
@@ -233,12 +240,22 @@ class AutoLinkParser(BaseParser):
         external_knowledge = ""
 
         if self.use_external:
+            # Priority 1: file-based external knowledge
             ext_path = row.get("external") or row.get("external_knowledge")
             if ext_path and Path(str(ext_path)).exists():
                 try:
                     external_knowledge = Path(str(ext_path)).read_text(encoding="utf-8")
                 except Exception as e:
                     logger.warning(f"AutoLinkParser: could not read external knowledge: {e}")
+            # Priority 2: inline string (BIRD uses 'evidence' field)
+            if not external_knowledge:
+                raw = (
+                    row.get("evidence")
+                    or row.get("external")
+                    or row.get("external_knowledge")
+                )
+                if raw and isinstance(raw, str):
+                    external_knowledge = raw
 
         # Schema → text
         schema_df   = self.process_schema(item, schema)

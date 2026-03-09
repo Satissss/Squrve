@@ -140,6 +140,13 @@ def parse_model_output(output: str):
     """
     import re as _re
 
+    # Strip <think>...</think> reasoning blocks before parsing tool calls.
+    # qwen3.5-flash and similar reasoning models emit thinking traces that
+    # must be removed so that the line-by-line scanner below can find the
+    # real tool-call lines (e.g. @schema_retrieval, @stop).
+    # Non-reasoning models produce no <think> tags, so this is a no-op.
+    output = _re.sub(r"<think>.*?</think>", "", output, flags=_re.DOTALL).strip()
+
     call_types = [
         "@schema_retrieval",
         "@sql_execution",

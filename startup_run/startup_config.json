@@ -6,11 +6,11 @@
   },
   "llm": {
     "use": "qwen",
-    "model_name": "qwen-plus-2025-09-11",
+    "model_name": "qwen3.5-flash",
     "context_window": 120000,
     "max_token": 8000,
-    "top_p": 0.9,
-    "temperature": 0.75,
+    "top_p": 0.2,
+    "temperature": 0.2,
     "time_out": 300.0
   },
   "text_embed": {

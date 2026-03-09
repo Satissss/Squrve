@@ -13,6 +13,7 @@ from core.actor.optimizer.CHESSOptimize import CHESSOptimizer
 from core.actor.optimizer.MACSQLOptimize import MACSQLOptimizer
 from core.actor.optimizer.RSLSQLOptimize import RSLSQLOptimizer
 from core.actor.optimizer.OpenSearchSQLOptimize import OpenSearchSQLOptimizer
+from core.actor.optimizer.AutoLinkOptimize import AutoLinkOptimizer
 
 
 class OptimizeTask(MetaTask):
@@ -98,6 +99,10 @@ class OptimizeTask(MetaTask):
 
         elif actor_type in ("AdaptiveOptimizer", "Adaptive"):
             actor = AdaptiveOptimizer(**optimize_args)
+            return actor
+
+        elif actor_type in ("AutoLinkOptimizer", "AutoLink"):
+            actor = AutoLinkOptimizer(**optimize_args)
             return actor
 
         warnings.warn(f"The optimize_type `{actor_type}` is not available.", category=UserWarning)

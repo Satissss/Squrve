@@ -14,6 +14,7 @@ from core.actor.generator.RSLSQLGenerate import RSLSQLGenerator
 from core.actor.generator.ReFoRCEGenerate import ReFoRCEGenerator
 from core.actor.generator.OpenSearchSQLGenerate import OpenSearchSQLGenerator
 from core.actor.generator.RecursiveGenerate import RecursiveGenerator
+from core.actor.generator.AutoLinkGenerate import AutoLinkGenerator
 
 
 class GenerateTask(MetaTask):
@@ -98,6 +99,10 @@ class GenerateTask(MetaTask):
 
         elif actor_type in ("RecursiveGenerator", "Recursive"):
             actor = RecursiveGenerator(**generate_args)
+            return actor
+
+        elif actor_type in ("AutoLinkGenerator", "AutoLink"):
+            actor = AutoLinkGenerator(**generate_args)
             return actor
 
         warnings.warn(f"The generate_type `{actor_type}` is not available.", category=UserWarning)

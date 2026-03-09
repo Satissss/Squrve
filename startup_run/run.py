@@ -8,11 +8,11 @@ from core.base import Router
 from core.engine import Engine
 
 if __name__ == "__main__":
-    router = Router(config_path="multi_actor_config.json")
+    router = Router(config_path="autolink.json")
 
     engine = Engine(router)
 
-    # 执行任务
+    执行任务
     print("执行自定义任务中...")
     engine.execute()
 
