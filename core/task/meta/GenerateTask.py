@@ -14,13 +14,15 @@ from core.actor.generator.RSLSQLGenerate import RSLSQLGenerator
 from core.actor.generator.ReFoRCEGenerate import ReFoRCEGenerator
 from core.actor.generator.OpenSearchSQLGenerate import OpenSearchSQLGenerator
 from core.actor.generator.RecursiveGenerate import RecursiveGenerator
+from core.actor.generator.DBCopilotGenerate import DBCopilotGenerator
+from core.actor.generator.ESQLCandidateGenerate import ESQLCandidateGenerator
 
 
 class GenerateTask(MetaTask):
     """ Task For Text-to-SQL """
 
     NAME = "GenerateTask"
-    registered_generate_type = ["LinkAlignGenerator", "LinkAlign", "DIN_SQLGenerator", "DIN_SQL", "DAILSQLGenerator", "DAILSQL"]
+    registered_generate_type = ["LinkAlignGenerator", "LinkAlign", "DIN_SQLGenerator", "DIN_SQL", "DAILSQLGenerator", "DAILSQL", "DBCopilotGenerator", "DBCopilot", "ESQLCandidateGenerator", "ESQL"]
 
     def __init__(
             self,
@@ -98,6 +100,14 @@ class GenerateTask(MetaTask):
 
         elif actor_type in ("RecursiveGenerator", "Recursive"):
             actor = RecursiveGenerator(**generate_args)
+            return actor
+
+        elif actor_type in ("DBCopilotGenerator", "DBCopilot"):
+            actor = DBCopilotGenerator(**generate_args)
+            return actor
+
+        elif actor_type in ("ESQLCandidateGenerator", "ESQL"):
+            actor = ESQLCandidateGenerator(**generate_args)
             return actor
 
         warnings.warn(f"The generate_type `{actor_type}` is not available.", category=UserWarning)

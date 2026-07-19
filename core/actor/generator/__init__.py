@@ -8,6 +8,8 @@ from .OpenSearchSQLGenerate import OpenSearchSQLGenerator
 from .ReFoRCEGenerate import ReFoRCEGenerator
 from .RSLSQLGenerate import RSLSQLGenerator
 from .RecursiveGenerate import RecursiveGenerator
+from .DBCopilotGenerate import DBCopilotGenerator
+from .ESQLCandidateGenerate import ESQLCandidateGenerator
 
 __all__ = [
     "BaseGenerator",
@@ -20,4 +22,6 @@ __all__ = [
     "ReFoRCEGenerator",
     "RSLSQLGenerate",
     "RecursiveGenerator",
+    "DBCopilotGenerator",
+    "ESQLCandidateGenerator",
 ]
