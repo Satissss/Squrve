@@ -1,0 +1,47 @@
+{
+  "pipeline_name": "ESQL_CSG_QE_SR",
+  "description": "E-SQL: Direct Schema Linking via Question Enrichment in Text-to-SQL",
+  "pipeline_order": "CSG-QE-SR",
+  "tasks": [
+    {
+      "name": "esql_candidate_generation",
+      "actor": "ESQLCandidateGenerator",
+      "type": "generate",
+      "description": "Stage 1: Candidate SQL Generation - generates initial SQL using original question + full schema + DB samples + column descriptions",
+      "params": {
+        "few_shot_data_path": "../few-shot-data/question_enrichment_few_shot_examples.json",
+        "generation_level_shot_number": 3,
+        "generation_few_shot_schema_existance": false,
+        "db_sample_limit": 5,
+        "relevant_description_number": 6,
+        "seed": 42
+      }
+    },
+    {
+      "name": "esql_question_enrichment",
+      "actor": "ESQLQuestionEnrichParser",
+      "type": "parse",
+      "description": "Stage 2: Question Enrichment - enriches the question by directly linking relevant database items (tables, columns, values) and candidate predicates into the natural language query",
+      "params": {
+        "few_shot_data_path": "../few-shot-data/question_enrichment_few_shot_examples.json",
+        "enrichment_level": "complex",
+        "enrichment_level_shot_number": 3,
+        "enrichment_few_shot_schema_existance": false,
+        "db_sample_limit": 5,
+        "relevant_description_number": 6,
+        "seed": 42
+      }
+    },
+    {
+      "name": "esql_sql_refinement",
+      "actor": "ESQLRefineOptimizer",
+      "type": "optimize",
+      "description": "Stage 3: SQL Refinement - refines the candidate SQL using the enriched question + candidate predicates + execution feedback",
+      "params": {
+        "db_sample_limit": 5,
+        "relevant_description_number": 6,
+        "seed": 42
+      }
+    }
+  ]
+}

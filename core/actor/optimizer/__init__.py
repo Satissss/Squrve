@@ -6,6 +6,7 @@ from .MACSQLOptimize import MACSQLOptimizer
 from .DINSQLOptimize import DINSQLOptimizer
 from .OpenSearchSQLOptimize import OpenSearchSQLOptimizer
 from .LinkAlignOptimize import LinkAlignOptimizer
+from .ESQLRefineOptimize import ESQLRefineOptimizer
 
 __all__ = [
     "BaseOptimizer",
@@ -16,4 +17,5 @@ __all__ = [
     "DINSQLOptimizer",
     "OpenSearchSQLOptimizer",
     "LinkAlignOptimizer",
+    "ESQLRefineOptimizer",
 ]
