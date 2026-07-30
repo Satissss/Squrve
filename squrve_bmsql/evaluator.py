@@ -8,7 +8,7 @@ import math
 import re
 from collections.abc import Mapping
 from datetime import date, datetime, time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Callable
 
 from .models import (
@@ -38,6 +38,7 @@ _MUTATION_KEYWORDS = frozenset(
         "UPDATE",
     }
 )
+_NATIVE_VALUE_TAG = "__squrve_bmsql_native_v1__"
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
@@ -158,7 +159,38 @@ def _canonical_number(value: int | float | Decimal) -> str:
     return str(decimal_value.normalize())
 
 
+def _tagged_native_parts(value: Any) -> tuple[str, str] | None:
+    if not isinstance(value, Mapping) or set(value) != {_NATIVE_VALUE_TAG}:
+        return None
+    payload = value[_NATIVE_VALUE_TAG]
+    if (
+        not isinstance(payload, list)
+        or len(payload) != 2
+        or not isinstance(payload[0], str)
+        or not isinstance(payload[1], str)
+    ):
+        return None
+    return payload[0], payload[1]
+
+
 def _canonical_value(value: Any) -> list[Any]:
+    tagged = _tagged_native_parts(value)
+    if tagged is not None:
+        kind, payload = tagged
+        if kind == "decimal":
+            try:
+                return ["number", _canonical_number(Decimal(payload))]
+            except (InvalidOperation, ValueError):
+                pass
+        elif kind == "float" and payload in {
+            "nan",
+            "+infinity",
+            "-infinity",
+        }:
+            return ["number", payload]
+        elif kind in {"bytes", "date", "datetime", "time"}:
+            return [kind, payload]
+
     if isinstance(value, Mapping):
         items = [
             [str(key), _canonical_value(item)]
@@ -224,20 +256,22 @@ def _json_safe_value(value: Any) -> Any:
         converted = [_json_safe_value(item) for item in value]
         return sorted(converted, key=lambda item: json.dumps(item, sort_keys=True))
     if isinstance(value, Decimal):
-        return str(value)
+        return {_NATIVE_VALUE_TAG: ["decimal", str(value)]}
     if isinstance(value, datetime):
-        return value.isoformat()
+        return {_NATIVE_VALUE_TAG: ["datetime", value.isoformat()]}
     if isinstance(value, date):
-        return value.isoformat()
+        return {_NATIVE_VALUE_TAG: ["date", value.isoformat()]}
     if isinstance(value, time):
-        return value.isoformat()
+        return {_NATIVE_VALUE_TAG: ["time", value.isoformat()]}
     if isinstance(value, (bytes, bytearray, memoryview)):
-        return base64.b64encode(bytes(value)).decode("ascii")
+        encoded = base64.b64encode(bytes(value)).decode("ascii")
+        return {_NATIVE_VALUE_TAG: ["bytes", encoded]}
     if isinstance(value, float):
         if math.isnan(value):
-            return "NaN"
+            return {_NATIVE_VALUE_TAG: ["float", "nan"]}
         if math.isinf(value):
-            return "-Infinity" if value < 0 else "Infinity"
+            payload = "-infinity" if value < 0 else "+infinity"
+            return {_NATIVE_VALUE_TAG: ["float", payload]}
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     return str(value)
@@ -275,14 +309,14 @@ class Evaluator:
                 error=generation.error or "generation produced no SQL",
                 metadata={"failure_stage": generation.error_stage or "generation"},
             )
+        if self.executor is None:
+            return Evaluation(status=ResultStatus.GENERATED_NOT_EXECUTED)
         if not isinstance(gold_sql, str) or not gold_sql.strip():
             return Evaluation(
                 status=ResultStatus.EXECUTION_FAILED,
                 error="gold SQL must be a non-empty string",
                 metadata={"failure_stage": "gold"},
             )
-        if self.executor is None:
-            return Evaluation(status=ResultStatus.GENERATED_NOT_EXECUTED)
 
         predicted = self.executor.execute(generation.pred_sql, db_id=db_id)
         if not predicted.success:

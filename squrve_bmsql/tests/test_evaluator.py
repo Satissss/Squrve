@@ -84,6 +84,12 @@ class EvaluatorTests(unittest.TestCase):
         self.assertIsNone(evaluation.predicted)
         self.assertIsNone(evaluation.gold)
 
+    def test_offline_valid_prediction_precedes_blank_gold_validation(self):
+        evaluation = Evaluator().evaluate(GENERATED, gold_sql=" \n\t ")
+
+        self.assertEqual(evaluation.status, ResultStatus.GENERATED_NOT_EXECUTED)
+        self.assertIsNone(evaluation.error)
+
     def test_prediction_execution_failure_stops_before_gold(self):
         failure = QueryExecution(
             success=False,
@@ -306,6 +312,16 @@ class FakeClient:
         return self.job
 
 
+class SequenceClient:
+    def __init__(self, jobs):
+        self.jobs = list(jobs)
+        self.calls = []
+
+    def query(self, sql, *, job_config, timeout=None):
+        self.calls.append((sql, job_config, timeout))
+        return self.jobs.pop(0)
+
+
 class FakeBigQueryRow:
     def __init__(self, values):
         self.values = values
@@ -474,17 +490,115 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
             execution.rows,
             [
                 {
-                    "decimal": "1.20",
-                    "date": "2026-07-30",
-                    "datetime": "2026-07-30T12:34:56",
-                    "time": "12:34:56",
-                    "bytes": "AP8=",
-                    "nested": ["2", {"when": "2026-07-31"}],
-                    "nan": "NaN",
+                    "decimal": {
+                        "__squrve_bmsql_native_v1__": ["decimal", "1.20"]
+                    },
+                    "date": {
+                        "__squrve_bmsql_native_v1__": ["date", "2026-07-30"]
+                    },
+                    "datetime": {
+                        "__squrve_bmsql_native_v1__": [
+                            "datetime",
+                            "2026-07-30T12:34:56",
+                        ]
+                    },
+                    "time": {
+                        "__squrve_bmsql_native_v1__": ["time", "12:34:56"]
+                    },
+                    "bytes": {
+                        "__squrve_bmsql_native_v1__": ["bytes", "AP8="]
+                    },
+                    "nested": [
+                        {
+                            "__squrve_bmsql_native_v1__": ["decimal", "2"]
+                        },
+                        {
+                            "when": {
+                                "__squrve_bmsql_native_v1__": [
+                                    "date",
+                                    "2026-07-31",
+                                ]
+                            }
+                        },
+                    ],
+                    "nan": {
+                        "__squrve_bmsql_native_v1__": ["float", "nan"]
+                    },
                 }
             ],
         )
         json.dumps(execution.to_dict(), allow_nan=False)
+
+    def test_tagged_decimal_from_bigquery_matches_integer_execution_result(self):
+        client = SequenceClient(
+            [
+                FakeJob(
+                    [
+                        FakeBigQueryRow(
+                            {
+                                "value": Decimal("1.0"),
+                                "nested": [Decimal("2.00")],
+                            }
+                        )
+                    ]
+                ),
+                FakeJob(
+                    [
+                        FakeBigQueryRow(
+                            {
+                                "value": 1,
+                                "nested": [2],
+                            }
+                        )
+                    ]
+                ),
+            ]
+        )
+        evaluator = Evaluator(self.make_executor(client))
+
+        evaluation = evaluator.evaluate(GENERATED, gold_sql="SELECT gold")
+
+        self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MATCH)
+        json.dumps(evaluation.to_dict(), allow_nan=False)
+
+    def test_tagged_bytes_and_date_do_not_alias_same_text_strings(self):
+        client = SequenceClient(
+            [
+                FakeJob(
+                    [
+                        FakeBigQueryRow(
+                            {
+                                "nested": {
+                                    "bytes": b"\x00\xff",
+                                    "date": date(2026, 7, 30),
+                                }
+                            }
+                        )
+                    ]
+                ),
+                FakeJob(
+                    [
+                        FakeBigQueryRow(
+                            {
+                                "nested": {
+                                    "bytes": "AP8=",
+                                    "date": "2026-07-30",
+                                }
+                            }
+                        )
+                    ]
+                ),
+            ]
+        )
+        evaluator = Evaluator(self.make_executor(client))
+
+        evaluation = evaluator.evaluate(GENERATED, gold_sql="SELECT gold")
+
+        self.assertEqual(
+            evaluation.status,
+            ResultStatus.EXECUTED_RESULT_MISMATCH,
+        )
+        json.dumps(evaluation.to_dict(), allow_nan=False)
 
 
 if __name__ == "__main__":
