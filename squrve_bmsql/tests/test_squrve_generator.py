@@ -120,6 +120,41 @@ class BMSQLGeneratorTests(unittest.TestCase):
         self.assertEqual(dataset[0]["error_stage"], "backend")
         self.assertEqual(dataset[0]["trajectory"], [])
 
+    def test_invalid_request_is_stored_as_failure_evidence(self):
+        dataset = self.make_dataset(question="")
+        generator = BMSQLGenerator(
+            dataset=dataset,
+            backend=MockBMSQLBackend(),
+            is_save=False,
+        )
+
+        sql = generator.act(0, schema=[{"table_name": "genes"}])
+
+        self.assertIsNone(sql)
+        self.assertIsNone(dataset[0]["pred_sql"])
+        self.assertEqual(dataset[0]["error"], "question must be non-empty")
+        self.assertEqual(dataset[0]["error_stage"], "request")
+        self.assertEqual(dataset[0]["trajectory"], [])
+
+    def test_schema_resolution_failure_is_stored_as_failure_evidence(self):
+        dataset = self.make_dataset()
+        generator = BMSQLGenerator(
+            dataset=dataset,
+            backend=MockBMSQLBackend(),
+            is_save=False,
+        )
+
+        sql = generator.act(0)
+
+        self.assertIsNone(sql)
+        self.assertIsNone(dataset[0]["pred_sql"])
+        self.assertEqual(
+            dataset[0]["error"],
+            "Failed to load a valid database schema for the sample",
+        )
+        self.assertEqual(dataset[0]["error_stage"], "schema")
+        self.assertEqual(dataset[0]["trajectory"], [])
+
     def test_process_control_exceptions_are_not_caught(self):
         for exception in (KeyboardInterrupt(), SystemExit()):
             with self.subTest(exception=type(exception).__name__):

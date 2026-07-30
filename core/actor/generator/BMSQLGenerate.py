@@ -71,19 +71,23 @@ class BMSQLGenerator(BaseGenerator):
             **kwargs
     ):
         row = self.dataset[item]
-        request = BMSQLRequest(
-            instance_id=str(row["instance_id"]),
-            question=str(row["question"]),
-            schema=self._resolve_schema(item, schema),
-            domain_context=row.get("external") or row.get("domain_context"),
-            metadata=dict(row.get("metadata") or {}),
-        )
+        error_stage = "schema"
         try:
+            resolved_schema = self._resolve_schema(item, schema)
+            error_stage = "request"
+            request = BMSQLRequest(
+                instance_id=str(row["instance_id"]),
+                question=str(row["question"]),
+                schema=resolved_schema,
+                domain_context=row.get("external") or row.get("domain_context"),
+                metadata=dict(row.get("metadata") or {}),
+            )
+            error_stage = "backend"
             generation = self.backend.generate(request)
         except Exception as exc:
             generation = BMSQLGeneration.failure(
                 str(exc),
-                error_stage="backend",
+                error_stage=error_stage,
             )
         self._store_generation(item, generation)
         return generation.pred_sql
