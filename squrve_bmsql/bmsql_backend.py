@@ -57,7 +57,15 @@ class MockBMSQLBackend:
                 model_metadata=metadata,
             )
 
-        pred_sql = self.sql_by_id.get(request.instance_id, "SELECT 1 AS mock_value")
+        configured_sql = self.sql_by_id.get(request.instance_id, "SELECT 1 AS mock_value")
+        pred_sql = _clean_sql(configured_sql)
+        if not pred_sql:
+            return BMSQLGeneration.failure(
+                "Mock SQL must be a non-empty string",
+                error_stage="mock",
+                latency_seconds=time.perf_counter() - started,
+                model_metadata=metadata,
+            )
         return BMSQLGeneration(
             pred_sql=pred_sql,
             raw_response=pred_sql,
@@ -89,13 +97,17 @@ class UpstreamBMSQLBackend:
             agent = self.agent_factory(request) if self.agent_factory else self.agent
             raw = agent.run_agent(question=request.question, num_passes=self.num_passes)
             if not isinstance(raw, tuple) or len(raw) != 6:
-                raise ValueError("BMSQL agent returned an invalid result tuple")
+                return BMSQLGeneration(
+                    raw_response=raw,
+                    error="BMSQL agent returned an invalid result tuple",
+                    error_stage="upstream_agent",
+                    latency_seconds=time.perf_counter() - started,
+                    model_metadata=self.model_metadata,
+                )
             general_sql, general_rows, refined_sql, refined_rows, answer, tokens = raw
             pred_sql = _clean_sql(refined_sql) or _clean_sql(general_sql)
-            if not pred_sql:
-                raise ValueError("BMSQL returned no SQL")
             return BMSQLGeneration(
-                pred_sql=pred_sql,
+                pred_sql=pred_sql or None,
                 raw_response=raw,
                 stage_outputs={
                     "general_sql_query": general_sql,
@@ -106,6 +118,8 @@ class UpstreamBMSQLBackend:
                     "input_tokens": tokens,
                 },
                 trajectory=_trajectory_from_outputs(raw),
+                error=None if pred_sql else "BMSQL returned no SQL",
+                error_stage=None if pred_sql else "upstream_agent",
                 latency_seconds=time.perf_counter() - started,
                 model_metadata=self.model_metadata,
             )
