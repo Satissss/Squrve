@@ -30,14 +30,16 @@ _SENSITIVE_ASSIGNMENT = re.compile(
     r")\s*([:=])\s*([\"']?)[^\s,;\]\}\"']+\3"
 )
 _BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
-_GOOGLE_OAUTH_ACCESS_TOKEN = re.compile(r"\bya29\.[A-Za-z0-9._-]{20,}\b")
+_GOOGLE_OAUTH_ACCESS_TOKEN = re.compile(
+    r"\bya29\.[A-Za-z0-9._-]{20,}(?![A-Za-z0-9._-])"
+)
 _RECOGNIZABLE_API_TOKEN = re.compile(
     r"\b(?:"
-    r"AIza[0-9A-Za-z_-]{35}|"
-    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|"
-    r"gh[pousr]_[A-Za-z0-9]{30,255}|"
-    r"github_pat_[A-Za-z0-9_]{20,}"
-    r")\b"
+    r"AIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|"
+    r"gh[pousr]_[A-Za-z0-9]{30,255}(?![A-Za-z0-9])|"
+    r"github_pat_[A-Za-z0-9_]{20,}(?![A-Za-z0-9_])"
+    r")"
 )
 _PEM_PRIVATE_KEY = re.compile(
     r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----.*?"

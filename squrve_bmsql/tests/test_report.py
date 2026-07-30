@@ -180,6 +180,24 @@ class ReportTests(unittest.TestCase):
 
         self.assertNotIn(oauth_token, persisted_content)
 
+    def test_write_report_redacts_tokens_ending_in_non_word_characters(self):
+        results = make_twenty_results()
+        oauth_token = "ya29." + "a" * 47 + "-"
+        google_api_key = "AIza" + "A" * 34 + "_"
+        results[0].generation.error = f"remote service returned {oauth_token} {google_api_key}"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_path, markdown_path = write_report(results, temp_dir)
+            persisted_content = (
+                json_path.read_text(encoding="utf-8")
+                + markdown_path.read_text(encoding="utf-8")
+            )
+
+        self.assertNotIn(oauth_token, persisted_content)
+        self.assertNotIn(google_api_key, persisted_content)
+        self.assertNotIn(f"[REDACTED]-", persisted_content)
+        self.assertNotIn(f"[REDACTED]_", persisted_content)
+
     def test_write_report_normalizes_nested_non_finite_floats_for_strict_json(self):
         results = make_twenty_results()
         results[0].generation.model_metadata["nested"] = {
