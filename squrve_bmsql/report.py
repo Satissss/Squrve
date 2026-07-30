@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import Any
 
 from .models import ResultStatus, SampleResult
-from .runner import _atomic_write_json, redact_secrets
+from .runner import (
+    _atomic_write_json,
+    _redact_literal_values,
+    _sensitive_string_values,
+    redact_secrets,
+)
 
 
 _REDACTED = "[REDACTED]"
@@ -25,12 +30,30 @@ _SENSITIVE_ASSIGNMENT = re.compile(
     r")\s*([:=])\s*([\"']?)[^\s,;\]\}\"']+\3"
 )
 _BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
+_RECOGNIZABLE_API_TOKEN = re.compile(
+    r"\b(?:"
+    r"AIza[0-9A-Za-z_-]{35}|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}|"
+    r"gh[pousr]_[A-Za-z0-9]{30,255}|"
+    r"github_pat_[A-Za-z0-9_]{20,}"
+    r")\b"
+)
+_PEM_PRIVATE_KEY = re.compile(
+    r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----.*?"
+    r"-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----",
+    re.DOTALL,
+)
+_GOOGLE_SERVICE_ACCOUNT = re.compile(
+    r'\{(?=[^{}]{0,8192}"type"\s*:\s*"service_account")[^{}]*\}',
+    re.DOTALL,
+)
 
 
 def build_report(
     results: Sequence[SampleResult], *, limitations: Sequence[str] = ()
 ) -> dict[str, Any]:
     """Build a JSON-compatible pilot report without executing any SQL."""
+    secret_values = _sensitive_values_from_results(results)
     status_counts = {status.value: 0 for status in ResultStatus}
     failure_stage_counts: Counter[str] = Counter()
     questions: list[dict[str, Any]] = []
@@ -74,7 +97,7 @@ def build_report(
         "limitations": [str(limitation) for limitation in limitations],
         "questions": questions,
     }
-    return _redact_report_value(report)
+    return _redact_report_value(report, secret_values)
 
 
 def render_markdown(report: Mapping[str, Any]) -> str:
@@ -87,7 +110,8 @@ def render_markdown(report: Mapping[str, Any]) -> str:
             f"- Generated: {clean_report.get('generated_count', 0)}",
             f"- Execution successes: {clean_report.get('execution_success_count', 0)}",
             f"- Result matches: {clean_report.get('match_count', 0)}",
-            f"- Most common failure stage: {clean_report.get('most_common_failure_stage') or 'none'}",
+            "- Most common failure stage: "
+            f"{_escape_markdown_prose(clean_report.get('most_common_failure_stage') or 'none')}",
             "",
             "### Status counts",
             "",
@@ -98,7 +122,10 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     lines.extend(("", "### Failure stages", ""))
     failure_stages = clean_report.get("failure_stage_counts", {})
     if failure_stages:
-        lines.extend(f"- {stage}: {count}" for stage, count in failure_stages.items())
+        lines.extend(
+            f"- {_escape_markdown_prose(stage)}: {count}"
+            for stage, count in failure_stages.items()
+        )
     else:
         lines.append("- none")
     lines.extend(("", "### Latency", ""))
@@ -110,7 +137,7 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     lines.extend(("", "## Limitations", ""))
     limitations = clean_report.get("limitations", [])
     if limitations:
-        lines.extend(f"- {limitation}" for limitation in limitations)
+        lines.extend(f"- {_escape_markdown_prose(limitation)}" for limitation in limitations)
     else:
         lines.append("- none recorded")
 
@@ -118,35 +145,35 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     for question in clean_report.get("questions", []):
         lines.extend(
             (
-                f"### {question.get('instance_id', 'unknown')}: {question.get('question', '')}",
+                "### "
+                f"{_escape_markdown_prose(question.get('instance_id', 'unknown'))}: "
+                f"{_escape_markdown_prose(question.get('question', ''))}",
                 "",
-                f"- Status: {question.get('status', '')}",
-                f"- Failure stage: {question.get('failure_stage') or 'none'}",
-                f"- Error: {question.get('error') or 'none'}",
+                f"- Status: {_escape_markdown_prose(question.get('status', ''))}",
+                "- Failure stage: "
+                f"{_escape_markdown_prose(question.get('failure_stage') or 'none')}",
+                f"- Error: {_escape_markdown_prose(question.get('error') or 'none')}",
                 "",
                 "#### Gold SQL",
                 "",
-                "```sql",
-                str(question.get("gold_sql", "")),
-                "```",
+                _fenced_code_block(question.get("gold_sql", ""), "sql"),
                 "",
                 "#### Predicted SQL",
                 "",
-                "```sql",
-                str(question.get("predicted_sql") or ""),
-                "```",
+                _fenced_code_block(question.get("predicted_sql") or "", "sql"),
                 "",
                 "#### Metadata",
                 "",
-                "```json",
-                _json_for_markdown(
-                    {
-                        "backend_metadata": question.get("backend_metadata", {}),
-                        "model_metadata": question.get("model_metadata", {}),
-                        "sample_metadata": question.get("sample_metadata", {}),
-                    }
+                _fenced_code_block(
+                    _json_for_markdown(
+                        {
+                            "backend_metadata": question.get("backend_metadata", {}),
+                            "model_metadata": question.get("model_metadata", {}),
+                            "sample_metadata": question.get("sample_metadata", {}),
+                        }
+                    ),
+                    "json",
                 ),
-                "```",
                 "",
             )
         )
@@ -230,8 +257,17 @@ def _latency_summary(latencies: Sequence[float]) -> dict[str, float | int | None
     }
 
 
-def _redact_report_value(value: Any) -> Any:
-    return _redact_error_strings(redact_secrets(value))
+def _sensitive_values_from_results(results: Sequence[SampleResult]) -> set[str]:
+    return set().union(
+        *(_sensitive_string_values(result.to_dict()) for result in results)
+    )
+
+
+def _redact_report_value(value: Any, sensitive_values: set[str] | None = None) -> Any:
+    redacted = redact_secrets(value)
+    if sensitive_values:
+        redacted = _redact_literal_values(redacted, sensitive_values)
+    return _redact_error_strings(redacted)
 
 
 def _redact_error_strings(value: Any) -> Any:
@@ -240,9 +276,27 @@ def _redact_error_strings(value: Any) -> Any:
     if isinstance(value, list):
         return [_redact_error_strings(item) for item in value]
     if isinstance(value, str):
+        value = _GOOGLE_SERVICE_ACCOUNT.sub(_REDACTED, value)
+        value = _PEM_PRIVATE_KEY.sub(_REDACTED, value)
+        value = _RECOGNIZABLE_API_TOKEN.sub(_REDACTED, value)
         value = _SENSITIVE_ASSIGNMENT.sub(lambda match: f"{match.group(1)}{match.group(2)}{_REDACTED}", value)
         return _BEARER_VALUE.sub(f"Bearer {_REDACTED}", value)
     return value
+
+
+def _escape_markdown_prose(value: Any) -> str:
+    text = str(value)
+    text = text.replace("\\", "\\\\")
+    for character in "`*_[]()#+-!>|":
+        text = text.replace(character, f"\\{character}")
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\\n")
+
+
+def _fenced_code_block(value: Any, language: str) -> str:
+    text = str(value)
+    longest_backtick_run = max((len(run) for run in re.findall(r"`+", text)), default=2)
+    fence = "`" * max(3, longest_backtick_run + 1)
+    return f"{fence}{language}\n{text}\n{fence}"
 
 
 def _json_for_markdown(value: Any) -> str:

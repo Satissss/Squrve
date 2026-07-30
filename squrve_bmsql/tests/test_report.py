@@ -91,6 +91,81 @@ class ReportTests(unittest.TestCase):
             self.assertNotIn(secret, json_content)
             self.assertNotIn(secret, markdown_content)
 
+    def test_write_report_removes_sensitive_literals_from_every_field(self):
+        results = make_twenty_results()
+        credential = "pilot-credential-value-0123456789"
+        results[0].generation.model_metadata["api_key"] = credential
+        results[0].question = f"Question containing {credential}"
+        results[0].gold_sql = f"SELECT '{credential}'"
+        results[0].generation.pred_sql = f"SELECT '{credential}'"
+        results[0].generation.error = f"unlabeled free-form failure {credential}"
+        results[0].metadata["ordinary_note"] = f"copied {credential}"
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_path, markdown_path = write_report(results, temp_dir)
+            persisted_content = (
+                json_path.read_text(encoding="utf-8")
+                + markdown_path.read_text(encoding="utf-8")
+            )
+
+        self.assertNotIn(credential, persisted_content)
+
+    def test_write_report_redacts_recognizable_raw_credential_patterns(self):
+        results = make_twenty_results()
+        google_api_key = "AIza" + "A" * 35
+        pem_private_key = (
+            "-----BEGIN PRIVATE KEY-----\n"
+            "not-a-real-key-material\n"
+            "-----END PRIVATE KEY-----"
+        )
+        service_account_material = (
+            '{"type":"service_account","project_id":"private-project",'
+            '"client_email":"service@example.invalid"}'
+        )
+        results[0].generation.error = " ".join(
+            (google_api_key, pem_private_key, service_account_material)
+        )
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_path, markdown_path = write_report(results, temp_dir)
+            persisted_content = (
+                json_path.read_text(encoding="utf-8")
+                + markdown_path.read_text(encoding="utf-8")
+            )
+
+        for raw_credential in (google_api_key, pem_private_key, service_account_material):
+            self.assertNotIn(raw_credential, persisted_content)
+
+    def test_markdown_escapes_prose_and_uses_safe_fences(self):
+        results = make_twenty_results()
+        results[0].question = "# injected heading\n- injected list [link](https://example.invalid)"
+        results[0].generation.error = "## injected error\n* [another](https://example.invalid)"
+        results[0].gold_sql = "SELECT '```';\n````sql\nnot a report fence"
+        results[0].generation.pred_sql = "SELECT '`````';"
+        results[0].metadata["note"] = "``````json\nnot a metadata fence"
+
+        markdown = render_markdown(build_report(results, limitations=["- injected limitation"]))
+
+        self.assertIn(r"\# injected heading\n\- injected list \[link\]\(https://example.invalid\)", markdown)
+        self.assertIn(r"\#\# injected error\n\* \[another\]\(https://example.invalid\)", markdown)
+        self.assertIn(r"\- injected limitation", markdown)
+        self.assertIn("`````sql\nSELECT '```';\n````sql\nnot a report fence\n`````", markdown)
+        self.assertIn("```````json\n", markdown)
+        self.assertIn('"note": "``````json\\nnot a metadata fence"', markdown)
+        self.assertEqual(markdown.count("# BMSQL Pilot Outcome Report"), 1)
+
+    def test_latency_summary_ignores_non_finite_values(self):
+        results = make_twenty_results()
+        results[0].generation.latency_seconds = float("nan")
+        results[1].generation.latency_seconds = float("inf")
+        results[2].generation.latency_seconds = float("-inf")
+        results[3].generation.latency_seconds = True
+
+        report = build_report(results)
+
+        self.assertEqual(report["latency_summary"]["count"], 16)
+        self.assertEqual(report["latency_summary"]["min_seconds"], 0.14)
+
 
 if __name__ == "__main__":
     unittest.main()
