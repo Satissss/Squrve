@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import base64
+import json
+import math
 import re
 from collections.abc import Mapping
+from datetime import date, datetime, time
+from decimal import Decimal
 from typing import Any, Callable
 
 from .models import (
@@ -134,29 +139,120 @@ def is_read_only_sql(sql: str) -> bool:
     return not _MUTATION_KEYWORDS.intersection(tokens)
 
 
-def _canonical_value(value: Any) -> tuple[Any, ...]:
+def _canonical_number(value: int | float | Decimal) -> str:
+    if isinstance(value, float):
+        if math.isnan(value):
+            return "nan"
+        if math.isinf(value):
+            return "-infinity" if value < 0 else "+infinity"
+        decimal_value = Decimal(str(value))
+    else:
+        decimal_value = Decimal(value)
+
+    if decimal_value.is_nan():
+        return "nan"
+    if decimal_value.is_infinite():
+        return "-infinity" if decimal_value.is_signed() else "+infinity"
+    if decimal_value.is_zero():
+        return "0"
+    return str(decimal_value.normalize())
+
+
+def _canonical_value(value: Any) -> list[Any]:
     if isinstance(value, Mapping):
-        items = (
-            (str(key), _canonical_value(item))
+        items = [
+            [str(key), _canonical_value(item)]
             for key, item in value.items()
-        )
-        return ("mapping", tuple(sorted(items, key=lambda pair: pair[0])))
+        ]
+        return ["mapping", sorted(items, key=lambda pair: pair[0])]
     if isinstance(value, (list, tuple)):
-        return ("sequence", tuple(_canonical_value(item) for item in value))
+        return ["sequence", [_canonical_value(item) for item in value]]
     if isinstance(value, (set, frozenset)):
         items = [_canonical_value(item) for item in value]
-        return ("set", tuple(sorted(items, key=repr)))
-    return (
-        "scalar",
+        serialized = (
+            json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            for item in items
+        )
+        return ["set", sorted(serialized)]
+    if value is None:
+        return ["none", None]
+    if isinstance(value, bool):
+        return ["bool", value]
+    if isinstance(value, (int, float, Decimal)):
+        return ["number", _canonical_number(value)]
+    if isinstance(value, str):
+        return ["string", value]
+    if isinstance(value, datetime):
+        return ["datetime", value.isoformat()]
+    if isinstance(value, date):
+        return ["date", value.isoformat()]
+    if isinstance(value, time):
+        return ["time", value.isoformat()]
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        encoded = base64.b64encode(bytes(value)).decode("ascii")
+        return ["bytes", encoded]
+    return [
+        "unknown",
         f"{type(value).__module__}.{type(value).__qualname__}",
-        repr(value),
-    )
+        str(value),
+    ]
 
 
-def canonical_rows(rows: list[dict[str, Any]]) -> tuple[tuple[Any, ...], ...]:
+def canonical_rows(rows: list[dict[str, Any]]) -> tuple[str, ...]:
     """Canonicalize rows as an order-insensitive multiset."""
-    canonical = [_canonical_value(row) for row in rows]
-    return tuple(sorted(canonical, key=repr))
+    canonical = (
+        json.dumps(
+            _canonical_value(row),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        for row in rows
+    )
+    return tuple(sorted(canonical))
+
+
+def _json_safe_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _json_safe_value(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+    if isinstance(value, (set, frozenset)):
+        converted = [_json_safe_value(item) for item in value]
+        return sorted(converted, key=lambda item: json.dumps(item, sort_keys=True))
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    if isinstance(value, time):
+        return value.isoformat()
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return base64.b64encode(bytes(value)).decode("ascii")
+    if isinstance(value, float):
+        if math.isnan(value):
+            return "NaN"
+        if math.isinf(value):
+            return "-Infinity" if value < 0 else "Infinity"
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
+
+
+def _json_safe_row(row: Any) -> dict[str, Any]:
+    if isinstance(row, Mapping):
+        mapping = row
+    else:
+        items = getattr(row, "items", None)
+        mapping = dict(items()) if callable(items) else dict(row)
+    return {
+        str(key): _json_safe_value(value)
+        for key, value in mapping.items()
+    }
 
 
 class Evaluator:
@@ -170,11 +266,20 @@ class Evaluator:
         gold_sql: str,
         db_id: str | None = None,
     ) -> Evaluation:
-        if not generation.pred_sql:
+        if (
+            not isinstance(generation.pred_sql, str)
+            or not generation.pred_sql.strip()
+        ):
             return Evaluation(
                 status=ResultStatus.GENERATION_FAILED,
                 error=generation.error or "generation produced no SQL",
                 metadata={"failure_stage": generation.error_stage or "generation"},
+            )
+        if not isinstance(gold_sql, str) or not gold_sql.strip():
+            return Evaluation(
+                status=ResultStatus.EXECUTION_FAILED,
+                error="gold SQL must be a non-empty string",
+                metadata={"failure_stage": "gold"},
             )
         if self.executor is None:
             return Evaluation(status=ResultStatus.GENERATED_NOT_EXECUTED)
@@ -206,7 +311,62 @@ class Evaluator:
         return Evaluation(status=status, predicted=predicted, gold=gold)
 
 
+def _normalized_signal(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value).lower())
+
+
+def _structured_error_type(error: Exception) -> str | None:
+    raw_errors = getattr(error, "errors", None)
+    if isinstance(raw_errors, Mapping):
+        entries = [raw_errors]
+    elif isinstance(raw_errors, (list, tuple)):
+        entries = list(raw_errors)
+    else:
+        entries = []
+
+    signals: set[str] = set()
+    has_structured_entry = False
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            continue
+        has_structured_entry = True
+        for field in ("reason", "code", "status"):
+            value = entry.get(field)
+            if value is not None:
+                signals.add(_normalized_signal(value))
+
+    permission_signals = {"403", "accessdenied", "forbidden", "permissiondenied"}
+    timeout_signals = {
+        "408",
+        "504",
+        "deadlineexceeded",
+        "requesttimeout",
+        "timeout",
+    }
+    if "invalidquery" in signals:
+        return "syntax"
+    if permission_signals.intersection(signals):
+        return "permission"
+    if timeout_signals.intersection(signals):
+        return "timeout"
+    if has_structured_entry:
+        return "execution_error"
+
+    code = getattr(error, "code", None)
+    if code is not None and not callable(code):
+        normalized_code = _normalized_signal(code)
+        if normalized_code in permission_signals:
+            return "permission"
+        if normalized_code in timeout_signals:
+            return "timeout"
+    return None
+
+
 def _classify_error(error: Exception) -> str:
+    structured_type = _structured_error_type(error)
+    if structured_type is not None:
+        return structured_type
+
     class_names = " ".join(
         cls.__name__.lower() for cls in type(error).__mro__
     )
@@ -229,13 +389,14 @@ def _classify_error(error: Exception) -> str:
     ):
         return "permission"
     if (
-        "badrequest" in class_names
-        or "invalidargument" in class_names
-        or "syntax" in message
+        "syntax error" in message
         or "parse error" in message
+        or "invalid sql" in message
+        or "unrecognized name" in message
+        or "unexpected keyword" in message
     ):
         return "syntax"
-    return "execution"
+    return "execution_error"
 
 
 class BigQueryReadOnlyExecutor:
@@ -283,12 +444,13 @@ class BigQueryReadOnlyExecutor:
             if db_id is not None:
                 config.default_dataset = db_id
 
-            job = self.client.query(sql, job_config=config)
-            if self.timeout_seconds is None:
-                result = job.result()
-            else:
-                result = job.result(timeout=self.timeout_seconds)
-            rows = [dict(row) for row in result]
+            job = self.client.query(
+                sql,
+                job_config=config,
+                timeout=self.timeout_seconds,
+            )
+            result = job.result(timeout=self.timeout_seconds)
+            rows = [_json_safe_row(row) for row in result]
             metadata = {"db_id": db_id}
             for attribute in ("job_id", "total_bytes_processed"):
                 value = getattr(job, attribute, None)

@@ -1,4 +1,7 @@
+import json
 import unittest
+from datetime import date, datetime, time
+from decimal import Decimal
 
 from squrve_bmsql.evaluator import (
     BigQueryReadOnlyExecutor,
@@ -22,6 +25,37 @@ class SequenceExecutor:
 
 
 class EvaluatorTests(unittest.TestCase):
+    def test_blank_or_non_string_prediction_is_generation_failure_offline(self):
+        for pred_sql in ("", " \n\t ", 7):
+            with self.subTest(pred_sql=pred_sql):
+                evaluation = Evaluator().evaluate(
+                    BMSQLGeneration(pred_sql=pred_sql),
+                    gold_sql="SELECT gold",
+                )
+
+                self.assertEqual(
+                    evaluation.status,
+                    ResultStatus.GENERATION_FAILED,
+                )
+
+    def test_blank_or_non_string_gold_is_execution_failure_without_execution(self):
+        for gold_sql in ("", " \n\t ", None, 7):
+            with self.subTest(gold_sql=gold_sql):
+                executor = SequenceExecutor([])
+
+                evaluation = Evaluator(executor).evaluate(
+                    GENERATED,
+                    gold_sql=gold_sql,
+                )
+
+                self.assertEqual(
+                    evaluation.status,
+                    ResultStatus.EXECUTION_FAILED,
+                )
+                self.assertEqual(evaluation.metadata["failure_stage"], "gold")
+                self.assertIn("gold SQL", evaluation.error)
+                self.assertEqual(executor.calls, [])
+
     def test_generation_failure_takes_precedence_over_offline_status(self):
         evaluation = Evaluator().evaluate(
             BMSQLGeneration.failure("model unavailable", error_stage="model"),
@@ -136,6 +170,60 @@ class EvaluatorTests(unittest.TestCase):
 
         self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MISMATCH)
 
+    def test_equivalent_native_numeric_values_match(self):
+        executor = SequenceExecutor(
+            [
+                QueryExecution(
+                    success=True,
+                    rows=[
+                        {
+                            "zero": -0.0,
+                            "integer": 1,
+                            "decimal": Decimal("1.00"),
+                            "nan": float("nan"),
+                            "positive_infinity": float("inf"),
+                            "negative_infinity": Decimal("-Infinity"),
+                        }
+                    ],
+                ),
+                QueryExecution(
+                    success=True,
+                    rows=[
+                        {
+                            "zero": Decimal("-0"),
+                            "integer": 1.0,
+                            "decimal": 1,
+                            "nan": Decimal("NaN"),
+                            "positive_infinity": Decimal("Infinity"),
+                            "negative_infinity": float("-inf"),
+                        }
+                    ],
+                ),
+            ]
+        )
+
+        evaluation = Evaluator(executor).evaluate(
+            GENERATED,
+            gold_sql="SELECT gold",
+        )
+
+        self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MATCH)
+
+    def test_boolean_does_not_compare_equal_to_number(self):
+        executor = SequenceExecutor(
+            [
+                QueryExecution(success=True, rows=[{"value": True}]),
+                QueryExecution(success=True, rows=[{"value": 1}]),
+            ]
+        )
+
+        evaluation = Evaluator(executor).evaluate(
+            GENERATED,
+            gold_sql="SELECT gold",
+        )
+
+        self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MISMATCH)
+
 
 class ReadOnlySQLTests(unittest.TestCase):
     def test_accepts_select_and_with_queries(self):
@@ -191,14 +279,17 @@ class FakeQueryConfig:
 
 
 class FakeJob:
-    def __init__(self, rows):
+    def __init__(self, rows=None, error=None):
         self.rows = rows
+        self.error = error
         self.result_calls = []
         self.job_id = "fake-job"
         self.total_bytes_processed = 123
 
     def result(self, *, timeout=None):
         self.result_calls.append(timeout)
+        if self.error is not None:
+            raise self.error
         return self.rows
 
 
@@ -208,11 +299,19 @@ class FakeClient:
         self.error = error
         self.calls = []
 
-    def query(self, sql, *, job_config):
-        self.calls.append((sql, job_config))
+    def query(self, sql, *, job_config, timeout=None):
+        self.calls.append((sql, job_config, timeout))
         if self.error is not None:
             raise self.error
         return self.job
+
+
+class FakeBigQueryRow:
+    def __init__(self, values):
+        self.values = values
+
+    def items(self):
+        return self.values.items()
 
 
 class BigQueryReadOnlyExecutorTests(unittest.TestCase):
@@ -240,10 +339,11 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
         self.assertTrue(execution.success)
         self.assertEqual(execution.rows, [{"b": 2, "a": 1}])
         self.assertEqual(len(client.calls), 1)
-        _, config = client.calls[0]
+        _, config, query_timeout = client.calls[0]
         self.assertFalse(config.use_legacy_sql)
         self.assertEqual(config.maximum_bytes_billed, 4096)
         self.assertEqual(config.default_dataset, "project.dataset")
+        self.assertEqual(query_timeout, 7)
         self.assertEqual(job.result_calls, [7])
         self.assertEqual(execution.metadata["db_id"], "project.dataset")
         self.assertEqual(execution.metadata["job_id"], "fake-job")
@@ -269,12 +369,27 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
         self.assertEqual(execution.error_type, "syntax")
         self.assertIn("Syntax error", execution.error)
 
-    def test_classifies_permission_failure(self):
-        class Forbidden(Exception):
-            pass
+    def test_classifies_structured_invalid_query_from_result(self):
+        class BadRequest(Exception):
+            def __init__(self):
+                super().__init__("request rejected")
+                self.errors = [{"reason": "invalidQuery", "code": 400}]
 
         execution = self.make_executor(
-            FakeClient(error=Forbidden("Access Denied"))
+            FakeClient(job=FakeJob(error=BadRequest()))
+        ).execute("SELECT invalid")
+
+        self.assertFalse(execution.success)
+        self.assertEqual(execution.error_type, "syntax")
+
+    def test_classifies_permission_failure(self):
+        class Forbidden(Exception):
+            def __init__(self):
+                super().__init__("request rejected")
+                self.errors = [{"reason": "accessDenied", "code": 403}]
+
+        execution = self.make_executor(
+            FakeClient(error=Forbidden())
         ).execute("SELECT 1")
 
         self.assertFalse(execution.success)
@@ -282,14 +397,94 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
 
     def test_classifies_timeout_failure(self):
         class DeadlineExceeded(Exception):
-            pass
+            def __init__(self):
+                super().__init__("request rejected")
+                self.errors = [{"reason": "deadlineExceeded", "code": 504}]
 
         execution = self.make_executor(
-            FakeClient(error=DeadlineExceeded("deadline exceeded"))
+            FakeClient(error=DeadlineExceeded())
         ).execute("SELECT 1")
 
         self.assertFalse(execution.success)
         self.assertEqual(execution.error_type, "timeout")
+
+    def test_submission_timeout_is_classified_and_passed_to_query(self):
+        client = FakeClient(error=TimeoutError("submission timed out"))
+
+        execution = self.make_executor(
+            client,
+            timeout_seconds=3,
+        ).execute("SELECT 1")
+
+        self.assertFalse(execution.success)
+        self.assertEqual(execution.error_type, "timeout")
+        self.assertEqual(client.calls[0][2], 3)
+
+    def test_non_syntax_bad_request_reasons_are_execution_errors(self):
+        class BadRequest(Exception):
+            def __init__(self, message, errors=None):
+                super().__init__(message)
+                if errors is not None:
+                    self.errors = errors
+
+        class InvalidArgument(Exception):
+            pass
+
+        errors = (
+            BadRequest(
+                "Resources exceeded during query execution",
+                [{"reason": "resourcesExceeded", "code": 400}],
+            ),
+            BadRequest("Maximum bytes billed limit exceeded"),
+            BadRequest("Invalid query configuration"),
+            InvalidArgument("Invalid job configuration"),
+        )
+
+        for error in errors:
+            with self.subTest(error=error):
+                execution = self.make_executor(
+                    FakeClient(error=error)
+                ).execute("SELECT 1")
+
+                self.assertFalse(execution.success)
+                self.assertEqual(execution.error_type, "execution_error")
+
+    def test_bigquery_native_values_are_converted_to_json_safe_rows(self):
+        row = FakeBigQueryRow(
+            {
+                "decimal": Decimal("1.20"),
+                "date": date(2026, 7, 30),
+                "datetime": datetime(2026, 7, 30, 12, 34, 56),
+                "time": time(12, 34, 56),
+                "bytes": b"\x00\xff",
+                "nested": (
+                    Decimal("2"),
+                    {"when": date(2026, 7, 31)},
+                ),
+                "nan": float("nan"),
+            }
+        )
+
+        execution = self.make_executor(
+            FakeClient(job=FakeJob([row]))
+        ).execute("SELECT native_values")
+
+        self.assertTrue(execution.success)
+        self.assertEqual(
+            execution.rows,
+            [
+                {
+                    "decimal": "1.20",
+                    "date": "2026-07-30",
+                    "datetime": "2026-07-30T12:34:56",
+                    "time": "12:34:56",
+                    "bytes": "AP8=",
+                    "nested": ["2", {"when": "2026-07-31"}],
+                    "nan": "NaN",
+                }
+            ],
+        )
+        json.dumps(execution.to_dict(), allow_nan=False)
 
 
 if __name__ == "__main__":
