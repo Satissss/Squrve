@@ -2,11 +2,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from squrve_bmsql.bmsql_backend import MockBMSQLBackend
 from squrve_bmsql.evaluator import Evaluator
-from squrve_bmsql.models import ResultStatus
-from squrve_bmsql.runner import PilotRunner, redact_secrets
+from squrve_bmsql.models import BMSQLGeneration, ResultStatus
+from squrve_bmsql.runner import PilotRunner, _atomic_write_json, redact_secrets
 
 
 class CountingBackend(MockBMSQLBackend):
@@ -28,6 +29,20 @@ class InterruptingBackend(CountingBackend):
         if len(self.calls) + 1 == self.interrupt_on_call:
             raise KeyboardInterrupt()
         return super().generate(request)
+
+
+class SensitiveBackend:
+    def __init__(self, secret):
+        self.secret = secret
+
+    def generate(self, request):
+        return BMSQLGeneration(
+            raw_response={"private_key": self.secret},
+            stage_outputs={"access_token": self.secret},
+            error=f"backend rejected configured value {self.secret}",
+            error_stage="backend",
+            model_metadata={"google_application_credentials": self.secret},
+        )
 
 
 class PilotRunnerTests(unittest.TestCase):
@@ -129,6 +144,29 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(resumed_backend.calls, ["Q02"])
         self.assertEqual(results[1].instance_id, "Q02")
 
+    def test_resume_regenerates_mismatched_or_statusless_checkpoints(self):
+        for invalid_checkpoint in (
+            {"instance_id": "other"},
+            {"instance_id": "Q02", "evaluation": {}},
+            {
+                "instance_id": "Q02",
+                "question": "Question two?",
+                "gold_sql": "SELECT 2",
+                "generation": {},
+                "evaluation": {"status": "not-a-status"},
+            },
+        ):
+            with self.subTest(invalid_checkpoint=invalid_checkpoint):
+                self.make_runner(CountingBackend()).run()
+                checkpoint = self.output / "samples" / "Q02.json"
+                checkpoint.write_text(json.dumps(invalid_checkpoint), encoding="utf-8")
+
+                resumed_backend = CountingBackend()
+                results = self.make_runner(resumed_backend).run(resume=True)
+
+                self.assertEqual(resumed_backend.calls, ["Q02"])
+                self.assertEqual(results[1].instance_id, "Q02")
+
     def test_sample_results_are_atomic_and_results_are_regenerated(self):
         results = self.make_runner(CountingBackend()).run()
 
@@ -142,6 +180,17 @@ class PilotRunnerTests(unittest.TestCase):
             [result.to_dict() for result in results],
         )
         self.assertEqual(list((self.output / "samples").glob(".*")), [])
+
+    def test_atomic_write_keeps_existing_file_when_replacement_fails(self):
+        path = self.output / "samples" / "Q01.json"
+        _atomic_write_json(path, {"value": "original"})
+
+        with patch("squrve_bmsql.runner.os.replace", side_effect=OSError("interrupted")):
+            with self.assertRaisesRegex(OSError, "interrupted"):
+                _atomic_write_json(path, {"value": "replacement"})
+
+        self.assertEqual(json.loads(path.read_text(encoding="utf-8")), {"value": "original"})
+        self.assertEqual(list(path.parent.glob(f".{path.name}.*")), [])
 
     def test_metadata_redacts_nested_secrets(self):
         self.make_runner(CountingBackend()).run()
@@ -162,6 +211,69 @@ class PilotRunnerTests(unittest.TestCase):
         self.assertEqual(redacted["token"], "[REDACTED]")
         self.assertEqual(redacted["ordinary"], [1, {"secret": "[REDACTED]"}])
         json.dumps(redacted)
+
+    def test_redact_secrets_catches_common_compound_keys_but_not_token_counts(self):
+        redacted = redact_secrets(
+            {
+                "API_KEY": "a",
+                "access_token": "b",
+                "db_password": "c",
+                "user_credentials": "d",
+                "private_key": "e",
+                "service_account": "f",
+                "google_application_credentials": "g",
+                "token_count": 19,
+                "nested": [{"client_secret": "h"}],
+            }
+        )
+
+        for key in (
+            "API_KEY",
+            "access_token",
+            "db_password",
+            "user_credentials",
+            "private_key",
+            "service_account",
+            "google_application_credentials",
+        ):
+            self.assertEqual(redacted[key], "[REDACTED]")
+        self.assertEqual(redacted["nested"][0]["client_secret"], "[REDACTED]")
+        self.assertEqual(redacted["token_count"], 19)
+
+    def test_persisted_artifacts_redact_values_but_returned_results_do_not(self):
+        secret = "review-only-sensitive-value"
+        self.rows[0]["metadata"] = {
+            "service_account": secret,
+            "token_count": 3,
+        }
+        runner = self.make_runner(SensitiveBackend(secret))
+        runner.run_config["api_key"] = secret
+
+        results = runner.run()
+
+        self.assertEqual(results[0].metadata["service_account"], secret)
+        self.assertEqual(results[0].generation.raw_response["private_key"], secret)
+        self.assertIn(secret, results[0].generation.error)
+        for path in (
+            self.output / "run_metadata.json",
+            self.output / "samples" / "Q01.json",
+            self.output / "results.json",
+        ):
+            persisted = path.read_text(encoding="utf-8")
+            self.assertNotIn(secret, persisted)
+            self.assertIn("[REDACTED]", persisted)
+        persisted_checkpoint = json.loads(
+            (self.output / "samples" / "Q01.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(persisted_checkpoint["metadata"]["token_count"], 3)
+
+    def test_system_exit_propagates_for_resume_safety(self):
+        class ExitingBackend(CountingBackend):
+            def generate(self, request):
+                raise SystemExit(7)
+
+        with self.assertRaises(SystemExit):
+            self.make_runner(ExitingBackend()).run()
 
 
 if __name__ == "__main__":

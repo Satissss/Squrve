@@ -18,7 +18,26 @@ from .models import BMSQLGeneration, Evaluation, ResultStatus, SampleResult
 
 
 _REDACTED = "[REDACTED]"
-_SECRET_KEYS = frozenset({"api_key", "token", "password", "credential", "secret"})
+_NON_SECRET_TOKEN_KEYS = frozenset(
+    {"inputtokens", "outputtokens", "tokencount", "totaltokens"}
+)
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    normalized = "".join(character for character in str(key).casefold() if character.isalnum())
+    if normalized in _NON_SECRET_TOKEN_KEYS or (
+        "token" in normalized and normalized.endswith(("count", "counts"))
+    ):
+        return False
+    return (
+        "apikey" in normalized
+        or "password" in normalized
+        or "credential" in normalized
+        or "secret" in normalized
+        or "privatekey" in normalized
+        or "serviceaccount" in normalized
+        or "token" in normalized
+    )
 
 
 def redact_secrets(value: Any) -> Any:
@@ -27,7 +46,7 @@ def redact_secrets(value: Any) -> Any:
         return {
             str(key): (
                 _REDACTED
-                if str(key).casefold() in _SECRET_KEYS
+                if _is_sensitive_key(key)
                 else redact_secrets(item)
             )
             for key, item in value.items()
@@ -39,6 +58,44 @@ def redact_secrets(value: Any) -> Any:
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
     return str(value)
+
+
+def _sensitive_string_values(value: Any) -> set[str]:
+    """Find literal values nested beneath sensitive configuration or row keys."""
+    if isinstance(value, Mapping):
+        values: set[str] = set()
+        for key, item in value.items():
+            if _is_sensitive_key(key):
+                values.update(_all_string_values(item))
+            else:
+                values.update(_sensitive_string_values(item))
+        return values
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return set().union(*(_sensitive_string_values(item) for item in value))
+    return set()
+
+
+def _all_string_values(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        return set().union(*(_all_string_values(item) for item in value.values()))
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return set().union(*(_all_string_values(item) for item in value))
+    return {value} if isinstance(value, str) and value else set()
+
+
+def _redact_literal_values(value: Any, sensitive_values: set[str]) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _redact_literal_values(item, sensitive_values)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_literal_values(item, sensitive_values) for item in value]
+    if isinstance(value, str):
+        for sensitive_value in sorted(sensitive_values, key=len, reverse=True):
+            value = value.replace(sensitive_value, _REDACTED)
+        return value
+    return value
 
 
 def _atomic_write_json(path: Path, value: Any) -> None:
@@ -75,6 +132,7 @@ class PilotRunner:
         self.evaluator = evaluator
         self.output_dir = Path(output_dir)
         self.run_config = dict(run_config or {})
+        self._secret_values: set[str] = set()
 
     @property
     def _samples_dir(self) -> Path:
@@ -82,15 +140,25 @@ class PilotRunner:
 
     def run(self, resume: bool = True) -> list[SampleResult]:
         """Run unfinished rows and rebuild the aggregate results from checkpoints."""
+        self._secret_values = _sensitive_string_values(self.rows)
+        self._secret_values.update(_sensitive_string_values(self.run_config))
         self._write_run_metadata()
+        in_memory_results: dict[str, SampleResult] = {}
         for row in self.rows:
             instance_id = self._instance_id(row)
-            if resume and self._read_checkpoint(instance_id) is not None:
-                continue
+            if resume:
+                checkpoint = self._read_checkpoint(instance_id)
+                if checkpoint is not None:
+                    in_memory_results[instance_id] = checkpoint
+                    continue
             result = self._run_row(row)
-            _atomic_write_json(self._checkpoint_path(instance_id), result.to_dict())
+            _atomic_write_json(
+                self._checkpoint_path(instance_id), self._persistent_snapshot(result.to_dict())
+            )
+            in_memory_results[instance_id] = result
             self._write_results_from_checkpoints()
-        return self._write_results_from_checkpoints()
+        self._write_results_from_checkpoints()
+        return [in_memory_results[self._instance_id(row)] for row in self.rows]
 
     def _run_row(self, row: Mapping[str, Any]) -> SampleResult:
         instance_id = self._instance_id(row)
@@ -133,7 +201,7 @@ class PilotRunner:
     def _write_run_metadata(self) -> None:
         _atomic_write_json(
             self.output_dir / "run_metadata.json",
-            redact_secrets(
+            self._persistent_snapshot(
                 {
                     "run_config": self.run_config,
                     "sample_count": len(self.rows),
@@ -148,9 +216,13 @@ class PilotRunner:
             if (checkpoint := self._read_checkpoint(self._instance_id(row))) is not None
         ]
         _atomic_write_json(
-            self.output_dir / "results.json", [result.to_dict() for result in results]
+            self.output_dir / "results.json",
+            self._persistent_snapshot([result.to_dict() for result in results]),
         )
         return results
+
+    def _persistent_snapshot(self, value: Any) -> Any:
+        return _redact_literal_values(redact_secrets(value), self._secret_values)
 
     def _read_checkpoint(self, instance_id: str) -> SampleResult | None:
         path = self._checkpoint_path(instance_id)
