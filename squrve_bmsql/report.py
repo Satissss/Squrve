@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import re
@@ -15,7 +16,6 @@ from typing import Any
 
 from .models import ResultStatus, SampleResult
 from .runner import (
-    _atomic_write_json,
     _redact_literal_values,
     _sensitive_string_values,
     redact_secrets,
@@ -30,6 +30,7 @@ _SENSITIVE_ASSIGNMENT = re.compile(
     r")\s*([:=])\s*([\"']?)[^\s,;\]\}\"']+\3"
 )
 _BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
+_GOOGLE_OAUTH_ACCESS_TOKEN = re.compile(r"\bya29\.[A-Za-z0-9._-]{20,}\b")
 _RECOGNIZABLE_API_TOKEN = re.compile(
     r"\b(?:"
     r"AIza[0-9A-Za-z_-]{35}|"
@@ -94,7 +95,7 @@ def build_report(
         "failure_stage_counts": dict(sorted(failure_stage_counts.items())),
         "most_common_failure_stage": most_common_failure_stage,
         "latency_summary": _latency_summary(latencies),
-        "limitations": [str(limitation) for limitation in limitations],
+        "limitations": list(limitations),
         "questions": questions,
     }
     return _redact_report_value(report, secret_values)
@@ -191,7 +192,7 @@ def write_report(
     output_path = Path(output_dir)
     json_path = output_path / "report.json"
     markdown_path = output_path / "report.md"
-    _atomic_write_json(json_path, report)
+    _atomic_write_strict_json(json_path, report)
     _atomic_write_text(markdown_path, render_markdown(report))
     return json_path, markdown_path
 
@@ -267,7 +268,7 @@ def _redact_report_value(value: Any, sensitive_values: set[str] | None = None) -
     redacted = redact_secrets(value)
     if sensitive_values:
         redacted = _redact_literal_values(redacted, sensitive_values)
-    return _redact_error_strings(redacted)
+    return _normalize_non_finite_floats(_redact_error_strings(redacted))
 
 
 def _redact_error_strings(value: Any) -> Any:
@@ -279,8 +280,19 @@ def _redact_error_strings(value: Any) -> Any:
         value = _GOOGLE_SERVICE_ACCOUNT.sub(_REDACTED, value)
         value = _PEM_PRIVATE_KEY.sub(_REDACTED, value)
         value = _RECOGNIZABLE_API_TOKEN.sub(_REDACTED, value)
+        value = _GOOGLE_OAUTH_ACCESS_TOKEN.sub(_REDACTED, value)
         value = _SENSITIVE_ASSIGNMENT.sub(lambda match: f"{match.group(1)}{match.group(2)}{_REDACTED}", value)
         return _BEARER_VALUE.sub(f"Bearer {_REDACTED}", value)
+    return value
+
+
+def _normalize_non_finite_floats(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {str(key): _normalize_non_finite_floats(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_normalize_non_finite_floats(item) for item in value]
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
     return value
 
 
@@ -300,9 +312,18 @@ def _fenced_code_block(value: Any, language: str) -> str:
 
 
 def _json_for_markdown(value: Any) -> str:
-    import json
+    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
 
-    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True)
+
+def _atomic_write_strict_json(path: Path, value: Any) -> None:
+    serialized = json.dumps(
+        value,
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    )
+    _atomic_write_text(path, f"{serialized}\n")
 
 
 def _atomic_write_text(path: Path, text: str) -> None:
