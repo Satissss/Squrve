@@ -1,4 +1,5 @@
 from .BaseGenerate import BaseGenerator
+from .BMSQLGenerate import BMSQLGenerator
 from .LinkAlignGenerate import LinkAlignGenerator
 from .CHESSGenerate import CHESSGenerator
 from .DAILSQLGenerate import DAILSQLGenerate
@@ -11,6 +12,7 @@ from .RecursiveGenerate import RecursiveGenerator
 
 __all__ = [
     "BaseGenerator",
+    "BMSQLGenerator",
     "LinkAlignGenerator", 
     "CHESSGenerator",
     "DAILSQLGenerate",
