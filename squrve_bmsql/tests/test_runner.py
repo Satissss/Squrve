@@ -6,7 +6,12 @@ from unittest.mock import patch
 
 from squrve_bmsql.bmsql_backend import MockBMSQLBackend
 from squrve_bmsql.evaluator import Evaluator
-from squrve_bmsql.models import BMSQLGeneration, ResultStatus
+from squrve_bmsql.models import (
+    BMSQLGeneration,
+    Evaluation,
+    QueryExecution,
+    ResultStatus,
+)
 from squrve_bmsql.runner import PilotRunner, _atomic_write_json, redact_secrets
 
 
@@ -42,6 +47,30 @@ class SensitiveBackend:
             error=f"backend rejected configured value {self.secret}",
             error_stage="backend",
             model_metadata={"google_application_credentials": self.secret},
+        )
+
+
+class RaisingMessageBackend:
+    def __init__(self, message):
+        self.message = message
+
+    def generate(self, request):
+        raise RuntimeError(self.message)
+
+
+class ExecutionEvidenceEvaluator:
+    def __init__(self, rows, metadata):
+        self.rows = rows
+        self.metadata = metadata
+
+    def evaluate(self, generation, *, gold_sql, db_id=None):
+        return Evaluation(
+            status=ResultStatus.EXECUTED_RESULT_MATCH,
+            predicted=QueryExecution(
+                success=True,
+                rows=self.rows,
+                metadata=self.metadata,
+            ),
         )
 
 
@@ -266,6 +295,85 @@ class PilotRunnerTests(unittest.TestCase):
             (self.output / "samples" / "Q01.json").read_text(encoding="utf-8")
         )
         self.assertEqual(persisted_checkpoint["metadata"]["token_count"], 3)
+
+    def test_persisted_artifacts_redact_credentials_found_only_in_exception_text(self):
+        credentials = {
+            "sk-error-only-123456789": "api_key=sk-error-only-123456789",
+            "eyJhbGciOi-error-only-token": "Bearer eyJhbGciOi-error-only-token",
+            "AIzaSyErrorOnlyCredential123456789": (
+                "Google API key: AIzaSyErrorOnlyCredential123456789"
+            ),
+            "/tmp/error-only-service-account.json": (
+                "GOOGLE_APPLICATION_CREDENTIALS=/tmp/error-only-service-account.json"
+            ),
+            "dXNlcjplcnJvci1vbmx5LXNlY3JldA==": (
+                "Authorization: Basic dXNlcjplcnJvci1vbmx5LXNlY3JldA=="
+            ),
+        }
+        message = "upstream rejected request; " + "; ".join(credentials.values())
+        runner = PilotRunner(
+            rows=self.rows[:1],
+            schema=self.schema,
+            backend=RaisingMessageBackend(message),
+            evaluator=Evaluator(),
+            output_dir=self.output,
+            run_config={},
+        )
+
+        results = runner.run()
+
+        self.assertEqual(results[0].generation.error, message)
+        for path in (
+            self.output / "samples" / "Q01.json",
+            self.output / "results.json",
+        ):
+            persisted = path.read_text(encoding="utf-8")
+            for secret in credentials:
+                self.assertNotIn(secret, persisted)
+            self.assertIn("[REDACTED]", persisted)
+
+    def test_runner_persists_nested_non_finite_execution_values_as_strict_json(self):
+        runner = PilotRunner(
+            rows=self.rows[:1],
+            schema=self.schema,
+            backend=CountingBackend(),
+            evaluator=ExecutionEvidenceEvaluator(
+                rows=[{"values": [float("nan"), {"infinity": float("inf")}]}],
+                metadata={"negative_infinity": float("-inf")},
+            ),
+            output_dir=self.output,
+        )
+
+        runner.run()
+
+        for path in (
+            self.output / "samples" / "Q01.json",
+            self.output / "results.json",
+        ):
+            json.loads(
+                path.read_text(encoding="utf-8"),
+                parse_constant=lambda constant: self.fail(
+                    f"non-standard JSON constant persisted: {constant}"
+                ),
+            )
+
+    def test_runner_isolates_unsupported_execution_values_as_sample_failure(self):
+        runner = PilotRunner(
+            rows=self.rows[:1],
+            schema=self.schema,
+            backend=CountingBackend(),
+            evaluator=ExecutionEvidenceEvaluator(
+                rows=[{"unsupported": object()}],
+                metadata={"unsupported": object()},
+            ),
+            output_dir=self.output,
+        )
+
+        results = runner.run()
+
+        self.assertEqual(results[0].status, ResultStatus.GENERATION_FAILED)
+        self.assertIn("Unsupported JSON value", results[0].generation.error)
+        json.loads((self.output / "samples" / "Q01.json").read_text(encoding="utf-8"))
 
     def test_system_exit_propagates_for_resume_safety(self):
         class ExitingBackend(CountingBackend):

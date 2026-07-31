@@ -16,39 +16,8 @@ from typing import Any
 
 from .models import ResultStatus, SampleResult
 from .runner import (
-    _redact_literal_values,
     _sensitive_string_values,
-    redact_secrets,
-)
-
-
-_REDACTED = "[REDACTED]"
-_SENSITIVE_ASSIGNMENT = re.compile(
-    r"(?ix)\b("
-    r"api[_-]?key|access[_-]?token|auth(?:orization)?|"
-    r"credential|password|private[_-]?key|secret|service[_-]?account|token"
-    r")\s*([:=])\s*([\"']?)[^\s,;\]\}\"']+\3"
-)
-_BEARER_VALUE = re.compile(r"(?i)\bBearer\s+[^\s,;]+")
-_GOOGLE_OAUTH_ACCESS_TOKEN = re.compile(
-    r"\bya29\.[A-Za-z0-9._-]{20,}(?![A-Za-z0-9._-])"
-)
-_RECOGNIZABLE_API_TOKEN = re.compile(
-    r"\b(?:"
-    r"AIza[0-9A-Za-z_-]{35}(?![0-9A-Za-z_-])|"
-    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|"
-    r"gh[pousr]_[A-Za-z0-9]{30,255}(?![A-Za-z0-9])|"
-    r"github_pat_[A-Za-z0-9_]{20,}(?![A-Za-z0-9_])"
-    r")"
-)
-_PEM_PRIVATE_KEY = re.compile(
-    r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----.*?"
-    r"-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----",
-    re.DOTALL,
-)
-_GOOGLE_SERVICE_ACCOUNT = re.compile(
-    r'\{(?=[^{}]{0,8192}"type"\s*:\s*"service_account")[^{}]*\}',
-    re.DOTALL,
+    sanitize_persistence_secrets,
 )
 
 
@@ -267,25 +236,8 @@ def _sensitive_values_from_results(results: Sequence[SampleResult]) -> set[str]:
 
 
 def _redact_report_value(value: Any, sensitive_values: set[str] | None = None) -> Any:
-    redacted = redact_secrets(value)
-    if sensitive_values:
-        redacted = _redact_literal_values(redacted, sensitive_values)
-    return _normalize_non_finite_floats(_redact_error_strings(redacted))
-
-
-def _redact_error_strings(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {str(key): _redact_error_strings(item) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_redact_error_strings(item) for item in value]
-    if isinstance(value, str):
-        value = _GOOGLE_SERVICE_ACCOUNT.sub(_REDACTED, value)
-        value = _PEM_PRIVATE_KEY.sub(_REDACTED, value)
-        value = _RECOGNIZABLE_API_TOKEN.sub(_REDACTED, value)
-        value = _GOOGLE_OAUTH_ACCESS_TOKEN.sub(_REDACTED, value)
-        value = _SENSITIVE_ASSIGNMENT.sub(lambda match: f"{match.group(1)}{match.group(2)}{_REDACTED}", value)
-        return _BEARER_VALUE.sub(f"Bearer {_REDACTED}", value)
-    return value
+    redacted = sanitize_persistence_secrets(value, sensitive_values)
+    return _normalize_non_finite_floats(redacted)
 
 
 def _normalize_non_finite_floats(value: Any) -> Any:

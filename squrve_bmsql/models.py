@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import base64
+import math
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
+from decimal import Decimal
 from enum import Enum
 from typing import Any, Mapping
 
@@ -15,15 +19,111 @@ class ResultStatus(str, Enum):
     EXECUTED_RESULT_MATCH = "executed_result_match"
 
 
-def _json_value(value: Any) -> Any:
-    """Return a JSON-compatible copy without requiring a custom encoder."""
+_NATIVE_VALUE_TAG = "__squrve_bmsql_json_v2__"
+_NATIVE_KINDS = frozenset({"bytes", "date", "datetime", "decimal", "float", "time"})
+
+
+def _native_envelope(kind: str, payload: str) -> dict[str, list[str]]:
+    return {_NATIVE_VALUE_TAG: [kind, payload]}
+
+
+def _native_parts(value: Any) -> tuple[str, Any] | None:
+    if not isinstance(value, Mapping) or set(value) != {_NATIVE_VALUE_TAG}:
+        return None
+    payload = value[_NATIVE_VALUE_TAG]
+    if not isinstance(payload, list) or len(payload) != 2 or not isinstance(payload[0], str):
+        return None
+    return payload[0], payload[1]
+
+
+def encode_json_value(value: Any) -> Any:
+    """Encode supported values as strict JSON, rejecting unknown native objects."""
     if isinstance(value, Enum):
-        return value.value
+        return encode_json_value(value.value)
     if isinstance(value, Mapping):
-        return {str(key): _json_value(item) for key, item in value.items()}
+        encoded = {str(key): encode_json_value(item) for key, item in value.items()}
+        if _native_parts(encoded) is not None:
+            return {
+                _NATIVE_VALUE_TAG: [
+                    "mapping",
+                    [[key, item] for key, item in encoded.items()],
+                ]
+            }
+        return encoded
     if isinstance(value, (list, tuple)):
-        return [_json_value(item) for item in value]
-    return value
+        return [encode_json_value(item) for item in value]
+    if isinstance(value, Decimal):
+        return _native_envelope("decimal", str(value))
+    if isinstance(value, datetime):
+        return _native_envelope("datetime", value.isoformat())
+    if isinstance(value, date):
+        return _native_envelope("date", value.isoformat())
+    if isinstance(value, time):
+        return _native_envelope("time", value.isoformat())
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return _native_envelope(
+            "bytes", base64.b64encode(bytes(value)).decode("ascii")
+        )
+    if isinstance(value, float) and not math.isfinite(value):
+        if math.isnan(value):
+            payload = "nan"
+        else:
+            payload = "-infinity" if value < 0 else "+infinity"
+        return _native_envelope("float", payload)
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+    raise TypeError(f"Unsupported JSON value type: {type_name}")
+
+
+def decode_json_value(value: Any) -> Any:
+    """Decode values emitted by :func:`encode_json_value`."""
+    tagged = _native_parts(value)
+    if tagged is not None:
+        kind, payload = tagged
+        if kind == "mapping":
+            if not isinstance(payload, list):
+                raise ValueError("Invalid encoded mapping payload")
+            decoded: dict[str, Any] = {}
+            for pair in payload:
+                if not isinstance(pair, list) or len(pair) != 2 or not isinstance(pair[0], str):
+                    raise ValueError("Invalid encoded mapping entry")
+                decoded[pair[0]] = decode_json_value(pair[1])
+            return decoded
+        if kind in _NATIVE_KINDS and not isinstance(payload, str):
+            raise ValueError(f"Invalid encoded {kind} payload")
+        if kind == "decimal":
+            return Decimal(payload)
+        if kind == "datetime":
+            return datetime.fromisoformat(payload)
+        if kind == "date":
+            return date.fromisoformat(payload)
+        if kind == "time":
+            return time.fromisoformat(payload)
+        if kind == "bytes":
+            return base64.b64decode(payload.encode("ascii"), validate=True)
+        if kind == "float":
+            values = {
+                "nan": float("nan"),
+                "+infinity": float("inf"),
+                "-infinity": float("-inf"),
+            }
+            if payload not in values:
+                raise ValueError("Invalid encoded float payload")
+            return values[payload]
+    if isinstance(value, Mapping):
+        return {str(key): decode_json_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [decode_json_value(item) for item in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+    raise TypeError(f"Unsupported JSON value type: {type_name}")
+
+
+def normalize_json_value(value: Any) -> Any:
+    """Validate and normalize a supported native value without losing its type."""
+    return decode_json_value(encode_json_value(value))
 
 
 def _dict(value: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -45,16 +145,17 @@ class BMSQLRequest:
             raise ValueError("question must be non-empty")
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return encode_json_value({
             "instance_id": self.instance_id,
             "question": self.question,
-            "schema": _json_value(self.schema),
+            "schema": self.schema,
             "domain_context": self.domain_context,
-            "metadata": _json_value(self.metadata),
-        }
+            "metadata": self.metadata,
+        })
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "BMSQLRequest":
+        value = decode_json_value(value)
         return cls(
             instance_id=str(value["instance_id"]),
             question=str(value["question"]),
@@ -92,19 +193,20 @@ class BMSQLGeneration:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return encode_json_value({
             "pred_sql": self.pred_sql,
-            "raw_response": _json_value(self.raw_response),
-            "stage_outputs": _json_value(self.stage_outputs),
-            "trajectory": _json_value(self.trajectory),
+            "raw_response": self.raw_response,
+            "stage_outputs": self.stage_outputs,
+            "trajectory": self.trajectory,
             "error": self.error,
             "error_stage": self.error_stage,
             "latency_seconds": self.latency_seconds,
-            "model_metadata": _json_value(self.model_metadata),
-        }
+            "model_metadata": self.model_metadata,
+        })
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "BMSQLGeneration":
+        value = decode_json_value(value)
         return cls(
             pred_sql=value.get("pred_sql"),
             raw_response=value.get("raw_response"),
@@ -125,19 +227,27 @@ class QueryExecution:
     error_type: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if type(self.success) is not bool:
+            raise TypeError("success must be a bool")
+
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return encode_json_value({
             "success": self.success,
-            "rows": _json_value(self.rows),
+            "rows": self.rows,
             "error": self.error,
             "error_type": self.error_type,
-            "metadata": _json_value(self.metadata),
-        }
+            "metadata": self.metadata,
+        })
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "QueryExecution":
+        value = decode_json_value(value)
+        success = value["success"]
+        if type(success) is not bool:
+            raise TypeError("success must be a bool")
         return cls(
-            success=bool(value["success"]),
+            success=success,
             rows=[dict(row) for row in value.get("rows", [])],
             error=value.get("error"),
             error_type=value.get("error_type"),
@@ -158,16 +268,17 @@ class Evaluation:
             self.status = ResultStatus(self.status)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return encode_json_value({
             "status": self.status.value,
             "predicted": None if self.predicted is None else self.predicted.to_dict(),
             "gold": None if self.gold is None else self.gold.to_dict(),
             "error": self.error,
-            "metadata": _json_value(self.metadata),
-        }
+            "metadata": self.metadata,
+        })
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "Evaluation":
+        value = decode_json_value(value)
         predicted = value.get("predicted")
         gold = value.get("gold")
         return cls(
@@ -199,17 +310,18 @@ class SampleResult:
         return self.evaluation.status
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        return encode_json_value({
             "instance_id": self.instance_id,
             "question": self.question,
             "gold_sql": self.gold_sql,
             "generation": self.generation.to_dict(),
             "evaluation": self.evaluation.to_dict(),
-            "metadata": _json_value(self.metadata),
-        }
+            "metadata": self.metadata,
+        })
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "SampleResult":
+        value = decode_json_value(value)
         return cls(
             instance_id=str(value["instance_id"]),
             question=str(value["question"]),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import tempfile
 from collections.abc import Mapping, Sequence
 from enum import Enum
@@ -14,12 +15,61 @@ from core.actor.generator.BMSQLGenerate import BMSQLGenerator
 from core.data_manage import Dataset
 
 from .evaluator import Evaluator
-from .models import BMSQLGeneration, Evaluation, ResultStatus, SampleResult
+from .models import (
+    BMSQLGeneration,
+    Evaluation,
+    ResultStatus,
+    SampleResult,
+    decode_json_value,
+    encode_json_value,
+)
 
 
 _REDACTED = "[REDACTED]"
 _NON_SECRET_TOKEN_KEYS = frozenset(
     {"inputtokens", "outputtokens", "tokencount", "totaltokens"}
+)
+_CREDENTIAL_KEY = (
+    r"(?:authorization|auth|access[\s_-]*token|api[\s_-]*key|"
+    r"client[\s_-]*secret|credential(?:s)?|db[\s_-]*password|password|"
+    r"private[\s_-]*key|secret|service[\s_-]*account|token|"
+    r"google[\s_-]*application[\s_-]*credentials|"
+    r"gcp[\s_-]*(?:credential(?:s)?|key|token))"
+)
+_ASSIGNMENT_KEY = rf"(?:[A-Za-z0-9]+[\s_-]+)*{_CREDENTIAL_KEY}"
+_QUOTED_CREDENTIAL_RE = re.compile(
+    rf"(?P<prefix>\b{_ASSIGNMENT_KEY}\b\s*[:=]\s*)"
+    r"(?P<quote>['\"])(?P<value>.*?)(?P=quote)",
+    re.IGNORECASE,
+)
+_ASSIGNED_CREDENTIAL_RE = re.compile(
+    rf"(?P<prefix>\b{_ASSIGNMENT_KEY}\b\s*[:=]\s*)"
+    r"(?P<value>(?:(?:Bearer|Basic)\s+)?[^\s;,]+)",
+    re.IGNORECASE,
+)
+_BEARER_RE = re.compile(
+    r"\bBearer\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE
+)
+_GOOGLE_API_KEY_RE = re.compile(r"\bAIza[0-9A-Za-z_-]{20,}\b")
+_PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN (?:[A-Z0-9 ]+ )?PRIVATE KEY-----.*?"
+    r"-----END (?:[A-Z0-9 ]+ )?PRIVATE KEY-----",
+    re.DOTALL,
+)
+_GOOGLE_OAUTH_ACCESS_TOKEN_RE = re.compile(
+    r"\bya29\.[A-Za-z0-9._-]{20,}(?![A-Za-z0-9._-])"
+)
+_RECOGNIZABLE_API_TOKEN_RE = re.compile(
+    r"\b(?:"
+    r"AIza[0-9A-Za-z_-]{20,}(?![0-9A-Za-z_-])|"
+    r"sk-(?:proj-)?[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])|"
+    r"gh[pousr]_[A-Za-z0-9]{30,255}(?![A-Za-z0-9])|"
+    r"github_pat_[A-Za-z0-9_]{20,}(?![A-Za-z0-9_])"
+    r")"
+)
+_GOOGLE_SERVICE_ACCOUNT_RE = re.compile(
+    r'\{(?=[^{}]{0,8192}"type"\s*:\s*"service_account")[^{}]*\}',
+    re.DOTALL,
 )
 
 
@@ -36,6 +86,8 @@ def _is_sensitive_key(key: Any) -> bool:
         or "secret" in normalized
         or "privatekey" in normalized
         or "serviceaccount" in normalized
+        or "authorization" in normalized
+        or normalized == "auth"
         or "token" in normalized
     )
 
@@ -57,7 +109,7 @@ def redact_secrets(value: Any) -> Any:
         return value.value
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
-    return str(value)
+    return value
 
 
 def _sensitive_string_values(value: Any) -> set[str]:
@@ -98,13 +150,61 @@ def _redact_literal_values(value: Any, sensitive_values: set[str]) -> Any:
     return value
 
 
+def _redact_credential_patterns(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _redact_credential_patterns(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_credential_patterns(item) for item in value]
+    if not isinstance(value, str):
+        return value
+    value = _GOOGLE_SERVICE_ACCOUNT_RE.sub(_REDACTED, value)
+    value = _PRIVATE_KEY_RE.sub(_REDACTED, value)
+    value = _RECOGNIZABLE_API_TOKEN_RE.sub(_REDACTED, value)
+    value = _GOOGLE_OAUTH_ACCESS_TOKEN_RE.sub(_REDACTED, value)
+    value = _QUOTED_CREDENTIAL_RE.sub(
+        lambda match: (
+            f"{match.group('prefix')}{match.group('quote')}"
+            f"{_REDACTED}{match.group('quote')}"
+        ),
+        value,
+    )
+    value = _ASSIGNED_CREDENTIAL_RE.sub(
+        lambda match: f"{match.group('prefix')}{_REDACTED}",
+        value,
+    )
+    value = _BEARER_RE.sub(f"Bearer {_REDACTED}", value)
+    return _GOOGLE_API_KEY_RE.sub(_REDACTED, value)
+
+
+def sanitize_persistence_secrets(
+    value: Any, sensitive_values: set[str] | None = None
+) -> Any:
+    """Redact keyed, repeated-literal, and recognizable credentials recursively."""
+    discovered_values = _sensitive_string_values(value)
+    if sensitive_values:
+        discovered_values.update(sensitive_values)
+    redacted = redact_secrets(value)
+    redacted = _redact_literal_values(redacted, discovered_values)
+    return _redact_credential_patterns(redacted)
+
+
 def _atomic_write_json(path: Path, value: Any) -> None:
     """Durably replace *path* with a complete JSON document."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            json.dump(value, stream, ensure_ascii=False, indent=2, sort_keys=True)
+            json.dump(
+                value,
+                stream,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+                allow_nan=False,
+            )
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temp_name, path)
@@ -153,7 +253,8 @@ class PilotRunner:
                     continue
             result = self._run_row(row)
             _atomic_write_json(
-                self._checkpoint_path(instance_id), self._persistent_snapshot(result.to_dict())
+                self._checkpoint_path(instance_id),
+                self._persistent_snapshot(result.to_dict(), encoded=True),
             )
             in_memory_results[instance_id] = result
             self._write_results_from_checkpoints()
@@ -182,6 +283,16 @@ class PilotRunner:
                 gold_sql=gold_sql,
                 db_id=row.get("db_id"),
             )
+            result = SampleResult(
+                instance_id=instance_id,
+                question=question if isinstance(question, str) else str(question),
+                gold_sql=gold_sql if isinstance(gold_sql, str) else str(gold_sql),
+                generation=generation,
+                evaluation=evaluation,
+                metadata=dict(row.get("metadata") or {}),
+            )
+            result.to_dict()
+            return result
         except Exception as exc:
             generation = BMSQLGeneration.failure(str(exc), error_stage="runner")
             evaluation = Evaluation(
@@ -217,12 +328,17 @@ class PilotRunner:
         ]
         _atomic_write_json(
             self.output_dir / "results.json",
-            self._persistent_snapshot([result.to_dict() for result in results]),
+            self._persistent_snapshot(
+                [result.to_dict() for result in results], encoded=True
+            ),
         )
         return results
 
-    def _persistent_snapshot(self, value: Any) -> Any:
-        return _redact_literal_values(redact_secrets(value), self._secret_values)
+    def _persistent_snapshot(self, value: Any, *, encoded: bool = False) -> Any:
+        if encoded:
+            value = decode_json_value(value)
+        redacted = sanitize_persistence_secrets(value, self._secret_values)
+        return encode_json_value(redacted)
 
     def _read_checkpoint(self, instance_id: str) -> SampleResult | None:
         path = self._checkpoint_path(instance_id)

@@ -185,6 +185,53 @@ class BMSQLGeneratorTests(unittest.TestCase):
         self.assertEqual(saved_path.read_text(encoding="utf-8"), raw_sql)
         self.assertEqual(saved_path.name, "BMSQLGenerator_Q1.sql")
 
+    def test_save_encodes_unsafe_instance_ids_and_stays_inside_save_dir(self):
+        for index, instance_id in enumerate(
+            ("x/../../../escape", "../nested/name", "back\\slash", "control\nid", "..")
+        ):
+            with self.subTest(instance_id=instance_id):
+                save_dir = Path(self.temp_dir.name) / f"instance-{index}"
+                dataset = self.make_dataset(instance_id=instance_id)
+                generator = BMSQLGenerator(
+                    dataset=dataset,
+                    backend=MockBMSQLBackend(sql_by_id={instance_id: "SELECT 1"}),
+                    is_save=True,
+                    save_dir=save_dir,
+                )
+
+                generator.act(0, schema=[{"table_name": "genes"}])
+
+                saved_path = Path(dataset[0]["pred_sql_path"]).resolve()
+                self.assertTrue(saved_path.is_relative_to(save_dir.resolve()))
+                self.assertEqual(dataset[0]["instance_id"], instance_id)
+                self.assertEqual(saved_path.read_text(encoding="utf-8"), "SELECT 1")
+
+    def test_save_encodes_unsafe_dataset_indexes_and_stays_inside_save_dir(self):
+        for index, dataset_index in enumerate(
+            ("../../escape", "nested/name", "back\\slash", "control\nid", "..")
+        ):
+            with self.subTest(dataset_index=dataset_index):
+                save_dir = Path(self.temp_dir.name) / f"dataset-{index}"
+                dataset = Dataset(
+                    data_source=[self.make_dataset()[0]],
+                    schema_source=str(self.schema_path),
+                    is_schema_final=True,
+                    dataset_index=dataset_index,
+                )
+                generator = BMSQLGenerator(
+                    dataset=dataset,
+                    backend=MockBMSQLBackend(),
+                    is_save=True,
+                    save_dir=save_dir,
+                )
+
+                generator.act(0, schema=[{"table_name": "genes"}])
+
+                saved_path = Path(dataset[0]["pred_sql_path"]).resolve()
+                self.assertTrue(saved_path.is_relative_to(save_dir.resolve()))
+                self.assertEqual(dataset.dataset_index, dataset_index)
+                self.assertEqual(saved_path.read_text(encoding="utf-8"), "SELECT 1 AS mock_value")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -8,7 +8,7 @@ import math
 import re
 from collections.abc import Mapping
 from datetime import date, datetime, time
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import Any, Callable
 
 from .models import (
@@ -16,6 +16,7 @@ from .models import (
     Evaluation,
     QueryExecution,
     ResultStatus,
+    normalize_json_value,
 )
 
 
@@ -38,7 +39,6 @@ _MUTATION_KEYWORDS = frozenset(
         "UPDATE",
     }
 )
-_NATIVE_VALUE_TAG = "__squrve_bmsql_native_v1__"
 _WORD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
@@ -159,38 +159,7 @@ def _canonical_number(value: int | float | Decimal) -> str:
     return str(decimal_value.normalize())
 
 
-def _tagged_native_parts(value: Any) -> tuple[str, str] | None:
-    if not isinstance(value, Mapping) or set(value) != {_NATIVE_VALUE_TAG}:
-        return None
-    payload = value[_NATIVE_VALUE_TAG]
-    if (
-        not isinstance(payload, list)
-        or len(payload) != 2
-        or not isinstance(payload[0], str)
-        or not isinstance(payload[1], str)
-    ):
-        return None
-    return payload[0], payload[1]
-
-
 def _canonical_value(value: Any) -> list[Any]:
-    tagged = _tagged_native_parts(value)
-    if tagged is not None:
-        kind, payload = tagged
-        if kind == "decimal":
-            try:
-                return ["number", _canonical_number(Decimal(payload))]
-            except (InvalidOperation, ValueError):
-                pass
-        elif kind == "float" and payload in {
-            "nan",
-            "+infinity",
-            "-infinity",
-        }:
-            return ["number", payload]
-        elif kind in {"bytes", "date", "datetime", "time"}:
-            return [kind, payload]
-
     if isinstance(value, Mapping):
         items = [
             [str(key), _canonical_value(item)]
@@ -223,11 +192,8 @@ def _canonical_value(value: Any) -> list[Any]:
     if isinstance(value, (bytes, bytearray, memoryview)):
         encoded = base64.b64encode(bytes(value)).decode("ascii")
         return ["bytes", encoded]
-    return [
-        "unknown",
-        f"{type(value).__module__}.{type(value).__qualname__}",
-        str(value),
-    ]
+    type_name = f"{type(value).__module__}.{type(value).__qualname__}"
+    raise TypeError(f"Unsupported JSON value type: {type_name}")
 
 
 def canonical_rows(rows: list[dict[str, Any]]) -> tuple[str, ...]:
@@ -245,36 +211,7 @@ def canonical_rows(rows: list[dict[str, Any]]) -> tuple[str, ...]:
 
 
 def _json_safe_value(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            str(key): _json_safe_value(item)
-            for key, item in value.items()
-        }
-    if isinstance(value, (list, tuple)):
-        return [_json_safe_value(item) for item in value]
-    if isinstance(value, (set, frozenset)):
-        converted = [_json_safe_value(item) for item in value]
-        return sorted(converted, key=lambda item: json.dumps(item, sort_keys=True))
-    if isinstance(value, Decimal):
-        return {_NATIVE_VALUE_TAG: ["decimal", str(value)]}
-    if isinstance(value, datetime):
-        return {_NATIVE_VALUE_TAG: ["datetime", value.isoformat()]}
-    if isinstance(value, date):
-        return {_NATIVE_VALUE_TAG: ["date", value.isoformat()]}
-    if isinstance(value, time):
-        return {_NATIVE_VALUE_TAG: ["time", value.isoformat()]}
-    if isinstance(value, (bytes, bytearray, memoryview)):
-        encoded = base64.b64encode(bytes(value)).decode("ascii")
-        return {_NATIVE_VALUE_TAG: ["bytes", encoded]}
-    if isinstance(value, float):
-        if math.isnan(value):
-            return {_NATIVE_VALUE_TAG: ["float", "nan"]}
-        if math.isinf(value):
-            payload = "-infinity" if value < 0 else "+infinity"
-            return {_NATIVE_VALUE_TAG: ["float", payload]}
-    if value is None or isinstance(value, (bool, int, float, str)):
-        return value
-    return str(value)
+    return normalize_json_value(value)
 
 
 def _json_safe_row(row: Any) -> dict[str, Any]:

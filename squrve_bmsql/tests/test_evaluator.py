@@ -1,4 +1,5 @@
 import json
+import math
 import unittest
 from datetime import date, datetime, time
 from decimal import Decimal
@@ -465,7 +466,7 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
                 self.assertFalse(execution.success)
                 self.assertEqual(execution.error_type, "execution_error")
 
-    def test_bigquery_native_values_are_converted_to_json_safe_rows(self):
+    def test_bigquery_native_values_are_normalized_and_serialize_as_strict_json(self):
         row = FakeBigQueryRow(
             {
                 "decimal": Decimal("1.20"),
@@ -486,48 +487,23 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
         ).execute("SELECT native_values")
 
         self.assertTrue(execution.success)
+        normalized = execution.rows[0]
+        self.assertEqual(normalized["decimal"], Decimal("1.20"))
+        self.assertEqual(normalized["date"], date(2026, 7, 30))
+        self.assertEqual(normalized["datetime"], datetime(2026, 7, 30, 12, 34, 56))
+        self.assertEqual(normalized["time"], time(12, 34, 56))
+        self.assertEqual(normalized["bytes"], b"\x00\xff")
         self.assertEqual(
-            execution.rows,
-            [
-                {
-                    "decimal": {
-                        "__squrve_bmsql_native_v1__": ["decimal", "1.20"]
-                    },
-                    "date": {
-                        "__squrve_bmsql_native_v1__": ["date", "2026-07-30"]
-                    },
-                    "datetime": {
-                        "__squrve_bmsql_native_v1__": [
-                            "datetime",
-                            "2026-07-30T12:34:56",
-                        ]
-                    },
-                    "time": {
-                        "__squrve_bmsql_native_v1__": ["time", "12:34:56"]
-                    },
-                    "bytes": {
-                        "__squrve_bmsql_native_v1__": ["bytes", "AP8="]
-                    },
-                    "nested": [
-                        {
-                            "__squrve_bmsql_native_v1__": ["decimal", "2"]
-                        },
-                        {
-                            "when": {
-                                "__squrve_bmsql_native_v1__": [
-                                    "date",
-                                    "2026-07-31",
-                                ]
-                            }
-                        },
-                    ],
-                    "nan": {
-                        "__squrve_bmsql_native_v1__": ["float", "nan"]
-                    },
-                }
-            ],
+            normalized["nested"],
+            [Decimal("2"), {"when": date(2026, 7, 31)}],
         )
-        json.dumps(execution.to_dict(), allow_nan=False)
+        self.assertTrue(math.isnan(normalized["nan"]))
+        encoded = execution.to_dict()
+        self.assertEqual(
+            encoded["rows"][0]["decimal"],
+            {"__squrve_bmsql_json_v2__": ["decimal", "1.20"]},
+        )
+        json.dumps(encoded, allow_nan=False)
 
     def test_tagged_decimal_from_bigquery_matches_integer_execution_result(self):
         client = SequenceClient(
@@ -560,6 +536,32 @@ class BigQueryReadOnlyExecutorTests(unittest.TestCase):
 
         self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MATCH)
         json.dumps(evaluation.to_dict(), allow_nan=False)
+
+    def test_user_mapping_matching_legacy_native_tag_is_not_decoded(self):
+        evaluator = Evaluator(
+            SequenceExecutor(
+                [
+                    QueryExecution(
+                        success=True,
+                        rows=[
+                            {
+                                "value": {
+                                    "__squrve_bmsql_native_v1__": ["decimal", "1"]
+                                }
+                            }
+                        ],
+                    ),
+                    QueryExecution(success=True, rows=[{"value": Decimal("1")}]),
+                ]
+            )
+        )
+
+        evaluation = evaluator.evaluate(GENERATED, gold_sql="SELECT gold")
+
+        self.assertEqual(
+            evaluation.status,
+            ResultStatus.EXECUTED_RESULT_MISMATCH,
+        )
 
     def test_tagged_bytes_and_date_do_not_alias_same_text_strings(self):
         client = SequenceClient(

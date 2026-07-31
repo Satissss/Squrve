@@ -1,5 +1,8 @@
 import json
+import math
 import unittest
+from datetime import date
+from decimal import Decimal
 
 from squrve_bmsql.data_adapter import (
     adapt_biomedsql_row,
@@ -109,6 +112,64 @@ class DataAdapterTests(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 encoded = json.dumps(value.to_dict())
                 self.assertEqual(cls.from_dict(json.loads(encoded)), value)
+
+    def test_query_execution_from_dict_rejects_non_boolean_success(self):
+        for value in ("false", 0, 1):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(TypeError, "success must be a bool"):
+                    QueryExecution.from_dict({"success": value})
+
+    def test_models_encode_native_and_non_finite_values_as_strict_json(self):
+        execution = QueryExecution(
+            success=True,
+            rows=[
+                {
+                    "decimal": Decimal("1.20"),
+                    "date": date(2026, 7, 31),
+                    "nan": float("nan"),
+                }
+            ],
+            metadata={"infinity": float("inf")},
+        )
+
+        encoded = execution.to_dict()
+        json.dumps(encoded, allow_nan=False)
+        decoded = QueryExecution.from_dict(json.loads(json.dumps(encoded)))
+
+        self.assertEqual(decoded.rows[0]["decimal"], Decimal("1.20"))
+        self.assertEqual(decoded.rows[0]["date"], date(2026, 7, 31))
+        self.assertTrue(math.isnan(decoded.rows[0]["nan"]))
+        self.assertEqual(decoded.metadata["infinity"], float("inf"))
+
+    def test_models_reject_unsupported_native_objects(self):
+        for execution in (
+            QueryExecution(success=True, rows=[{"unsupported": object()}]),
+            QueryExecution(success=True, metadata={"unsupported": object()}),
+        ):
+            with self.subTest(execution=execution):
+                with self.assertRaisesRegex(TypeError, "Unsupported JSON value"):
+                    execution.to_dict()
+
+    def test_sample_result_round_trips_native_values_in_nested_execution(self):
+        result = SampleResult(
+            instance_id="Q-native",
+            question="Native result?",
+            gold_sql="SELECT value",
+            generation=BMSQLGeneration(pred_sql="SELECT value"),
+            evaluation=Evaluation(
+                status=ResultStatus.EXECUTED_RESULT_MATCH,
+                predicted=QueryExecution(
+                    success=True,
+                    rows=[{"value": Decimal("1.0")}],
+                ),
+            ),
+        )
+
+        restored = SampleResult.from_dict(
+            json.loads(json.dumps(result.to_dict(), allow_nan=False))
+        )
+
+        self.assertEqual(restored, result)
 
 
 if __name__ == "__main__":
