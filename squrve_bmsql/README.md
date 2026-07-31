@@ -25,14 +25,16 @@ python3 -m squrve_bmsql.scripts.run_pilot \
 The preparation command writes a manifest with the selected IDs, seed,
 normalized rows, and normalized schema. The run command defaults to
 `--backend mock` and prints only result counts and artifact paths. It writes
-`results.json`, `run_metadata.json`, per-sample checkpoints, `report.json`,
-and `report.md`; generated artifacts are intentionally ignored by Git.
+`schema.json`, `results.json`, `run_metadata.json`, per-sample checkpoints,
+`report.json`, and `report.md`; generated artifacts are intentionally ignored
+by Git.
 
 Use `--config /path/to/pilot_20.yaml` to supply another safe pilot
-configuration. It may set `sample_size` (which must remain 20), `seed`,
-`db_id`, `db_type`, and an optional `project_id`/`dataset_name` placeholder
-pair (both values must be supplied together). Do not put API keys, model
-tokens, or credential material in it.
+configuration. It may set `sample_size` (which must remain 20), `db_id`,
+`db_type`, and an optional `project_id`/`dataset_name` placeholder pair (both
+values must be supplied together). The seed is fixed at `20260730` and cannot
+be changed. Do not put API keys, model tokens, or credential material in the
+configuration.
 
 ## Later real-service execution
 

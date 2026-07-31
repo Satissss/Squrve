@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -13,9 +14,14 @@ import yaml
 
 from squrve_bmsql.data_adapter import adapt_biomedsql_row, select_pilot_rows
 from squrve_bmsql.schema_adapter import to_squrve_parallel_schema
+from squrve_bmsql.scripts.run_pilot import FIXED_SEED, validate_manifest
 
 
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "config" / "pilot_20.yaml"
+_CONFIG_FIELDS = frozenset(
+    {"sample_size", "seed", "db_id", "db_type", "project_id", "dataset_name"}
+)
+_SAFE_CONFIG_VALUE = re.compile(r"[A-Za-z0-9_-]+\Z")
 
 
 def _read_json(path: Path) -> Any:
@@ -46,7 +52,7 @@ def _load_config(path: Path) -> dict[str, Any]:
 def _optional_text(value: Any, name: str) -> str | None:
     if value is None:
         return None
-    if not isinstance(value, str):
+    if not isinstance(value, str) or _SAFE_CONFIG_VALUE.fullmatch(value) is None:
         raise ValueError(f"{name} must be a string")
     return value
 
@@ -56,12 +62,14 @@ def build_manifest(
 ) -> dict[str, Any]:
     """Build a manifest whose settings are whitelisted from the pilot config."""
     config = _load_config(config_path)
+    if set(config) - _CONFIG_FIELDS:
+        raise ValueError("pilot configuration contains unsupported fields")
     sample_size = config.get("sample_size", 20)
-    seed = config.get("seed", 20260730)
+    seed = config.get("seed", FIXED_SEED)
     if sample_size != 20 or isinstance(sample_size, bool) or not isinstance(sample_size, int):
         raise ValueError("pilot sample_size must be exactly 20")
-    if isinstance(seed, bool) or not isinstance(seed, int):
-        raise ValueError("pilot seed must be an integer")
+    if seed != FIXED_SEED:
+        raise ValueError("pilot seed must use the fixed reproducible value")
 
     db_id = config.get("db_id", "biomedsql")
     db_type = config.get("db_type", "big_query")
@@ -90,9 +98,9 @@ def build_manifest(
         project_id=project_id,
         dataset_name=dataset_name,
     )
-    return {
+    return validate_manifest({
         "version": 1,
-        "seed": seed,
+        "seed": FIXED_SEED,
         "selected_ids": [row["instance_id"] for row in normalized_rows],
         "rows": normalized_rows,
         "schema": schema,
@@ -103,7 +111,7 @@ def build_manifest(
                 "Mock SQL validates Squrve wiring only; it does not evaluate model or query quality."
             ],
         },
-    }
+    })
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
