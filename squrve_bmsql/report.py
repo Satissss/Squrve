@@ -14,7 +14,7 @@ from numbers import Real
 from pathlib import Path
 from typing import Any
 
-from .models import ResultStatus, SampleResult
+from .models import ResultStatus, SampleResult, encode_json_value
 from .runner import (
     _sensitive_string_values,
     sanitize_persistence_secrets,
@@ -266,12 +266,18 @@ def _fenced_code_block(value: Any, language: str) -> str:
 
 
 def _json_for_markdown(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True, allow_nan=False)
+    return json.dumps(
+        encode_json_value(value),
+        ensure_ascii=False,
+        indent=2,
+        sort_keys=True,
+        allow_nan=False,
+    )
 
 
 def _atomic_write_strict_json(path: Path, value: Any) -> None:
     serialized = json.dumps(
-        value,
+        encode_json_value(value),
         ensure_ascii=False,
         indent=2,
         sort_keys=True,

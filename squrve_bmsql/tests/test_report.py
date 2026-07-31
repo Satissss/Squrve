@@ -1,9 +1,17 @@
 import json
 import tempfile
 import unittest
+from datetime import date, datetime, time
+from decimal import Decimal
 from pathlib import Path
 
-from squrve_bmsql.models import BMSQLGeneration, Evaluation, ResultStatus, SampleResult
+from squrve_bmsql.models import (
+    BMSQLGeneration,
+    Evaluation,
+    ResultStatus,
+    SampleResult,
+    decode_json_value,
+)
 from squrve_bmsql.report import build_report, render_markdown, write_report
 
 
@@ -225,6 +233,75 @@ class ReportTests(unittest.TestCase):
         self.assertIsNone(question["backend_metadata"]["evaluation"]["nested"]["not_a_number"])
         self.assertEqual(question["sample_metadata"]["nested"], [None, {"negative": None}])
         self.assertEqual(persisted["limitations"], [None])
+
+    def test_write_report_encodes_native_metadata_once_for_json_and_markdown(self):
+        results = make_twenty_results()
+        legacy_shaped_mapping = {
+            "__squrve_bmsql_json_v2__": ["decimal", "ordinary-user-value"]
+        }
+        results[0].generation.model_metadata["native"] = {
+            "decimal": Decimal("1.20"),
+            "date": date(2026, 7, 31),
+            "datetime": datetime(2026, 7, 31, 12, 34, 56),
+            "time": time(12, 34, 56),
+            "bytes": b"\x00\xff",
+            "nested": [Decimal("2"), {"when": date(2026, 8, 1)}],
+            "user_mapping": legacy_shaped_mapping,
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            json_path, markdown_path = write_report(results, temp_dir)
+            persisted = json.loads(
+                json_path.read_text(encoding="utf-8"),
+                parse_constant=lambda value: self.fail(f"non-strict JSON constant: {value}"),
+            )
+            markdown = markdown_path.read_text(encoding="utf-8")
+
+        encoded_native = persisted["questions"][0]["model_metadata"]["native"]
+        self.assertEqual(
+            encoded_native["decimal"],
+            {"__squrve_bmsql_json_v2__": ["decimal", "1.20"]},
+        )
+        self.assertEqual(
+            decode_json_value(encoded_native),
+            {
+                "decimal": Decimal("1.20"),
+                "date": date(2026, 7, 31),
+                "datetime": datetime(2026, 7, 31, 12, 34, 56),
+                "time": time(12, 34, 56),
+                "bytes": b"\x00\xff",
+                "nested": [Decimal("2"), {"when": date(2026, 8, 1)}],
+                "user_mapping": legacy_shaped_mapping,
+            },
+        )
+        self.assertEqual(
+            encoded_native["user_mapping"],
+            {
+                "__squrve_bmsql_json_v2__": [
+                    "mapping",
+                    [
+                        [
+                            "__squrve_bmsql_json_v2__",
+                            ["decimal", "ordinary-user-value"],
+                        ]
+                    ],
+                ]
+            },
+        )
+        self.assertIn("__squrve_bmsql_json_v2__", markdown)
+        self.assertIn("ordinary-user-value", markdown)
+
+    def test_write_report_rejects_unsupported_metadata_without_partial_artifacts(self):
+        results = make_twenty_results()
+        results[0].metadata["unsupported"] = object()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            with self.assertRaisesRegex(TypeError, "Unsupported JSON value"):
+                write_report(results, output_dir)
+
+            self.assertFalse((output_dir / "report.json").exists())
+            self.assertFalse((output_dir / "report.md").exists())
 
 
 if __name__ == "__main__":
