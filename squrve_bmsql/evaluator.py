@@ -279,7 +279,35 @@ class Evaluator:
             if canonical_rows(predicted.rows) == canonical_rows(gold.rows)
             else ResultStatus.EXECUTED_RESULT_MISMATCH
         )
-        return Evaluation(status=status, predicted=predicted, gold=gold)
+        return Evaluation(
+            status=status,
+            predicted=predicted,
+            gold=gold,
+            metadata={
+                "projected_result_match": projected_result_match(predicted, gold),
+            },
+        )
+
+
+def projected_result_match(
+    predicted: QueryExecution, gold: QueryExecution
+) -> bool:
+    """Compare gold columns while allowing harmless extra predicted columns.
+
+    This secondary metric is useful for BMSQL because its prompts often ask for
+    all relevant columns while benchmark gold SQL projects only the answer
+    columns. The strict execution status remains unchanged.
+    """
+    if not predicted.success or not gold.success:
+        return False
+    if not gold.rows:
+        return not predicted.rows
+    gold_columns = set(gold.rows[0])
+    projected = [
+        {column: row.get(column) for column in gold_columns}
+        for row in predicted.rows
+    ]
+    return canonical_rows(projected) == canonical_rows(gold.rows)
 
 
 def _normalized_signal(value: Any) -> str:

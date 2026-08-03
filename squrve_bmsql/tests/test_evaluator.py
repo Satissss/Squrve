@@ -8,6 +8,7 @@ from squrve_bmsql.evaluator import (
     BigQueryReadOnlyExecutor,
     Evaluator,
     is_read_only_sql,
+    projected_result_match,
 )
 from squrve_bmsql.models import BMSQLGeneration, QueryExecution, ResultStatus
 
@@ -230,6 +231,14 @@ class EvaluatorTests(unittest.TestCase):
         )
 
         self.assertEqual(evaluation.status, ResultStatus.EXECUTED_RESULT_MISMATCH)
+
+    def test_projected_match_allows_extra_predicted_columns(self):
+        predicted = QueryExecution(
+            success=True, rows=[{"id": "q1", "answer": 7, "extra": "context"}]
+        )
+        gold = QueryExecution(success=True, rows=[{"id": "q1", "answer": 7}])
+
+        self.assertTrue(projected_result_match(predicted, gold))
 
 
 class ReadOnlySQLTests(unittest.TestCase):
