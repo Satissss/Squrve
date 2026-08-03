@@ -26,9 +26,12 @@ __all__ = [
     "substitute_sql_placeholders",
 ]
 from .upstream_adapter import build_official_backend, load_official_classes, upstream_revision
+from .local_duckdb import DuckDBBMSQLHandler, DuckDBReadOnlyExecutor
 
 __all__ = [
     "build_official_backend",
     "load_official_classes",
     "upstream_revision",
+    "DuckDBBMSQLHandler",
+    "DuckDBReadOnlyExecutor",
 ]

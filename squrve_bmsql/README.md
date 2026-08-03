@@ -76,6 +76,16 @@ charges.  DeepSeek is an execution smoke test of the official BMSQL pipeline,
 not the paper's GPT-o3-mini result; matching the reported 62.6% requires the
 paper's Azure model, database snapshot, and evaluation settings.
 
+## No-Google-Cloud alternative
+
+If a Google Cloud account is unavailable, install DuckDB and place the official
+Parquet files in a local directory. `DuckDBReadOnlyExecutor` exposes the same
+read-only evaluator surface and rewrites ``project.dataset.table`` references
+to local Parquet views. `DuckDBBMSQLHandler` can be injected into the official
+`SQLHandler`. This avoids cloud storage and query fees, but should be reported
+as a local DuckDB reproduction because BigQuery dialect and execution semantics
+are not identical.
+
 ## Later real-service execution
 
 The pilot CLI deliberately refuses every backend other than `mock`, so tests
