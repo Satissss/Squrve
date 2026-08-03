@@ -25,3 +25,10 @@ __all__ = [
     "select_pilot_rows",
     "substitute_sql_placeholders",
 ]
+from .upstream_adapter import build_official_backend, load_official_classes, upstream_revision
+
+__all__ = [
+    "build_official_backend",
+    "load_official_classes",
+    "upstream_revision",
+]

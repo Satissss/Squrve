@@ -1,4 +1,4 @@
-# BMSQL offline pilot
+# BMSQL pilot and official upstream adapter
 
 This package adapts BiomedSQL inputs to Squrve and provides a deterministic,
 offline-safe 20-sample pilot. The default backend is an explicit mock backend:
@@ -36,12 +36,51 @@ values must be supplied together). The seed is fixed at `20260730` and cannot
 be changed. Do not put API keys, model tokens, or credential material in the
 configuration.
 
+## Official implementation hookup
+
+The official NIH-CARD checkout is the source of the BMSQL algorithm.  Squrve
+does not copy or rewrite its prompts: `squrve_bmsql.upstream_adapter` imports
+`handlers.sql.sql_agent.SQLAgent` and constructs the official
+`SQLHandler`/`SQLAgent` pair, then passes it through `UpstreamBMSQLBackend`.
+The checkout is intentionally external because the upstream project is under a
+PolyForm Noncommercial license and has a separate dependency environment.
+
+After cloning the official repository and installing its dependencies, verify
+the source entrypoint without making any paid calls:
+
+```bash
+python3 -m squrve_bmsql.scripts.check_official \
+  --upstream-root /path/to/biomedsql
+```
+
+The check reports the upstream revision and the exact imported classes.  A
+real run must also provide the official benchmark/database, a model provider,
+and read-only BigQuery credentials; it is not silently enabled by the offline
+pilot.
+
+With an approved DeepSeek-compatible endpoint and a read-only BigQuery account,
+the explicit external launcher is:
+
+```bash
+DEEPSEEK_API_KEY=... PROJECT_ID=... DATASET_NAME=... \
+SERVICE_ACCOUNT_PATH=/secure/read-only.json \
+python3 -m squrve_bmsql.scripts.run_official_pilot \
+  --manifest /path/to/manifest.json \
+  --output-dir squrve_bmsql/artifacts/official_run \
+  --upstream-root /path/to/biomedsql \
+  --confirm-external
+```
+
+This command is intentionally guarded because it incurs model and BigQuery
+charges.  DeepSeek is an execution smoke test of the official BMSQL pipeline,
+not the paper's GPT-o3-mini result; matching the reported 62.6% requires the
+paper's Azure model, database snapshot, and evaluation settings.
+
 ## Later real-service execution
 
-This CLI deliberately refuses every backend other than `mock`, so tests and
-ordinary local runs cannot contact a paid model or BigQuery. Before wiring a
-separate real-service launcher, obtain all of the following outside this
-repository:
+The pilot CLI deliberately refuses every backend other than `mock`, so tests
+and ordinary local runs cannot contact a paid model or BigQuery. Before a real
+launcher is enabled, obtain all of the following outside this repository:
 
 - an approved checkout of the upstream BiomedSQL/BMSQL implementation;
 - a configured model provider account and its credential mechanism;
