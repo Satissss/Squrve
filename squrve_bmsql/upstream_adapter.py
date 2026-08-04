@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -65,6 +66,7 @@ def build_official_backend(
     project_id: str | None = None,
     dataset_name: str | None = None,
     model_metadata: Mapping[str, Any] | None = None,
+    tolerant_sql_extraction: bool = False,
 ) -> UpstreamBMSQLBackend:
     """Construct a Squrve backend around the untouched official BMSQL agent."""
     if project_id:
@@ -72,6 +74,18 @@ def build_official_backend(
     if dataset_name:
         os.environ["DATASET_NAME"] = dataset_name
     SQLAgent, SQLHandler = load_official_classes(upstream_root)
+    if tolerant_sql_extraction:
+        class TolerantSQLHandler(SQLHandler):
+            def extract_sql_code(self, text: Any) -> str:
+                parsed = super().extract_sql_code(text)
+                if parsed:
+                    return parsed
+                if not isinstance(text, str):
+                    return ""
+                match = re.search(r"(?is)\b(select|with)\b.*", text.strip())
+                return match.group(0).strip().rstrip("`") if match else ""
+
+        SQLHandler = TolerantSQLHandler
     handler = SQLHandler(
         table_info=table_info,
         table_info_concise=table_info_concise,
