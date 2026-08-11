@@ -60,3 +60,7 @@ examples
 squrl
 
 test_app
+
+# Reproducible BMSQL pilot outputs (keep the artifact directory itself).
+squrve_bmsql/artifacts/*
+!squrve_bmsql/artifacts/.gitkeep

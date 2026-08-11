@@ -1,0 +1,5 @@
+# Deterministic, offline-safe defaults for the reproducible BMSQL pilot.
+sample_size: 20
+seed: 20260730
+db_id: biomedsql
+db_type: big_query

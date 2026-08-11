@@ -4,6 +4,7 @@ from typing import Union, List, Optional
 from llama_index.core.llms.llm import LLM
 
 from core.task.meta.MetaTask import MetaTask
+from core.actor.generator.BMSQLGenerate import BMSQLGenerator
 from core.actor.generator.LinkAlignGenerate import LinkAlignGenerator
 from core.actor.generator.DINSQLGenerate import DINSQLGenerator
 from core.actor.generator.DAILSQLGenerate import DAILSQLGenerate
@@ -66,6 +67,10 @@ class GenerateTask(MetaTask):
 
         if actor_type in ("LinkAlignGenerator", "LinkAlign"):
             actor = LinkAlignGenerator(**generate_args)
+            return actor
+
+        elif actor_type in ("BMSQLGenerator", "BMSQL"):
+            actor = BMSQLGenerator(**generate_args)
             return actor
         
         elif actor_type in ("DINSQLGenerator", "DINSQL"):
