@@ -13,7 +13,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--upstream-root", required=True, type=Path)
-    parser.add_argument("--model", default=os.getenv("BMSQL_MODEL", "deepseek-chat"))
+    parser.add_argument("--model", default=os.getenv("BMSQL_MODEL", "deepseek-v4-flash"))
     parser.add_argument("--confirm-external", action="store_true")
     args = parser.parse_args(argv)
     if not args.confirm_external:
